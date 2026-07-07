@@ -1,0 +1,24 @@
+{
+  "name": "@nilovon-wiki/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@nilovon-wiki/db": "workspace:*",
+    "@nilovon-wiki/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@nilovon-wiki/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,3 @@
+{
+  "extends": "@nilovon-wiki/config/tsconfig.base.json"
+}
