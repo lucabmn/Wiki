@@ -916,46 +916,48 @@ function RouteComponent() {
         <main className="relative flex-1 overflow-y-auto">
           {/* ===== DASHBOARD ===== */}
           {view === "dashboard" && (
-            <div className="mx-auto max-w-[1160px] px-10 pt-12 pb-24">
-              {/* masthead */}
-              <div className="flex items-end justify-between gap-6 border-b-2 border-foreground pb-5">
+            <div className="mx-auto max-w-[1160px] px-10 pt-10 pb-24">
+              {/* header */}
+              <div className="mb-6 flex items-end justify-between gap-6">
                 <div>
-                  <div className="font-mono text-[11px] tracking-[0.2em] text-muted-foreground uppercase">
+                  <div className="mb-1 font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
                     Mittwoch, 29. Juni · Übersicht
                   </div>
-                  <h1 className="mt-3 font-display text-[44px] leading-[0.98] font-semibold tracking-tight text-balance">
+                  <h1 className="font-display text-[36px] leading-tight font-semibold tracking-tight text-balance">
                     Willkommen zurück, {firstName}
                   </h1>
                 </div>
-                <Button size="sm" onClick={() => setView("edit")} className="mb-1 shrink-0">
+                <Button size="sm" onClick={() => setView("edit")} className="shrink-0">
                   <Plus /> Neue Seite
                 </Button>
               </div>
 
-              {/* metric strip — hairline separators, no cards */}
-              <div className="grid grid-cols-2 border-b border-border sm:grid-cols-4 sm:divide-x sm:divide-border">
-                {stats.map((s, i) => (
-                  <div key={s[0]} className={cn("py-6", i === 0 ? "sm:pr-7" : "sm:px-7")}>
-                    <div className="font-mono text-[34px] leading-none font-semibold tracking-tight tabular-nums">
-                      {s[1]}
-                    </div>
-                    <div className="mt-2.5 text-[13px] font-medium">{s[0]}</div>
-                    <div className={cn("mt-0.5 text-[12px]", s[3])}>{s[2]}</div>
-                  </div>
+              {/* metric cards */}
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {stats.map((s) => (
+                  <Card key={s[0]} size="sm" className={cardCls}>
+                    <CardContent className="px-4 py-0">
+                      <div className="text-[13px] font-medium text-muted-foreground">{s[0]}</div>
+                      <div className="mt-1.5 font-display text-[30px] leading-none font-semibold tracking-tight tabular-nums">
+                        {s[1]}
+                      </div>
+                      <div className={cn("mt-2 text-[12px]", s[3])}>{s[2]}</div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
 
-              {/* search — calm, underlined, no pill */}
-              <div className="relative mt-9">
-                <Search className="pointer-events-none absolute top-1/2 left-0 size-[18px] -translate-y-1/2 text-muted-foreground" />
+              {/* search */}
+              <div className="relative mt-6">
+                <Search className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-muted-foreground" />
                 <input
                   placeholder="Im Hub suchen — Seiten, Personen, Anhänge …"
-                  className="h-11 w-full border-b border-border bg-transparent pr-12 pl-7 text-[15px] outline-none placeholder:text-muted-foreground focus:border-foreground"
+                  className="h-11 w-full rounded-lg border border-border bg-card pr-12 pl-11 text-[15px] shadow-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 />
-                <Kbd className="absolute top-1/2 right-0 -translate-y-1/2">⌘K</Kbd>
+                <Kbd className="absolute top-1/2 right-3.5 -translate-y-1/2">⌘K</Kbd>
               </div>
 
-              <div className="mt-14 grid gap-x-16 gap-y-12 lg:grid-cols-[1fr_248px]">
+              <div className="mt-10 grid gap-x-16 gap-y-12 lg:grid-cols-[1fr_248px]">
                 {/* editorial index */}
                 <section>
                   <div className="mb-2 flex items-baseline justify-between border-b border-border pb-2.5">
