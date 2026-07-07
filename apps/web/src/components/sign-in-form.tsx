@@ -12,7 +12,6 @@ import AuthLayout from "./auth-layout";
 import Loader from "./loader";
 
 const formSchema = z.object({
-  name: z.string().min(2, "Name muss mindestens 2 Zeichen haben"),
   email: z.email("Ungültige E-Mail-Adresse"),
   password: z.string().min(8, "Passwort muss mindestens 8 Zeichen haben"),
 });
@@ -138,7 +137,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
               disabled={!canSubmit || isSubmitting}
               form="sign-in-form"
             >
-              {isSubmitting ? "Wird erstellt …" : "Registrieren"}
+              {isSubmitting ? "Anmelden …" : "Anmelden"}
             </Button>
           )}
         </form.Subscribe>
