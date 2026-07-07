@@ -3,16 +3,22 @@ import * as schema from "@nilovon-wiki/db/schema/auth";
 import { env } from "@nilovon-wiki/env/server";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { admin, organization, twoFactor } from "better-auth/plugins";
+import { passkey } from "@better-auth/passkey";
+import { ac, roles } from "./permissions";
 
 export function createAuth() {
   const db = createDb();
 
   return betterAuth({
+    appName: "Nilovon Wiki",
     database: drizzleAdapter(db, {
       provider: "pg",
-
       schema: schema,
     }),
+    experimental: {
+      joins: true,
+    },
     trustedOrigins: [env.CORS_ORIGIN],
     emailAndPassword: {
       enabled: true,
@@ -26,7 +32,21 @@ export function createAuth() {
         httpOnly: true,
       },
     },
-    plugins: [],
+    plugins: [
+      admin(),
+      twoFactor(),
+      passkey(),
+      organization({
+        ac,
+        roles,
+        dynamicAccessControl: {
+          enabled: true,
+        },
+        teams: {
+          enabled: true,
+        },
+      }),
+    ],
   });
 }
 

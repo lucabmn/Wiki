@@ -6,6 +6,7 @@ import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
+import { BatchHandlerPlugin } from "@orpc/server/plugins";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { initLogger } from "evlog";
 import { createAuthMiddleware, type BetterAuthInstance } from "evlog/better-auth";
@@ -56,6 +57,9 @@ export const apiHandler = new OpenAPIHandler(appRouter, {
 });
 
 export const rpcHandler = new RPCHandler(appRouter, {
+  // Decodes batched calls from the client's BatchLinkPlugin. Must be present
+  // or batched requests 404. maxSize defaults to 10 calls per batch.
+  plugins: [new BatchHandlerPlugin()],
   interceptors: [
     onError((error) => {
       console.error(error);

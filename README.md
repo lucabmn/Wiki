@@ -122,3 +122,7 @@ nilovon-wiki/
 - `pnpm run docker:up`: Build and start the Docker Compose stack
 - `pnpm run docker:logs`: Tail logs from the Docker Compose stack
 - `pnpm run docker:down`: Stop the Docker Compose stack
+
+## Documentation
+
+- [Permissions (RBAC)](docs/permissions.md) — how authorization works and how to use it in the backend and frontend.

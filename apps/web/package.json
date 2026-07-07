@@ -8,7 +8,9 @@
     "dev": "vite dev"
   },
   "dependencies": {
+    "@better-auth/passkey": "^1.6.23",
     "@nilovon-wiki/api": "workspace:*",
+    "@nilovon-wiki/auth": "workspace:*",
     "@nilovon-wiki/env": "workspace:*",
     "@nilovon-wiki/ui": "workspace:*",
     "@orpc/client": "catalog:",

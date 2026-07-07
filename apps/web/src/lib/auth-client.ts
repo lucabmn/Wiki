@@ -1,5 +1,10 @@
 import { env } from "@nilovon-wiki/env/web";
 import { createAuthClient } from "better-auth/react";
+import { adminClient } from "better-auth/client/plugins";
+import { twoFactorClient } from "better-auth/client/plugins";
+import { passkeyClient } from "@better-auth/passkey/client";
+import { organizationClient } from "better-auth/client/plugins";
+import { ac, roles } from "@nilovon-wiki/auth/permissions";
 
 function getServerUrl(url: string) {
   const normalized = url.endsWith("/") ? url.slice(0, -1) : url;
@@ -32,4 +37,16 @@ export const authClient = createAuthClient({
   // better-auth derives its route-matching base from this URL's path, so the
   // public auth path must equal the server-side mount (/api/auth everywhere)
   baseURL: new URL("/api/auth", getServerUrl(env.VITE_SERVER_URL)).toString(),
+  plugins: [
+    adminClient(),
+    twoFactorClient(),
+    passkeyClient(),
+    organizationClient({
+      ac,
+      roles,
+      dynamicAccessControl: {
+        enabled: true,
+      },
+    }),
+  ],
 });

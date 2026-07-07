@@ -6,11 +6,14 @@ export type CreateContextOptions = {
 };
 
 export async function createContext({ context }: CreateContextOptions) {
+  const headers = context.req.raw.headers;
   const session = await auth.api.getSession({
-    headers: context.req.raw.headers,
+    headers,
   });
   return {
-    auth: null,
+    // forwarded so permission checks can re-issue authenticated better-auth
+    // calls (e.g. auth.api.hasPermission) with the caller's cookies/session.
+    headers,
     session,
   };
 }

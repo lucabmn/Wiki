@@ -6,6 +6,7 @@ import type { RouterClient } from "@orpc/server";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { BatchLinkPlugin } from "@orpc/client/plugins";
 
 export function createQueryClient() {
   return new QueryClient({
@@ -21,6 +22,7 @@ export function createQueryClient() {
         });
       },
     }),
+    // Default to 1 minute stale time for queries, so that we don't spam the server
     defaultOptions: { queries: { staleTime: 60 * 1000 } },
   });
 }
@@ -60,6 +62,14 @@ const link = new RPCLink({
       credentials: "include",
     });
   },
+  // Bundle concurrent RPC calls into one HTTP request (POST /rpc/__batch__),
+  // cutting round-trips when the UI fires several queries at once. Server side
+  // decodes them via BatchHandlerPlugin. One catch-all group batches everything.
+  plugins: [
+    new BatchLinkPlugin({
+      groups: [{ condition: () => true, context: {} }],
+    }),
+  ],
 });
 
 const getORPCClient = () => {
