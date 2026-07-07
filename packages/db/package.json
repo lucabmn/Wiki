@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@nilovon-wiki/env": "workspace:*",
+    "@paralleldrive/cuid2": "^3.3.0",
     "dotenv": "catalog:",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.22.0",
