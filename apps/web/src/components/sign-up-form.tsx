@@ -1,6 +1,6 @@
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Input } from "@nilovon-wiki/ui/components/input";
-import { Label } from "@nilovon-wiki/ui/components/label";
+import { Field, FieldGroup, FieldLabel, FieldError } from "@nilovon-wiki/ui/components/field";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -8,7 +8,14 @@ import z from "zod";
 
 import { authClient } from "@/lib/auth-client";
 
+import AuthLayout from "./auth-layout";
 import Loader from "./loader";
+
+const formSchema = z.object({
+  name: z.string().min(2, "Name muss mindestens 2 Zeichen haben"),
+  email: z.email("Ungültige E-Mail-Adresse"),
+  password: z.string().min(8, "Passwort muss mindestens 8 Zeichen haben"),
+});
 
 export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
   const navigate = useNavigate({
@@ -32,22 +39,19 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
         {
           onSuccess: () => {
             navigate({
-              to: "/dashboard",
+              to: "/",
             });
-            toast.success("Sign up successful");
+            toast.success("Erfolgreich registriert");
           },
           onError: (error) => {
+            console.error(error);
             toast.error(error.error.message || error.error.statusText);
           },
         },
       );
     },
     validators: {
-      onSubmit: z.object({
-        name: z.string().min(2, "Name must be at least 2 characters"),
-        email: z.email("Invalid email address"),
-        password: z.string().min(8, "Password must be at least 8 characters"),
-      }),
+      onSubmit: formSchema,
     },
   });
 
@@ -56,105 +60,114 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
   }
 
   return (
-    <div className="mx-auto w-full mt-10 max-w-md p-6">
-      <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
-
+    <AuthLayout
+      title="Konto erstellen"
+      subtitle="Leg los mit deinem Wissens-Hub."
+      footer={
+        <>
+          Bereits ein Konto?{" "}
+          <Button variant="link" onClick={onSwitchToSignIn} className="h-auto p-0 font-semibold">
+            Anmelden
+          </Button>
+        </>
+      }
+    >
       <form
+        id="sign-up-form"
         onSubmit={(e) => {
           e.preventDefault();
           e.stopPropagation();
           form.handleSubmit();
         }}
-        className="space-y-4"
+        className="flex flex-col gap-4"
       >
-        <div>
-          <form.Field name="name">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Name</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
-
-        <div>
-          <form.Field name="email">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Email</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
-
-        <div>
-          <form.Field name="password">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Password</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="password"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
+        <FieldGroup>
+          <form.Field
+            name="name"
+            children={(field) => {
+              const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor={field.name}>Name</FieldLabel>
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    aria-invalid={isInvalid}
+                    placeholder="Name"
+                    autoComplete="off"
+                  />
+                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                </Field>
+              );
+            }}
+          />
+          <form.Field
+            name="email"
+            children={(field) => {
+              const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor={field.name}>E-Mail</FieldLabel>
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    aria-invalid={isInvalid}
+                    placeholder="name@firma.de"
+                    autoComplete="off"
+                    type="email"
+                  />
+                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                </Field>
+              );
+            }}
+          />
+          <form.Field
+            name="password"
+            children={(field) => {
+              const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor={field.name}>Passwort</FieldLabel>
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    aria-invalid={isInvalid}
+                    placeholder="••••••••"
+                    autoComplete="off"
+                    type="password"
+                  />
+                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                </Field>
+              );
+            }}
+          />
+        </FieldGroup>
 
         <form.Subscribe
           selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}
         >
           {({ canSubmit, isSubmitting }) => (
-            <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Sign Up"}
+            <Button
+              type="submit"
+              size="lg"
+              className="mt-1 w-full"
+              disabled={!canSubmit || isSubmitting}
+              form="sign-up-form"
+            >
+              {isSubmitting ? "Wird erstellt …" : "Registrieren"}
             </Button>
           )}
         </form.Subscribe>
       </form>
-
-      <div className="mt-4 text-center">
-        <Button
-          variant="link"
-          onClick={onSwitchToSignIn}
-          className="text-indigo-600 hover:text-indigo-800"
-        >
-          Already have an account? Sign In
-        </Button>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }
