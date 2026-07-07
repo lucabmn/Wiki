@@ -21,19 +21,19 @@ export default function AuthLayout({
   return (
     <div className="grid min-h-svh font-sans lg:grid-cols-[1.1fr_1fr]">
       {/* ---- brand panel ---- */}
-      <div className="relative hidden overflow-hidden bg-[oklch(0.24_0.020_45)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        {/* warm accent glow — terracotta, not blue */}
+      <div className="relative hidden overflow-hidden bg-[oklch(0.26_0.09_262)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        {/* cool accent glow — blue & indigo */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(680px circle at 12% 8%, rgba(197,95,60,.30), transparent 50%), radial-gradient(520px circle at 92% 96%, rgba(120,70,40,.28), transparent 50%)",
+              "radial-gradient(680px circle at 12% 8%, rgba(59,130,246,.38), transparent 50%), radial-gradient(520px circle at 92% 96%, rgba(99,102,241,.32), transparent 50%)",
           }}
         />
 
         <div className="relative flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-white/12 font-serif text-lg font-semibold ring-1 ring-white/20 backdrop-blur">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-white/12 text-lg font-bold ring-1 ring-white/20 backdrop-blur">
             N
           </div>
           <div className="text-[15px] leading-tight font-semibold">
@@ -43,7 +43,7 @@ export default function AuthLayout({
         </div>
 
         <div className="relative max-w-md">
-          <h2 className="font-serif text-[38px] leading-[1.12] font-medium tracking-tight">
+          <h2 className="text-[38px] leading-[1.12] font-semibold tracking-tight">
             Das Wissen deines Teams, an einem Ort.
           </h2>
           <p className="mt-4 text-[15px] leading-relaxed text-white/80">
@@ -83,7 +83,7 @@ export default function AuthLayout({
         <div className="w-full max-w-sm">
           {/* mobile logo */}
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary font-serif text-lg font-semibold text-primary-foreground shadow-sm">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-sm">
               N
             </div>
             <div className="text-[15px] leading-tight font-semibold">
@@ -92,7 +92,7 @@ export default function AuthLayout({
             </div>
           </div>
 
-          <h1 className="font-serif text-[30px] font-semibold tracking-tight">{title}</h1>
+          <h1 className="text-[30px] font-semibold tracking-tight">{title}</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
 
           <div className="mt-8">{children}</div>

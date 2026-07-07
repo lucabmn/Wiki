@@ -8,14 +8,14 @@ The system is built on **Better Auth's organization plugin with Dynamic Access C
 
 ## Concepts
 
-| Term | Meaning |
-|---|---|
-| **Statement** | The full permission surface: a map of `resource -> actions`. Defined once, shared everywhere. |
-| **Permission** | A `{ resource: [actions] }` pair, e.g. `{ page: ["delete"] }`. |
-| **Access Control (`ac`)** | The engine built from the statement. Used to create roles. |
-| **Role** | A named bundle of permissions. Two kinds: **static** (defined in code) and **dynamic** (created at runtime, stored in the DB). |
-| **Group** | Product term for a **dynamic role**. "Create a group and give it permissions" == create a dynamic role. |
-| **Member** | A user's membership in an organization. Carries one or more roles (comma-separated). |
+| Term                      | Meaning                                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Statement**             | The full permission surface: a map of `resource -> actions`. Defined once, shared everywhere.                                  |
+| **Permission**            | A `{ resource: [actions] }` pair, e.g. `{ page: ["delete"] }`.                                                                 |
+| **Access Control (`ac`)** | The engine built from the statement. Used to create roles.                                                                     |
+| **Role**                  | A named bundle of permissions. Two kinds: **static** (defined in code) and **dynamic** (created at runtime, stored in the DB). |
+| **Group**                 | Product term for a **dynamic role**. "Create a group and give it permissions" == create a dynamic role.                        |
+| **Member**                | A user's membership in an organization. Carries one or more roles (comma-separated).                                           |
 
 A user's effective permissions come from **the roles on their member row in the organization being checked**. Everything is scoped to an organization.
 
@@ -23,13 +23,13 @@ A user's effective permissions come from **the roles on their member row in the 
 
 ## Where things live
 
-| File | Contents |
-|---|---|
-| [`packages/auth/src/permissions.ts`](../packages/auth/src/permissions.ts) | The `statement`, the `ac` instance, static `roles`, and the `PermissionRequest` type. **Single source of truth.** Server-free — safe to import from the browser. |
-| [`packages/auth/src/index.ts`](../packages/auth/src/index.ts) | Server org plugin wired with `ac`, `roles`, `dynamicAccessControl`. |
-| [`apps/web/src/lib/auth-client.ts`](../apps/web/src/lib/auth-client.ts) | Client org plugin wired with the same `ac`/`roles`. |
-| [`packages/api/src/index.ts`](../packages/api/src/index.ts) | Backend guards: `requireOrgPermission`, `assertOrgPermission`, `hasOrgPermission`. |
-| [`apps/web/src/lib/use-permissions.ts`](../apps/web/src/lib/use-permissions.ts) | Frontend: `usePermission` hook, `checkStaticRolePermission`. |
+| File                                                                            | Contents                                                                                                                                                         |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`packages/auth/src/permissions.ts`](../packages/auth/src/permissions.ts)       | The `statement`, the `ac` instance, static `roles`, and the `PermissionRequest` type. **Single source of truth.** Server-free — safe to import from the browser. |
+| [`packages/auth/src/index.ts`](../packages/auth/src/index.ts)                   | Server org plugin wired with `ac`, `roles`, `dynamicAccessControl`.                                                                                              |
+| [`apps/web/src/lib/auth-client.ts`](../apps/web/src/lib/auth-client.ts)         | Client org plugin wired with the same `ac`/`roles`.                                                                                                              |
+| [`packages/api/src/index.ts`](../packages/api/src/index.ts)                     | Backend guards: `requireOrgPermission`, `assertOrgPermission`, `hasOrgPermission`.                                                                               |
+| [`apps/web/src/lib/use-permissions.ts`](../apps/web/src/lib/use-permissions.ts) | Frontend: `usePermission` hook, `checkStaticRolePermission`.                                                                                                     |
 
 > **Why `permissions.ts` must stay server-free:** it is imported by both the server package and the browser bundle (via `@nilovon-wiki/auth/permissions`). Never import db, env, or `./index` into it, or the database gets pulled into the client build.
 
@@ -57,7 +57,7 @@ export const statement = {
 2. Grant it in the relevant static `roles` (`owner`/`admin`/`member`) if needed.
 3. Done — `PermissionRequest` updates automatically, so backend guards and the frontend hook now accept it and reject typos.
 
-No codegen, no DB change for the statement itself. (Adding it to a *dynamic* role is a runtime call — see [Groups](#groups-dynamic-roles).)
+No codegen, no DB change for the statement itself. (Adding it to a _dynamic_ role is a runtime call — see [Groups](#groups-dynamic-roles).)
 
 ---
 
@@ -91,7 +91,7 @@ export const deletePage = requireOrgPermission({ page: ["delete"] })
 
 ### Gate on a resource's own org (preferred for anything cross-org)
 
-`requireOrgPermission` checks the **active** organization. If a request targets a resource that lives in some *other* org, check against **that resource's** org id instead — otherwise rights in the active org would authorize actions elsewhere.
+`requireOrgPermission` checks the **active** organization. If a request targets a resource that lives in some _other_ org, check against **that resource's** org id instead — otherwise rights in the active org would authorize actions elsewhere.
 
 ```ts
 import { protectedProcedure, assertOrgPermission } from "@nilovon-wiki/api";

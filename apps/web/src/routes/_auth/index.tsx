@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
-import { Avatar, AvatarFallback, AvatarGroup } from "@nilovon-wiki/ui/components/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarGroup,
+  AvatarGroupCount,
+} from "@nilovon-wiki/ui/components/avatar";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import {
   Breadcrumb,
@@ -48,11 +53,11 @@ import {
 } from "@nilovon-wiki/ui/components/table";
 import { Tabs, TabsList, TabsTrigger } from "@nilovon-wiki/ui/components/tabs";
 import {
-  Bold,
   BookOpen,
+  Bold,
+  Check,
   ChevronRight,
   ChevronsUpDown,
-  Check,
   Code,
   FileText,
   Folder,
@@ -87,28 +92,28 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-// ChevronDown intentionally not imported — tree chevrons use ChevronRight with rotate.
 import { type ComponentType, useEffect, useRef, useState } from "react";
 
 export const Route = createFileRoute("/_auth/")({
   component: RouteComponent,
 });
 
-/* ---------- shared bits ---------- */
+/* ---------- shared bits ----------
+ * Soft, rounded, blue. Components carry their own radii (Card, Badge, Avatar …);
+ * we don't override them — we only compose. Cohesive cool avatar palette. */
 
-const ROLE_CLASS: Record<string, string> = {
-  Administrator: "bg-violet-500/12 text-violet-600 dark:text-violet-300",
-  Admin: "bg-violet-500/12 text-violet-600 dark:text-violet-300",
-  Editor: "bg-primary/12 text-primary",
-  Kommentator: "bg-amber-500/12 text-amber-600 dark:text-amber-300",
-  Leser: "bg-muted text-muted-foreground",
+const eyebrow = "text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+
+const ROLE_BADGE: Record<string, "default" | "secondary" | "outline" | "ghost"> = {
+  Administrator: "default",
+  Admin: "default",
+  Editor: "secondary",
+  Kommentator: "outline",
+  Leser: "ghost",
 };
 function RoleBadge({ role, className }: { role: string; className?: string }) {
   return (
-    <Badge
-      variant="secondary"
-      className={cn("rounded-md", ROLE_CLASS[role] ?? ROLE_CLASS.Leser, className)}
-    >
+    <Badge variant={ROLE_BADGE[role] ?? "outline"} className={className}>
       {role}
     </Badge>
   );
@@ -117,54 +122,67 @@ function RoleBadge({ role, className }: { role: string; className?: string }) {
 function ColorAvatar({
   initials,
   color,
+  size = "default",
   className,
 }: {
   initials: string;
   color: string;
+  size?: "default" | "sm" | "lg";
   className?: string;
 }) {
   return (
-    <Avatar className={cn("size-8.5", className)}>
-      <AvatarFallback
-        style={{ backgroundColor: color, color: "#fff" }}
-        className="text-[12px] font-bold"
-      >
+    <Avatar size={size} className={className}>
+      <AvatarFallback style={{ backgroundColor: color, color: "#fff" }} className="font-semibold">
         {initials}
       </AvatarFallback>
     </Avatar>
   );
 }
 
-const STATUS_CLASS: Record<string, string> = {
-  Aktiv: "text-emerald-600 dark:text-emerald-400",
-  Eingeladen: "text-amber-600 dark:text-amber-400",
-  Abwesend: "text-muted-foreground",
+const STATUS: Record<string, { dot: string; text: string }> = {
+  Aktiv: { dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+  Eingeladen: { dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+  Abwesend: { dot: "bg-muted-foreground/40", text: "text-muted-foreground" },
 };
+function StatusPill({ status }: { status: string }) {
+  const s = STATUS[status] ?? STATUS.Abwesend;
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 text-xs font-medium", s.text)}>
+      <span className={cn("size-1.5 rounded-full", s.dot)} />
+      {status}
+    </span>
+  );
+}
 
 /* ---------- article (read view) ---------- */
 
 function ChecklistRow({ step, done }: { step: string; done: boolean }) {
   return (
-    <div className="grid grid-cols-[1fr_120px] border-b border-border last:border-0">
-      <div className="px-4 py-2.5">{step}</div>
-      <div
-        className={cn(
-          "px-4 py-2.5 font-semibold",
-          done ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400",
-        )}
-      >
-        {done ? "✓ Erledigt" : "● Offen"}
-      </div>
+    <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 last:border-0">
+      <span className="text-[15px]">{step}</span>
+      {done ? (
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+          <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500/15">
+            <Check className="size-3" />
+          </span>
+          Erledigt
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+          <span className="size-4 rounded-full border border-border" />
+          Offen
+        </span>
+      )}
     </div>
   );
 }
 
 function Article() {
   const h2 =
-    "mt-9 mb-3.5 scroll-mt-20 font-serif text-[26px] font-semibold tracking-tight text-foreground";
+    "mt-10 mb-4 scroll-mt-20 font-sans text-[22px] font-semibold tracking-tight text-foreground";
   return (
-    <div className="font-serif text-[18px] leading-[1.72] text-foreground">
-      <p className="mb-5.5 text-[19px] text-muted-foreground">
+    <div className="font-serif text-[18px] leading-[1.75] text-foreground">
+      <p className="mb-6 text-[19px] leading-[1.7] text-muted-foreground">
         Schön, dass du da bist! Diese Seite führt dich durch deine ersten Tage bei Nordwind – von
         der Vorbereitung vor dem Start bis zur Einrichtung deiner Arbeitsumgebung. Plane dafür
         ungefähr eine Stunde ein.
@@ -173,16 +191,18 @@ function Article() {
       <h2 id="ueberblick" className={h2}>
         Überblick
       </h2>
-      <p className="mb-5.5">
+      <p className="mb-6">
         Dein Onboarding gliedert sich in drei Phasen. In den ersten Tagen liegt der Fokus auf
         Orientierung und Setup – fachliche Tiefe kommt später ganz von selbst. Bei Fragen ist dein{" "}
         <em>Buddy</em> die erste Anlaufstelle.
       </p>
 
-      <div className="mb-6.5 flex gap-3 rounded-xl border border-primary/25 bg-primary/8 p-4 font-sans text-[14.5px] leading-relaxed">
-        <Info className="mt-0.5 size-5 shrink-0 text-primary" />
+      <div className="mb-7 flex gap-3 rounded-xl border border-primary/20 bg-primary/[0.06] p-4 font-sans text-[14.5px] leading-relaxed">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
+          <Info className="size-4.5" />
+        </span>
         <div>
-          <b className="font-bold text-foreground">Gut zu wissen:</b> Deinen Buddy findest du im{" "}
+          <b className="font-semibold text-foreground">Gut zu wissen:</b> Deinen Buddy findest du im{" "}
           <span className="font-semibold text-primary">Org-Chart</span>. Trag dich außerdem für die
           wöchentliche Onboarding-Runde ein.
         </div>
@@ -195,7 +215,7 @@ function Article() {
         Idealerweise erledigst du diese Punkte schon im Vorfeld, damit am ersten Tag alles
         bereitsteht:
       </p>
-      <ul className="mb-5.5 list-disc pl-6">
+      <ul className="mb-6 list-disc pl-6 marker:text-primary">
         <li className="mb-2">
           Bestätige deine Daten im <b className="font-semibold">People-Portal</b> (Adresse,
           Bankverbindung, Notfallkontakt).
@@ -205,7 +225,7 @@ function Article() {
         </li>
         <li className="mb-2">
           Lies das{" "}
-          <span className="border-b border-primary/40 font-semibold text-primary">
+          <span className="font-semibold text-primary underline decoration-primary/30 underline-offset-2">
             Leitbild &amp; Werte
           </span>
           , damit du weißt, wofür wir stehen.
@@ -219,7 +239,7 @@ function Article() {
         Um 9:30 Uhr holt dich dein Buddy am Empfang ab. Der Vormittag ist für Setup und Kennenlernen
         reserviert, am Nachmittag folgt eine kurze Tour durchs Büro.
       </p>
-      <blockquote className="mb-5.5 border-l-[3px] border-primary py-1 pl-5 text-muted-foreground italic">
+      <blockquote className="mb-6 rounded-r-xl border-l-[3px] border-primary bg-muted/40 py-3 pr-5 pl-5 text-[18px] leading-[1.6] text-muted-foreground italic">
         „Niemand erwartet, dass du in Woche eins produktiv bist. Erwarte es auch nicht von dir
         selbst.“
       </blockquote>
@@ -231,16 +251,12 @@ function Article() {
         Dein Laptop ist vorkonfiguriert. Melde dich mit deinen Zugangsdaten an und arbeite die
         folgende Checkliste ab:
       </p>
-      <div className="mb-5.5 overflow-hidden rounded-xl border border-border font-sans text-sm">
-        <div className="grid grid-cols-[1fr_120px] border-b border-border bg-muted/50 text-[12.5px] font-semibold text-muted-foreground">
-          <div className="px-4 py-2.5">Schritt</div>
-          <div className="px-4 py-2.5">Status</div>
-        </div>
+      <div className="mb-6 overflow-hidden rounded-xl border border-border font-sans">
         <ChecklistRow step="SSO / 2-Faktor aktivieren" done />
         <ChecklistRow step="VPN einrichten" done={false} />
         <ChecklistRow step="Slack & Kalender verbinden" done={false} />
       </div>
-      <pre className="mb-5.5 overflow-auto rounded-xl border border-border bg-muted/60 p-4 font-mono text-[13px] leading-relaxed">
+      <pre className="mb-6 overflow-auto rounded-xl border border-border bg-muted/50 p-4 font-mono text-[13px] leading-relaxed">
         <span className="text-muted-foreground"># VPN-Profil installieren</span>
         {"\n"}brew install nordwind-vpn{"\n"}nordwind-vpn login --sso
       </pre>
@@ -249,10 +265,10 @@ function Article() {
         Wichtige Kontakte
       </h2>
       <p className="mb-3.5">Bei Problemen wendest du dich an:</p>
-      <ul className="mb-2.5 list-disc pl-6">
+      <ul className="mb-2.5 list-disc pl-6 marker:text-primary">
         <li className="mb-2">
           <b className="font-semibold">IT-Support</b> —{" "}
-          <span className="font-mono text-sm text-primary">#it-help</span> in Slack
+          <span className="font-mono text-[15px] text-primary">#it-help</span> in Slack
         </li>
         <li className="mb-2">
           <b className="font-semibold">People &amp; Culture</b> — Sarah König
@@ -322,9 +338,18 @@ function RouteComponent() {
     setView("read");
   };
 
+  const now = new Date();
+  const dateLine = now.toLocaleDateString("de-DE", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const greeting =
+    now.getHours() < 11 ? "Guten Morgen" : now.getHours() < 18 ? "Guten Tag" : "Guten Abend";
+
   /* ----- data ----- */
   const nav: [string, string, ComponentType<{ className?: string }>][] = [
-    ["dashboard", "Dashboard", Home],
+    ["dashboard", "Übersicht", Home],
     ["spaces", "Alle Spaces", LayoutGrid],
     ["permissions", "Mitglieder & Rechte", Lock],
   ];
@@ -364,34 +389,33 @@ function RouteComponent() {
   };
 
   const crumbMap: Record<string, string[]> = {
-    dashboard: ["Dashboard"],
+    dashboard: ["Übersicht"],
     spaces: ["Spaces"],
     read: ["Team-Handbuch", "Onboarding", "Erste Schritte bei Nordwind"],
     edit: ["Team-Handbuch", "Erste Schritte bei Nordwind", "Bearbeiten"],
     permissions: ["Team-Handbuch", "Zugriff"],
     history: ["Team-Handbuch", "Erste Schritte", "Verlauf"],
   };
-  const crumbs = crumbMap[view] || ["Dashboard"];
+  const crumbs = crumbMap[view] || ["Übersicht"];
 
-  const stats: [string, string, string, string][] = [
-    ["Seiten gesamt", "410", "+12 diese Woche", "text-emerald-600 dark:text-emerald-400"],
-    ["Spaces", "6", "Du bist in 6", "text-muted-foreground"],
-    ["Offene Kommentare", "7", "2 erwähnen dich", "text-amber-600 dark:text-amber-400"],
-    ["Aktive Mitglieder", "24", "5 gerade online", "text-emerald-600 dark:text-emerald-400"],
+  const stats: [string, string, string][] = [
+    ["Seiten", "48", "+3 diese Woche"],
+    ["Mitglieder", "24", "6 aktiv jetzt"],
+    ["Offene Kommentare", "3", "2 dir zugewiesen"],
   ];
   const recent: [string, string, string, string][] = [
-    ["Erste Schritte bei Nordwind", "Sarah König · vor 2 Std.", "Team-Handbuch", "#6b7233"],
-    ["Incident-Runbook: API-Gateway", "Tobias Mayer · vor 4 Std.", "Engineering", "#0f766e"],
-    ["Q3 Roadmap-Entwurf", "Du · vor 5 Std.", "Produkt", "#7c3aed"],
-    ["Benefits & Vergünstigungen", "Lena Brandt · gestern", "People", "#c2410c"],
-    ["Marken-Richtlinien 2026", "David Klein · gestern", "Design", "#be185d"],
+    ["Erste Schritte bei Nordwind", "Sarah König · vor 2 Std.", "Team-Handbuch", "#8b5cf6"],
+    ["Incident-Runbook: API-Gateway", "Tobias Mayer · vor 4 Std.", "Engineering", "#14b8a6"],
+    ["Q3 Roadmap-Entwurf", "Du · vor 5 Std.", "Produkt", "#6366f1"],
+    ["Benefits & Vergünstigungen", "Lena Brandt · gestern", "People", "#0ea5e9"],
+    ["Marken-Richtlinien 2026", "David Klein · gestern", "Design", "#3b82f6"],
   ];
   const activity: [string, string, string, string, string, string][] = [
-    ["Tobias Mayer", "TM", "#0f766e", "kommentierte", "IT-Setup", "vor 2 Std."],
-    ["Lena Brandt", "LB", "#6b7233", "bearbeitete", "Benefits", "vor 4 Std."],
-    ["Sarah König", "SK", "#7c3aed", "erstellte", "VPN-Anleitung", "vor 5 Std."],
-    ["David Klein", "DK", "#be185d", "verschob", "Logo-Assets", "gestern"],
-    ["Jonas Weber", "JW", "#c2410c", "lud ein", "m.olsen@partner.io", "gestern"],
+    ["Tobias Mayer", "TM", "#14b8a6", "kommentierte", "IT-Setup", "vor 2 Std."],
+    ["Lena Brandt", "LB", "#6366f1", "bearbeitete", "Benefits", "vor 4 Std."],
+    ["Sarah König", "SK", "#8b5cf6", "erstellte", "VPN-Anleitung", "vor 5 Std."],
+    ["David Klein", "DK", "#3b82f6", "verschob", "Logo-Assets", "gestern"],
+    ["Jonas Weber", "JW", "#0ea5e9", "lud ein", "m.olsen@partner.io", "gestern"],
   ];
   const members: [string, string, string, string, string, string, string][] = [
     [
@@ -401,9 +425,9 @@ function RouteComponent() {
       "Administrator",
       "Aktiv",
       "LB",
-      "#6b7233",
+      "#6366f1",
     ],
-    ["Tobias Mayer", "tobias.mayer@nordwind.de", "Engineering", "Editor", "Aktiv", "TM", "#0f766e"],
+    ["Tobias Mayer", "tobias.mayer@nordwind.de", "Engineering", "Editor", "Aktiv", "TM", "#14b8a6"],
     [
       "Sarah König",
       "sarah.koenig@nordwind.de",
@@ -411,7 +435,7 @@ function RouteComponent() {
       "Editor",
       "Aktiv",
       "SK",
-      "#7c3aed",
+      "#8b5cf6",
     ],
     [
       "Jonas Weber",
@@ -420,20 +444,20 @@ function RouteComponent() {
       "Kommentator",
       "Aktiv",
       "JW",
-      "#c2410c",
+      "#0ea5e9",
     ],
-    ["David Klein", "david.klein@nordwind.de", "Design", "Editor", "Abwesend", "DK", "#be185d"],
-    ["Mara Olsen", "m.olsen@partner.io", "Extern", "Leser", "Eingeladen", "MO", "#b45309"],
+    ["David Klein", "david.klein@nordwind.de", "Design", "Editor", "Abwesend", "DK", "#3b82f6"],
+    ["Mara Olsen", "m.olsen@partner.io", "Extern", "Leser", "Eingeladen", "MO", "#0891b2"],
   ];
   const roles: [string, string, string, string][] = [
     [
       "Administrator",
       "Voller Zugriff inkl. Berechtigungen und Space-Einstellungen.",
       "1",
-      "bg-violet-500",
+      "bg-primary",
     ],
-    ["Editor", "Seiten erstellen, bearbeiten, verschieben und löschen.", "3", "bg-primary"],
-    ["Kommentator", "Lesen und kommentieren, aber keine Bearbeitung.", "1", "bg-amber-500"],
+    ["Editor", "Seiten erstellen, bearbeiten, verschieben und löschen.", "3", "bg-sky-500"],
+    ["Kommentator", "Lesen und kommentieren, aber keine Bearbeitung.", "1", "bg-teal-500"],
     ["Leser", "Ausschließlich Lesezugriff auf freigegebene Seiten.", "1", "bg-muted-foreground"],
   ];
   const matrix: [string, boolean[]][] = [
@@ -446,11 +470,11 @@ function RouteComponent() {
     ["Berechtigungen verwalten", [true, false, false, false]],
     ["Space-Einstellungen", [true, false, false, false]],
   ];
-  const pageBadge: Record<string, string> = {
-    root: "bg-primary/12 text-primary",
-    inherit: "bg-muted text-muted-foreground",
-    override: "bg-amber-500/12 text-amber-600 dark:text-amber-300",
-    restricted: "bg-destructive/12 text-destructive",
+  const pageBadge: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+    root: "default",
+    inherit: "secondary",
+    override: "outline",
+    restricted: "destructive",
   };
   const pageBadgeText: Record<string, string> = {
     root: "Space-Standard",
@@ -487,7 +511,7 @@ function RouteComponent() {
       "v14",
       "Sarah König",
       "SK",
-      "#7c3aed",
+      "#8b5cf6",
       "heute, 09:24",
       "Abschnitt „IT-Setup“ um VPN-Schritte ergänzt",
       42,
@@ -499,7 +523,7 @@ function RouteComponent() {
       "v13",
       "Tobias Mayer",
       "TM",
-      "#0f766e",
+      "#14b8a6",
       "gestern, 16:10",
       "Tippfehler korrigiert, Slack-Links aktualisiert",
       8,
@@ -511,7 +535,7 @@ function RouteComponent() {
       "v12",
       "Sarah König",
       "SK",
-      "#7c3aed",
+      "#8b5cf6",
       "24. Juni, 11:02",
       "Checkliste neu strukturiert (Tabelle eingefügt)",
       60,
@@ -523,7 +547,7 @@ function RouteComponent() {
       "v11",
       "Lena Brandt",
       "LB",
-      "#6b7233",
+      "#6366f1",
       "21. Juni, 08:45",
       "Seite angelegt",
       120,
@@ -536,27 +560,27 @@ function RouteComponent() {
     [
       "Tobias Mayer",
       "TM",
-      "#0f766e",
+      "#14b8a6",
       "vor 2 Std.",
-      "„IT-Setup“",
+      "IT-Setup",
       "Sollten wir hier nicht auch erwähnen, dass der VPN-Zugang erst nach SSO-Freischaltung funktioniert? Das hat letzte Woche für Verwirrung gesorgt.",
       0,
     ],
     [
       "Lena Brandt",
       "LB",
-      "#6b7233",
+      "#6366f1",
       "gestern",
-      "„Erste Schritte“",
+      "Erste Schritte",
       "Super überarbeitet, danke! Die neue Checkliste ist viel klarer. 👍",
       1,
     ],
     [
       "Jonas Weber",
       "JW",
-      "#c2410c",
+      "#0ea5e9",
       "vor 3 Tagen",
-      "„Wichtige Kontakte“",
+      "Wichtige Kontakte",
       "Können wir noch den Notfall-Kontakt für Hardware-Ausfälle ergänzen?",
       2,
     ],
@@ -565,7 +589,7 @@ function RouteComponent() {
     [
       "Team-Handbuch",
       "TH",
-      "#6b7233",
+      "#6366f1",
       "Onboarding, Prozesse und alles Wissenswerte fürs Team.",
       "48",
       "24",
@@ -575,7 +599,7 @@ function RouteComponent() {
     [
       "Engineering",
       "EN",
-      "#0f766e",
+      "#14b8a6",
       "Architektur, Runbooks und technische Entscheidungen.",
       "132",
       "18",
@@ -585,7 +609,7 @@ function RouteComponent() {
     [
       "Produkt",
       "PR",
-      "#7c3aed",
+      "#8b5cf6",
       "Roadmap, Specs und Nutzer-Research.",
       "76",
       "15",
@@ -595,7 +619,7 @@ function RouteComponent() {
     [
       "People & Culture",
       "PC",
-      "#c2410c",
+      "#0ea5e9",
       "Policies, Benefits und Recruiting-Prozesse.",
       "54",
       "9",
@@ -605,7 +629,7 @@ function RouteComponent() {
     [
       "Sales & Marketing",
       "SM",
-      "#b45309",
+      "#0891b2",
       "Playbooks, Pitch-Material und Kampagnen.",
       "39",
       "12",
@@ -615,7 +639,7 @@ function RouteComponent() {
     [
       "Design",
       "DS",
-      "#be185d",
+      "#3b82f6",
       "Guidelines, Komponenten und Marken-Assets.",
       "61",
       "7",
@@ -715,8 +739,6 @@ function RouteComponent() {
     ],
   ];
 
-  const cardCls = "rounded-xl border border-border bg-card shadow-sm ring-0";
-
   return (
     <SidebarProvider className="h-svh min-h-0">
       {/* ============ SIDEBAR ============ */}
@@ -724,9 +746,9 @@ function RouteComponent() {
         <SidebarHeader className="gap-0">
           <button
             type="button"
-            className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-sidebar-accent"
+            className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent"
           >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary font-serif text-[15px] font-semibold text-primary-foreground shadow-sm">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
               N
             </div>
             <div className="min-w-0 flex-1">
@@ -736,11 +758,11 @@ function RouteComponent() {
             <ChevronsUpDown className="size-4 text-muted-foreground" />
           </button>
 
-          <div className="px-2 pt-1">
+          <div className="px-2 pt-2">
             <Button
               variant="outline"
               onClick={() => setView("dashboard")}
-              className="h-9 w-full justify-start gap-2.5 bg-muted/40 px-2.5 font-normal text-muted-foreground"
+              className="h-9 w-full justify-start gap-2.5 px-2.5 font-normal text-muted-foreground"
             >
               <Search className="size-4" />
               <span className="flex-1 text-left">Suchen …</span>
@@ -757,7 +779,7 @@ function RouteComponent() {
                   <SidebarMenuButton
                     isActive={view === id}
                     onClick={() => setView(id)}
-                    className="data-active:bg-primary/12 data-active:text-primary"
+                    className="data-active:bg-primary/10 data-active:font-medium data-active:text-primary"
                   >
                     <Icon />
                     <span>{label}</span>
@@ -782,7 +804,7 @@ function RouteComponent() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger
                       render={
-                        <SidebarMenuButton className="font-semibold text-muted-foreground">
+                        <SidebarMenuButton className="font-medium text-muted-foreground">
                           <ChevronRight className="transition-transform group-data-open/collapsible:rotate-90" />
                           <Folder />
                           <span>{sec.label}</span>
@@ -798,7 +820,7 @@ function RouteComponent() {
                               <SidebarMenuSubButton
                                 isActive={active}
                                 onClick={() => selectPage(pid)}
-                                className="cursor-pointer data-active:bg-primary/12 data-active:text-primary"
+                                className="cursor-pointer data-active:bg-primary/10 data-active:text-primary"
                               >
                                 <FileText />
                                 <span>{plabel}</span>
@@ -816,13 +838,16 @@ function RouteComponent() {
         </SidebarContent>
 
         <SidebarFooter className="flex-row items-center gap-2.5 border-t border-border">
-          <ColorAvatar initials={initials} color="#7c3aed" className="size-7" />
+          <ColorAvatar initials={initials} color="#8b5cf6" size="sm" />
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] leading-tight font-semibold">{userName}</div>
-            <div className="text-[11px] text-muted-foreground">Editor · Online</div>
+            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <span className="size-1.5 rounded-full bg-emerald-500" />
+              Editor · Online
+            </div>
           </div>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon-sm"
             title="Theme wechseln"
             onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
@@ -835,7 +860,7 @@ function RouteComponent() {
       {/* ============ MAIN ============ */}
       <SidebarInset className="min-w-0">
         {/* topbar */}
-        <header className="flex h-13 shrink-0 items-center gap-3.5 border-b border-border bg-card px-4.5">
+        <header className="flex h-14 shrink-0 items-center gap-3.5 border-b border-border bg-background/80 px-5 backdrop-blur">
           <Breadcrumb className="min-w-0 flex-1">
             <BreadcrumbList>
               {crumbs.map((label, i) => {
@@ -843,7 +868,7 @@ function RouteComponent() {
                 return (
                   <BreadcrumbItem key={label}>
                     {last ? (
-                      <BreadcrumbPage className="font-bold">{label}</BreadcrumbPage>
+                      <BreadcrumbPage className="font-semibold">{label}</BreadcrumbPage>
                     ) : (
                       <>
                         <span className="text-muted-foreground">{label}</span>
@@ -901,14 +926,16 @@ function RouteComponent() {
                 </Button>
               </>
             )}
-            <Button
-              variant="outline"
-              size="icon-sm"
-              title="Neue Seite"
-              onClick={() => setView("edit")}
-            >
-              <Plus />
-            </Button>
+            {view !== "edit" && (
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="Neue Seite"
+                onClick={() => setView("edit")}
+              >
+                <Plus />
+              </Button>
+            )}
           </div>
         </header>
 
@@ -916,110 +943,98 @@ function RouteComponent() {
         <main className="relative flex-1 overflow-y-auto">
           {/* ===== DASHBOARD ===== */}
           {view === "dashboard" && (
-            <div className="mx-auto max-w-[1160px] px-10 pt-10 pb-24">
-              {/* header */}
-              <div className="mb-6 flex items-end justify-between gap-6">
-                <div>
-                  <div className="mb-1 font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
-                    Mittwoch, 29. Juni · Übersicht
+            <div className="mx-auto max-w-[1080px] px-8 pt-8 pb-20">
+              {/* hero */}
+              <Card className="mb-8 overflow-hidden rounded-2xl p-7">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <div className={cn(eyebrow, "mb-2 flex items-center gap-1.5 text-primary")}>
+                      {dateLine}
+                    </div>
+                    <h1 className="text-[28px] leading-tight font-semibold tracking-tight">
+                      {greeting}, {firstName}.
+                    </h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Du hast 2 neue Kommentare und 3 aktualisierte Seiten seit gestern.
+                    </p>
                   </div>
-                  <h1 className="font-display text-[36px] leading-tight font-semibold tracking-tight text-balance">
-                    Willkommen zurück, {firstName}
-                  </h1>
+                  <Button onClick={() => setView("edit")} className="shrink-0">
+                    <Plus /> Neue Seite
+                  </Button>
                 </div>
-                <Button size="sm" onClick={() => setView("edit")} className="shrink-0">
-                  <Plus /> Neue Seite
-                </Button>
-              </div>
 
-              {/* metric cards */}
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {stats.map((s) => (
-                  <Card key={s[0]} size="sm" className={cardCls}>
-                    <CardContent className="px-4 py-0">
-                      <div className="text-[13px] font-medium text-muted-foreground">{s[0]}</div>
-                      <div className="mt-1.5 font-display text-[30px] leading-none font-semibold tracking-tight tabular-nums">
-                        {s[1]}
-                      </div>
-                      <div className={cn("mt-2 text-[12px]", s[3])}>{s[2]}</div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                <div className="mt-6 grid grid-cols-3 gap-3">
+                  {stats.map(([label, value, delta]) => (
+                    <Card key={label} className="px-4 py-3">
+                      <div className="text-[13px] text-muted-foreground">{label}</div>
+                      <div className="text-2xl font-semibold tracking-tight">{value}</div>
+                      <div className="text-[11.5px] text-muted-foreground">{delta}</div>
+                    </Card>
+                  ))}
+                </div>
+              </Card>
 
-              {/* search */}
-              <div className="relative mt-6">
-                <Search className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-muted-foreground" />
-                <input
-                  placeholder="Im Hub suchen — Seiten, Personen, Anhänge …"
-                  className="h-11 w-full rounded-lg border border-border bg-card pr-12 pl-11 text-[15px] shadow-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                />
-                <Kbd className="absolute top-1/2 right-3.5 -translate-y-1/2">⌘K</Kbd>
-              </div>
-
-              <div className="mt-10 grid gap-x-16 gap-y-12 lg:grid-cols-[1fr_248px]">
-                {/* editorial index */}
+              <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
+                {/* recently edited */}
                 <section>
-                  <div className="mb-2 flex items-baseline justify-between border-b border-border pb-2.5">
-                    <h2 className="font-mono text-[11px] tracking-[0.2em] text-muted-foreground uppercase">
-                      Zuletzt bearbeitet
-                    </h2>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h2 className="text-[15px] font-semibold">Zuletzt bearbeitet</h2>
                     <button
                       type="button"
                       onClick={() => setView("spaces")}
-                      className="text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                      className="text-[13px] font-medium text-primary transition-colors hover:text-primary/80"
                     >
-                      Alle Spaces →
+                      Alle Spaces
                     </button>
                   </div>
-                  <div className="flex flex-col">
-                    {recent.map((r, i) => (
+                  <Card className="gap-0 py-0">
+                    {recent.map((r) => (
                       <button
                         type="button"
                         key={r[0]}
                         onClick={() => selectPage("erste-schritte")}
-                        className="group -mx-3 flex items-baseline gap-5 border-b border-border/60 px-3 py-5 text-left transition-colors last:border-0 hover:bg-muted/30"
+                        className="group flex w-full items-center gap-3 border-b border-border px-4 py-3.5 text-left transition-colors last:border-0 hover:bg-muted/50"
                       >
-                        <span className="pt-1 font-mono text-[12px] tabular-nums text-muted-foreground/60">
-                          {String(i + 1).padStart(2, "0")}
+                        <span
+                          className="flex size-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
+                          style={{ backgroundColor: r[3] }}
+                        >
+                          <FileText className="size-4.5" />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="font-display text-[20px] leading-snug font-medium tracking-tight transition-colors group-hover:text-primary">
+                          <div className="truncate text-[14px] font-medium group-hover:text-primary">
                             {r[0]}
                           </div>
-                          <div className="mt-1.5 text-[13px] text-muted-foreground">{r[1]}</div>
+                          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {r[1]}
+                          </div>
                         </div>
-                        <span className="shrink-0 self-center font-mono text-[11px] tracking-wider text-muted-foreground uppercase">
+                        <Badge variant="outline" className="shrink-0">
                           {r[2]}
-                        </span>
+                        </Badge>
                       </button>
                     ))}
-                  </div>
+                  </Card>
                 </section>
 
-                {/* activity margin rail */}
+                {/* activity */}
                 <aside>
-                  <h2 className="mb-5 border-b border-border pb-2.5 font-mono text-[11px] tracking-[0.2em] text-muted-foreground uppercase">
-                    Aktivität
-                  </h2>
-                  <div className="flex flex-col gap-5">
-                    {activity.map((a) => (
-                      <div key={`${a[0]}-${a[4]}`} className="flex gap-3">
-                        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-border font-mono text-[10px] font-semibold text-muted-foreground">
-                          {a[1]}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="text-[13px] leading-snug">
-                            <span className="font-semibold">{a[0]}</span> {a[3]}{" "}
-                            <span className="text-primary">{a[4]}</span>
-                          </div>
-                          <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                            {a[5]}
+                  <h2 className="mb-3 text-[15px] font-semibold">Aktivität</h2>
+                  <Card className="gap-0 py-4">
+                    <CardContent className="flex flex-col gap-4">
+                      {activity.map((a) => (
+                        <div key={`${a[0]}-${a[4]}`} className="flex gap-2.5">
+                          <ColorAvatar initials={a[1]} color={a[2]} size="sm" className="mt-0.5" />
+                          <div className="min-w-0 text-[13px] leading-snug">
+                            <span className="font-medium">{a[0]}</span>{" "}
+                            <span className="text-muted-foreground">{a[3]}</span>{" "}
+                            <span className="font-medium text-primary">{a[4]}</span>
+                            <div className="mt-0.5 text-xs text-muted-foreground">{a[5]}</div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </CardContent>
+                  </Card>
                 </aside>
               </div>
             </div>
@@ -1029,76 +1044,56 @@ function RouteComponent() {
           {view === "read" && (
             <div className="flex justify-center">
               <article className="min-w-0 max-w-[760px] flex-1 px-14 pt-11 pb-24">
-                <div className="mb-3.5 flex items-center gap-2 text-[12.5px] text-muted-foreground">
-                  <Badge className="gap-1.5 bg-primary/12 text-primary">
-                    <span className="size-1.5 rounded-full bg-primary" />
-                    Onboarding
-                  </Badge>
+                <div className="mb-4 flex items-center gap-2.5 text-[12.5px] text-muted-foreground">
+                  <Badge className="bg-primary/12 text-primary">Onboarding</Badge>
                   <span>·</span>
                   <span>4 Min. Lesezeit</span>
                   <span>·</span>
                   <span>14 Versionen</span>
                 </div>
-                <h1 className="mb-4 font-serif text-[42px] leading-[1.08] font-semibold tracking-tight">
+                <h1 className="mb-4 font-serif text-[36px] leading-[1.12] font-semibold tracking-tight">
                   Erste Schritte bei Nordwind
                 </h1>
-                <div className="mb-7.5 flex items-center gap-3 border-b border-border pb-5.5">
-                  <ColorAvatar initials="SK" color="#7c3aed" className="size-6.5" />
+                <div className="mb-8 flex items-center gap-3 border-b border-border pb-6">
+                  <ColorAvatar initials="SK" color="#8b5cf6" size="sm" />
                   <span className="text-[13px] text-muted-foreground">
                     Aktualisiert von <b className="font-semibold text-foreground">Sarah König</b> ·
                     heute, 09:24
                   </span>
                   <div className="flex-1" />
                   <AvatarGroup>
-                    <ColorAvatar
-                      initials="LB"
-                      color="#6b7233"
-                      className="size-6 text-[9.5px] ring-2 ring-card"
-                    />
-                    <ColorAvatar
-                      initials="TM"
-                      color="#0f766e"
-                      className="size-6 text-[9.5px] ring-2 ring-card"
-                    />
-                    <Avatar className="size-6 ring-2 ring-card">
-                      <AvatarFallback className="bg-muted text-[9.5px] font-bold text-muted-foreground">
-                        +3
-                      </AvatarFallback>
-                    </Avatar>
+                    <ColorAvatar initials="LB" color="#6366f1" size="sm" />
+                    <ColorAvatar initials="TM" color="#14b8a6" size="sm" />
+                    <AvatarGroupCount className="size-6 text-[10px]">+3</AvatarGroupCount>
                   </AvatarGroup>
                 </div>
 
                 <Article />
 
-                <div className="mt-10 flex items-center gap-2.5 border-t border-border pt-5.5">
-                  <span className="text-[13px] text-muted-foreground">War das hilfreich?</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full hover:border-emerald-500 hover:text-emerald-600"
-                  >
+                <div className="mt-12 flex items-center gap-2.5 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                  <span className="text-[13px] font-medium">War das hilfreich?</span>
+                  <div className="flex-1" />
+                  <Button variant="outline" size="sm">
                     <ThumbsUp /> 18
                   </Button>
-                  <Button variant="outline" size="sm" className="rounded-full">
+                  <Button variant="outline" size="sm">
                     <ThumbsDown /> 1
                   </Button>
                 </div>
               </article>
 
               {/* TOC */}
-              <aside className="sticky top-0 hidden h-svh w-[228px] shrink-0 self-start pt-12.5 pr-6 xl:block">
-                <div className="mb-3 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
-                  Auf dieser Seite
-                </div>
-                <div className="flex flex-col gap-px border-l-2 border-border">
+              <aside className="sticky top-0 hidden h-svh w-[236px] shrink-0 self-start pt-12 pr-6 xl:block">
+                <div className={cn(eyebrow, "mb-3")}>Auf dieser Seite</div>
+                <div className="flex flex-col gap-px border-l border-border">
                   {toc.map(([label, id], i) => (
                     <a
                       key={id}
                       href={`#${id}`}
                       className={cn(
-                        "-ml-0.5 border-l-2 py-1.5 pl-3.5 text-[13px] hover:text-foreground",
+                        "-ml-px border-l-2 py-1.5 pl-3.5 text-[13px] transition-colors hover:text-foreground",
                         i === 0
-                          ? "border-primary font-semibold text-primary"
+                          ? "border-primary font-medium text-primary"
                           : "border-transparent text-muted-foreground",
                       )}
                     >
@@ -1106,14 +1101,14 @@ function RouteComponent() {
                     </a>
                   ))}
                 </div>
-                <div className="mt-5.5 flex flex-col gap-2.5 border-t border-border pt-4.5 text-[12.5px]">
+                <div className="mt-6 flex flex-col gap-2.5 border-t border-border pt-5 text-[12.5px]">
                   <button
                     type="button"
                     onClick={() => {
                       setHistTab("versions");
                       setView("history");
                     }}
-                    className="flex items-center gap-2 text-muted-foreground hover:text-primary"
+                    className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-primary"
                   >
                     <History className="size-3.5" /> Versionsverlauf
                   </button>
@@ -1123,13 +1118,13 @@ function RouteComponent() {
                       setHistTab("comments");
                       setView("history");
                     }}
-                    className="flex items-center gap-2 text-muted-foreground hover:text-primary"
+                    className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-primary"
                   >
                     <MessageSquare className="size-3.5" /> 3 Kommentare
                   </button>
                   <button
                     type="button"
-                    className="flex items-center gap-2 text-muted-foreground hover:text-primary"
+                    className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-primary"
                   >
                     <Share2 className="size-3.5" /> Teilen / Export
                   </button>
@@ -1141,8 +1136,8 @@ function RouteComponent() {
           {/* ===== EDITOR ===== */}
           {view === "edit" && (
             <div>
-              <div className="sticky top-0 z-20 flex justify-center border-b border-border bg-card py-1.5">
-                <div className="flex w-full max-w-[760px] flex-wrap items-center gap-0.5 px-6">
+              <div className="sticky top-0 z-20 flex justify-center border-b border-border bg-background/90 py-2 backdrop-blur">
+                <div className="flex w-full max-w-[760px] flex-wrap items-center gap-0.5 rounded-xl px-6">
                   <Button
                     variant="outline"
                     size="icon-sm"
@@ -1175,7 +1170,7 @@ function RouteComponent() {
                   contentEditable
                   suppressContentEditableWarning
                   data-ph="Titel der Seite"
-                  className="mb-4.5 font-serif text-[42px] leading-[1.08] font-semibold tracking-tight outline-none"
+                  className="mb-5 font-serif text-[36px] leading-[1.12] font-semibold tracking-tight outline-none"
                 >
                   Erste Schritte bei Nordwind
                 </div>
@@ -1183,7 +1178,7 @@ function RouteComponent() {
                   ref={editorRef}
                   contentEditable
                   suppressContentEditableWarning
-                  className="min-h-[300px] font-serif text-[18px] leading-[1.72] outline-none [&_h2]:mt-7 [&_h2]:mb-3 [&_h2]:font-sans [&_h2]:text-2xl [&_h2]:font-bold [&_p]:mb-5 [&_ul]:mb-5 [&_ul]:list-disc [&_ul]:pl-6"
+                  className="min-h-[300px] font-serif text-[18px] leading-[1.75] outline-none [&_h2]:mt-8 [&_h2]:mb-3 [&_h2]:font-sans [&_h2]:text-[22px] [&_h2]:font-semibold [&_h2]:tracking-tight [&_p]:mb-5 [&_ul]:mb-5 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:marker:text-primary"
                 >
                   <p className="text-muted-foreground">
                     Schön, dass du da bist! Diese Seite führt dich durch deine ersten Tage bei
@@ -1206,18 +1201,16 @@ function RouteComponent() {
                 </div>
 
                 {showSlash && (
-                  <div className="animate-in fade-in zoom-in-95 absolute top-32 left-6 z-30 w-[300px] rounded-xl border border-border bg-popover p-1.5 shadow-lg">
-                    <div className="px-2.5 pt-1.5 pb-1 text-[10.5px] font-bold tracking-wider text-muted-foreground uppercase">
-                      Basis-Blöcke
-                    </div>
+                  <div className="absolute top-32 left-6 z-30 w-[300px] rounded-xl border border-border bg-popover p-1.5 shadow-lg">
+                    <div className={cn(eyebrow, "px-2.5 pt-1.5 pb-1")}>Basis-Blöcke</div>
                     {slashItems.map(([Icon, label, desc, run]) => (
                       <button
                         type="button"
                         key={label}
                         onClick={run}
-                        className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-primary/10"
+                        className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted"
                       >
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                           <Icon className="size-4" />
                         </span>
                         <div>
@@ -1236,20 +1229,18 @@ function RouteComponent() {
           {view === "permissions" && (
             <div className="mx-auto max-w-[1080px] px-10 pt-9 pb-20">
               <div className="mb-2 flex items-start gap-3.5">
-                <div className="flex size-10.5 shrink-0 items-center justify-center rounded-xl bg-primary font-serif text-[17px] font-semibold text-primary-foreground">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
                   TH
                 </div>
                 <div className="flex-1">
-                  <h1 className="font-display text-[28px] font-semibold tracking-tight">
-                    Team-Handbuch · Zugriff
-                  </h1>
+                  <h1 className="text-2xl font-semibold tracking-tight">Team-Handbuch · Zugriff</h1>
                   <p className="mt-0.5 text-sm text-muted-foreground">
                     Verwalte Mitglieder, Rollen und seitengenaue Berechtigungen für diesen Space.
                   </p>
                 </div>
               </div>
 
-              <Tabs value={permTab} onValueChange={setPermTab} className="mt-5.5">
+              <Tabs value={permTab} onValueChange={setPermTab} className="mt-6">
                 <TabsList
                   variant="line"
                   className="mb-6 w-full justify-start border-b border-border"
@@ -1260,7 +1251,7 @@ function RouteComponent() {
                       6
                     </Badge>
                   </TabsTrigger>
-                  <TabsTrigger value="roles">Rollen & Rechte</TabsTrigger>
+                  <TabsTrigger value="roles">Rollen &amp; Rechte</TabsTrigger>
                   <TabsTrigger value="pages">Seiten-Berechtigungen</TabsTrigger>
                   <TabsTrigger value="invites">
                     Einladungen{" "}
@@ -1287,31 +1278,23 @@ function RouteComponent() {
                       <UserPlus /> Mitglied einladen
                     </Button>
                   </div>
-                  <Card className={cn(cardCls, "overflow-hidden py-0")}>
+                  <Card className="py-0">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-muted/40 hover:bg-muted/40">
-                          <TableHead className="text-[11.5px] tracking-wide uppercase">
-                            Name
-                          </TableHead>
-                          <TableHead className="text-[11.5px] tracking-wide uppercase">
-                            Gruppe
-                          </TableHead>
-                          <TableHead className="text-[11.5px] tracking-wide uppercase">
-                            Rolle
-                          </TableHead>
-                          <TableHead className="text-[11.5px] tracking-wide uppercase">
-                            Status
-                          </TableHead>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="pl-4 text-xs">Name</TableHead>
+                          <TableHead className="text-xs">Gruppe</TableHead>
+                          <TableHead className="text-xs">Rolle</TableHead>
+                          <TableHead className="text-xs">Status</TableHead>
                           <TableHead className="w-10" />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {members.map((m) => (
                           <TableRow key={m[1]}>
-                            <TableCell>
+                            <TableCell className="py-3 pl-4">
                               <div className="flex items-center gap-2.5">
-                                <ColorAvatar initials={m[5]} color={m[6]} />
+                                <ColorAvatar initials={m[5]} color={m[6]} size="sm" />
                                 <div className="min-w-0">
                                   <div className="truncate text-[13.5px] font-semibold">{m[0]}</div>
                                   <div className="truncate text-xs text-muted-foreground">
@@ -1327,9 +1310,7 @@ function RouteComponent() {
                               <RoleBadge role={m[3]} />
                             </TableCell>
                             <TableCell>
-                              <span className={cn("text-xs font-semibold", STATUS_CLASS[m[4]])}>
-                                {m[4]}
-                              </span>
+                              <StatusPill status={m[4]} />
                             </TableCell>
                             <TableCell>
                               <Button variant="ghost" size="icon-sm">
@@ -1349,28 +1330,28 @@ function RouteComponent() {
                 <>
                   <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
                     {roles.map((r) => (
-                      <Card key={r[0]} size="sm" className={cardCls}>
-                        <CardContent className="px-4 py-0">
+                      <Card key={r[0]} size="sm">
+                        <CardContent>
                           <div className="mb-1.5 flex items-center gap-2">
                             <span className={cn("size-2.5 rounded-full", r[3])} />
-                            <span className="text-sm font-bold">{r[0]}</span>
+                            <span className="text-sm font-semibold">{r[0]}</span>
                           </div>
                           <div className="min-h-13.5 text-[12.5px] leading-normal text-muted-foreground">
                             {r[1]}
                           </div>
                           <div className="mt-2 border-t border-border pt-2.5 text-xs text-muted-foreground">
-                            {r[2]} Mitglieder
+                            {r[2]} {r[2] === "1" ? "Mitglied" : "Mitglieder"}
                           </div>
                         </CardContent>
                       </Card>
                     ))}
                   </div>
-                  <h2 className="mb-3 text-[15px] font-bold">Berechtigungs-Matrix</h2>
-                  <Card className={cn(cardCls, "overflow-hidden py-0")}>
+                  <h2 className="mb-3 text-[15px] font-semibold">Berechtigungs-Matrix</h2>
+                  <Card className="py-0">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-muted/40 hover:bg-muted/40">
-                          <TableHead className="w-[40%] text-xs">Berechtigung</TableHead>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="w-[40%] pl-4 text-xs">Berechtigung</TableHead>
                           {["Admin", "Editor", "Kommentator", "Leser"].map((h) => (
                             <TableHead key={h} className="text-center text-xs">
                               {h}
@@ -1381,13 +1362,15 @@ function RouteComponent() {
                       <TableBody>
                         {matrix.map((row) => (
                           <TableRow key={row[0]}>
-                            <TableCell className="text-[13.5px]">{row[0]}</TableCell>
+                            <TableCell className="pl-4 text-[13.5px]">{row[0]}</TableCell>
                             {row[1].map((on, ci) => (
                               <TableCell key={`${row[0]}-${ci}`} className="text-center">
                                 {on ? (
-                                  <Check className="mx-auto size-4 text-emerald-600 dark:text-emerald-400" />
+                                  <span className="mx-auto flex size-5 items-center justify-center rounded-full bg-primary/12 text-primary">
+                                    <Check className="size-3.5" />
+                                  </span>
                                 ) : (
-                                  <Minus className="mx-auto size-4 text-muted-foreground/50" />
+                                  <Minus className="mx-auto size-4 text-muted-foreground/40" />
                                 )}
                               </TableCell>
                             ))}
@@ -1406,14 +1389,14 @@ function RouteComponent() {
                     Berechtigungen werden vom Space nach unten vererbt. Du kannst sie auf einzelnen
                     Seiten überschreiben – untergeordnete Seiten erben dann die neue Einstellung.
                   </p>
-                  <Card className={cn(cardCls, "overflow-hidden py-0")}>
+                  <Card className="gap-0 py-0">
                     {pagePerms.map((p, idx) => {
                       const isRoot = p[2] === "root";
                       const Icon = isRoot ? LayoutGrid : p[0] === 1 ? Folder : FileText;
                       return (
                         <div
                           key={`${p[1]}-${idx}`}
-                          className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-0 hover:bg-muted/40"
+                          className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 transition-colors last:border-0 hover:bg-muted/40"
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-2.5">
                             <span style={{ width: `${p[0] * 18}px` }} className="shrink-0" />
@@ -1421,17 +1404,12 @@ function RouteComponent() {
                             <span
                               className={cn(
                                 "truncate text-[13.5px]",
-                                isRoot ? "font-bold" : "font-medium",
+                                isRoot ? "font-semibold" : "font-medium",
                               )}
                             >
                               {p[1]}
                             </span>
-                            <Badge
-                              variant="secondary"
-                              className={cn("rounded-md", pageBadge[p[2]])}
-                            >
-                              {pageBadgeText[p[2]]}
-                            </Badge>
+                            <Badge variant={pageBadge[p[2]]}>{pageBadgeText[p[2]]}</Badge>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
                             <span className="text-[12.5px] text-muted-foreground">{p[3]}</span>
@@ -1450,14 +1428,14 @@ function RouteComponent() {
               {permTab === "invites" && (
                 <div className="grid items-start gap-6 lg:grid-cols-[1fr_320px]">
                   <div>
-                    <h2 className="mb-3 text-[15px] font-bold">Offene Einladungen</h2>
-                    <Card className={cn(cardCls, "overflow-hidden py-0")}>
+                    <h2 className="mb-3 text-[15px] font-semibold">Offene Einladungen</h2>
+                    <Card className="gap-0 py-0">
                       {invites.map((iv) => (
                         <div
                           key={iv[0]}
                           className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-0"
                         >
-                          <span className="flex size-8.5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                             <Mail className="size-4" />
                           </span>
                           <div className="min-w-0 flex-1">
@@ -1467,7 +1445,7 @@ function RouteComponent() {
                             </div>
                           </div>
                           <RoleBadge role={iv[3]} />
-                          <Badge className="bg-amber-500/12 text-amber-600 dark:text-amber-300">
+                          <Badge variant="outline" className="text-amber-600 dark:text-amber-400">
                             Ausstehend
                           </Badge>
                           <Button
@@ -1481,18 +1459,20 @@ function RouteComponent() {
                       ))}
                     </Card>
                   </div>
-                  <Card className={cn(cardCls, "p-4.5")}>
-                    <h3 className="mb-3.5 text-sm font-bold">Neue Einladung</h3>
-                    <Label className="mb-1.5 text-xs">E-Mail-Adressen</Label>
-                    <Input placeholder="name@firma.de, …" className="mb-3.5 bg-muted/40" />
-                    <Label className="mb-1.5 text-xs">Rolle</Label>
-                    <NativeSelect className="mb-3.5 bg-muted/40">
-                      <NativeSelectOption>Editor</NativeSelectOption>
-                      <NativeSelectOption>Kommentator</NativeSelectOption>
-                      <NativeSelectOption>Leser</NativeSelectOption>
-                      <NativeSelectOption>Administrator</NativeSelectOption>
-                    </NativeSelect>
-                    <Button className="w-full">Einladung senden</Button>
+                  <Card>
+                    <CardContent>
+                      <h3 className="mb-3.5 text-sm font-semibold">Neue Einladung</h3>
+                      <Label className="mb-1.5 text-xs">E-Mail-Adressen</Label>
+                      <Input placeholder="name@firma.de, …" className="mb-3.5" />
+                      <Label className="mb-1.5 text-xs">Rolle</Label>
+                      <NativeSelect className="mb-3.5">
+                        <NativeSelectOption>Editor</NativeSelectOption>
+                        <NativeSelectOption>Kommentator</NativeSelectOption>
+                        <NativeSelectOption>Leser</NativeSelectOption>
+                        <NativeSelectOption>Administrator</NativeSelectOption>
+                      </NativeSelect>
+                      <Button className="w-full">Einladung senden</Button>
+                    </CardContent>
                   </Card>
                 </div>
               )}
@@ -1505,7 +1485,7 @@ function RouteComponent() {
               <div className="mb-1 text-[13px] text-muted-foreground">
                 Erste Schritte bei Nordwind
               </div>
-              <h1 className="mb-5.5 font-display text-[28px] font-semibold tracking-tight">
+              <h1 className="mb-5 text-2xl font-semibold tracking-tight">
                 Verlauf &amp; Kommentare
               </h1>
               <Tabs value={histTab} onValueChange={setHistTab}>
@@ -1535,7 +1515,7 @@ function RouteComponent() {
                       <div className="flex shrink-0 flex-col items-center">
                         <span
                           className={cn(
-                            "mt-4 size-3 shrink-0 rounded-full border-2",
+                            "mt-5 size-3 shrink-0 rounded-full border-2",
                             v[8] ? "border-primary bg-primary" : "border-border bg-card",
                           )}
                         />
@@ -1543,42 +1523,38 @@ function RouteComponent() {
                           <span className="my-0.5 w-0.5 flex-1 bg-border" />
                         )}
                       </div>
-                      <Card
-                        className={cn(
-                          cardCls,
-                          "mb-3.5 flex-1 px-4 py-3.5",
-                          v[8] && "border-primary/40",
-                        )}
-                      >
-                        <div className="mb-1.5 flex items-center gap-2.5">
-                          <ColorAvatar initials={v[2]} color={v[3]} className="size-7" />
-                          <div className="flex-1">
-                            <span className="text-[13.5px] font-semibold">{v[1]}</span>
-                            <span className="text-[12.5px] text-muted-foreground"> · {v[4]}</span>
+                      <Card className={cn("mb-3.5 flex-1 gap-0 py-0", v[8] && "ring-primary/40")}>
+                        <CardContent className="py-3.5">
+                          <div className="mb-1.5 flex items-center gap-2.5">
+                            <ColorAvatar initials={v[2]} color={v[3]} size="sm" />
+                            <div className="flex-1">
+                              <span className="text-[13.5px] font-semibold">{v[1]}</span>
+                              <span className="text-[12.5px] text-muted-foreground"> · {v[4]}</span>
+                            </div>
+                            {v[8] && (
+                              <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                                Aktuell
+                              </Badge>
+                            )}
+                            <Kbd>{v[0]}</Kbd>
                           </div>
-                          {v[8] && (
-                            <Badge className="bg-emerald-500/12 text-emerald-600 dark:text-emerald-400">
-                              Aktuell
-                            </Badge>
-                          )}
-                          <Kbd>{v[0]}</Kbd>
-                        </div>
-                        <div className="mb-2.5 text-[13.5px] text-muted-foreground">{v[5]}</div>
-                        <div className="flex items-center gap-3.5">
-                          <span className="font-mono text-xs text-emerald-600 dark:text-emerald-400">
-                            +{v[6]}
-                          </span>
-                          <span className="font-mono text-xs text-destructive">−{v[7]}</span>
-                          <div className="flex-1" />
-                          <Button variant="outline" size="xs">
-                            Vergleichen
-                          </Button>
-                          {v[9] && (
-                            <Button variant="outline" size="xs" className="text-primary">
-                              Wiederherstellen
+                          <div className="mb-2.5 text-[13.5px] text-muted-foreground">{v[5]}</div>
+                          <div className="flex items-center gap-3.5">
+                            <span className="font-mono text-xs text-emerald-600 dark:text-emerald-400">
+                              +{v[6]}
+                            </span>
+                            <span className="font-mono text-xs text-destructive">−{v[7]}</span>
+                            <div className="flex-1" />
+                            <Button variant="outline" size="xs">
+                              Vergleichen
                             </Button>
-                          )}
-                        </div>
+                            {v[9] && (
+                              <Button variant="outline" size="xs" className="text-primary">
+                                Wiederherstellen
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
                       </Card>
                     </div>
                   ))}
@@ -1590,52 +1566,50 @@ function RouteComponent() {
                   {comments.map((c, i) => {
                     const isResolved = resolved[i];
                     return (
-                      <Card key={c[4]} className={cn(cardCls, "p-4", isResolved && "opacity-70")}>
-                        <div className="mb-2.5 flex items-center gap-2.5">
-                          <ColorAvatar initials={c[1]} color={c[2]} className="size-7" />
-                          <div className="flex-1">
-                            <span className="text-[13.5px] font-semibold">{c[0]}</span>
-                            <span className="text-[12.5px] text-muted-foreground"> · {c[3]}</span>
+                      <Card key={c[4]} className={cn(isResolved && "opacity-70")}>
+                        <CardContent>
+                          <div className="mb-2.5 flex items-center gap-2.5">
+                            <ColorAvatar initials={c[1]} color={c[2]} size="sm" />
+                            <div className="flex-1">
+                              <span className="text-[13.5px] font-semibold">{c[0]}</span>
+                              <span className="text-[12.5px] text-muted-foreground"> · {c[3]}</span>
+                            </div>
+                            {isResolved && (
+                              <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                <Check className="size-3.5" />
+                                Gelöst
+                              </span>
+                            )}
                           </div>
-                          {isResolved && (
-                            <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-emerald-600 dark:text-emerald-400">
-                              <Check className="size-3.5" />
-                              Gelöst
-                            </span>
-                          )}
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className="mb-2 rounded-md bg-primary/10 text-primary"
-                        >
-                          Bezieht sich auf {c[4]}
-                        </Badge>
-                        <div className="text-sm leading-relaxed">{c[5]}</div>
-                        <div className="mt-2.5 flex items-center gap-3.5">
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="h-auto p-0 text-muted-foreground"
-                          >
-                            Antworten
-                          </Button>
-                          {c[6] > 0 && (
-                            <span className="text-[12.5px] text-muted-foreground">
-                              {c[6]} Antwort
-                            </span>
-                          )}
-                          <div className="flex-1" />
-                          {!isResolved && (
+                          <Badge variant="secondary" className="mb-2 text-primary">
+                            Bezieht sich auf „{c[4]}“
+                          </Badge>
+                          <div className="text-sm leading-relaxed">{c[5]}</div>
+                          <div className="mt-2.5 flex items-center gap-3.5">
                             <Button
-                              variant="outline"
-                              size="xs"
-                              onClick={() => setResolved((s) => ({ ...s, [i]: true }))}
-                              className="hover:border-emerald-500 hover:text-emerald-600"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-muted-foreground"
                             >
-                              Als gelöst markieren
+                              Antworten
                             </Button>
-                          )}
-                        </div>
+                            {c[6] > 0 && (
+                              <span className="text-[12.5px] text-muted-foreground">
+                                {c[6]} Antwort
+                              </span>
+                            )}
+                            <div className="flex-1" />
+                            {!isResolved && (
+                              <Button
+                                variant="outline"
+                                size="xs"
+                                onClick={() => setResolved((s) => ({ ...s, [i]: true }))}
+                              >
+                                Als gelöst markieren
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
                       </Card>
                     );
                   })}
@@ -1649,7 +1623,7 @@ function RouteComponent() {
             <div className="mx-auto max-w-[1080px] px-10 pt-9 pb-20">
               <div className="mb-6 flex items-end justify-between">
                 <div>
-                  <h1 className="font-display text-[36px] font-semibold tracking-tight">Spaces</h1>
+                  <h1 className="text-2xl font-semibold tracking-tight">Spaces</h1>
                   <p className="mt-1 text-sm text-muted-foreground">
                     6 Bereiche · dein Zugriff wird pro Space verwaltet.
                   </p>
@@ -1663,36 +1637,35 @@ function RouteComponent() {
                   <Card
                     key={s[0]}
                     onClick={() => selectPage("erste-schritte")}
-                    className={cn(
-                      cardCls,
-                      "cursor-pointer p-4.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md",
-                    )}
+                    className="cursor-pointer transition-all hover:shadow-md hover:ring-primary/30"
                   >
-                    <div className="mb-3 flex items-center justify-between">
-                      <div
-                        className="flex size-10 items-center justify-center rounded-xl text-[15px] font-bold text-white"
-                        style={{ backgroundColor: s[2] }}
-                      >
-                        {s[1]}
+                    <CardContent>
+                      <div className="mb-3 flex items-center justify-between">
+                        <div
+                          className="flex size-11 items-center justify-center rounded-xl text-[15px] font-bold text-white shadow-sm"
+                          style={{ backgroundColor: s[2] }}
+                        >
+                          {s[1]}
+                        </div>
+                        <RoleBadge role={s[6]} />
                       </div>
-                      <RoleBadge role={s[6]} />
-                    </div>
-                    <div className="mb-1.5 text-base font-bold">{s[0]}</div>
-                    <div className="min-h-10 text-[13px] leading-normal text-muted-foreground">
-                      {s[3]}
-                    </div>
-                    <div className="mt-3.5 flex items-center gap-3.5 border-t border-border pt-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1.5">
-                        <BookOpen className="size-3.5" />
-                        {s[4]}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Users className="size-3.5" />
-                        {s[5]}
-                      </span>
-                      <div className="flex-1" />
-                      <span>{s[7]}</span>
-                    </div>
+                      <div className="mb-1 text-base font-semibold">{s[0]}</div>
+                      <div className="min-h-10 text-[13px] leading-normal text-muted-foreground">
+                        {s[3]}
+                      </div>
+                      <div className="mt-3.5 flex items-center gap-3.5 border-t border-border pt-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <BookOpen className="size-3.5" />
+                          {s[4]}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Users className="size-3.5" />
+                          {s[5]}
+                        </span>
+                        <div className="flex-1" />
+                        <span>{s[7]}</span>
+                      </div>
+                    </CardContent>
                   </Card>
                 ))}
               </div>
