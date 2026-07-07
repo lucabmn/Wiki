@@ -28,7 +28,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "My App",
+        title: "Nilovon Wiki - Die private Wiki-Lösung für Teams",
       },
     ],
     links: [

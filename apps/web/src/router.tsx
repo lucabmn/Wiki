@@ -1,7 +1,9 @@
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 
-import Loader from "./components/loader";
+import ErrorScreen from "./components/default-screens/error-screen";
+import LoadingScreen from "./components/default-screens/loading-screen";
+import NotFoundScreen from "./components/default-screens/not-found-screen";
 import { routeTree } from "./routeTree.gen";
 import { createQueryClient, orpc } from "./utils/orpc";
 
@@ -13,8 +15,9 @@ export const getRouter = () => {
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
     context: { orpc, queryClient },
-    defaultPendingComponent: () => <Loader />,
-    defaultNotFoundComponent: () => <div>Not Found</div>,
+    defaultPendingComponent: () => <LoadingScreen />,
+    defaultErrorComponent: ({ error, reset }) => <ErrorScreen error={error} reset={reset} />,
+    defaultNotFoundComponent: () => <NotFoundScreen />,
   });
 
   setupRouterSsrQueryIntegration({
