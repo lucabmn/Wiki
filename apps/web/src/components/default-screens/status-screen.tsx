@@ -18,26 +18,16 @@ export default function StatusScreen({
   children?: ReactNode;
 }) {
   return (
-    <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-background px-6 py-16 font-sans text-center">
-      {/* decorative glow */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-60"
-        style={{
-          background:
-            "radial-gradient(600px circle at 20% 0%, rgba(31,111,235,.16), transparent 45%), radial-gradient(500px circle at 85% 100%, rgba(31,111,235,.10), transparent 45%)",
-        }}
-      />
-
+    <div className="relative flex min-h-svh flex-col items-center justify-center bg-background px-6 py-16 font-sans text-center">
       <div className="relative flex w-full max-w-md flex-col items-center">
         {/* brand mark */}
         <div className="mb-8 flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-primary to-blue-800 text-lg font-extrabold text-white shadow-sm">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-primary font-serif text-lg font-semibold text-primary-foreground shadow-sm">
             N
           </div>
-          <div className="text-left text-[15px] leading-tight font-bold">
+          <div className="text-left text-[15px] leading-tight font-semibold">
             Nilovon Wiki
-            <span className="block text-xs font-medium text-muted-foreground">Wissens-Hub</span>
+            <span className="block text-xs font-normal text-muted-foreground">Wissens-Hub</span>
           </div>
         </div>
 
@@ -47,19 +37,21 @@ export default function StatusScreen({
         </div>
 
         {badge && (
-          <div className="mb-3 rounded-full bg-muted px-3 py-1 font-mono text-xs font-semibold text-muted-foreground">
+          <div className="mb-3 rounded-full bg-muted px-3 py-1 font-mono text-xs font-medium text-muted-foreground">
             {badge}
           </div>
         )}
 
-        <h1 className="text-[26px] leading-tight font-extrabold tracking-tight text-foreground">
+        <h1 className="font-serif text-[28px] leading-tight font-semibold tracking-tight text-foreground">
           {title}
         </h1>
         <p className="mt-2.5 max-w-sm text-[14.5px] leading-relaxed text-muted-foreground">
           {message}
         </p>
 
-        {children && <div className="mt-8 flex flex-wrap items-center justify-center gap-3">{children}</div>}
+        {children && (
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">{children}</div>
+        )}
       </div>
     </div>
   );

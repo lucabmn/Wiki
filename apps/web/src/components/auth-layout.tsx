@@ -21,29 +21,29 @@ export default function AuthLayout({
   return (
     <div className="grid min-h-svh font-sans lg:grid-cols-[1.1fr_1fr]">
       {/* ---- brand panel ---- */}
-      <div className="relative hidden overflow-hidden bg-linear-to-br from-primary via-blue-700 to-blue-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        {/* decorative glow */}
+      <div className="relative hidden overflow-hidden bg-[oklch(0.24_0.020_45)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        {/* warm accent glow — terracotta, not blue */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-70"
+          className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(600px circle at 15% 10%, rgba(255,255,255,.18), transparent 45%), radial-gradient(500px circle at 90% 90%, rgba(255,255,255,.12), transparent 45%)",
+              "radial-gradient(680px circle at 12% 8%, rgba(197,95,60,.30), transparent 50%), radial-gradient(520px circle at 92% 96%, rgba(120,70,40,.28), transparent 50%)",
           }}
         />
 
         <div className="relative flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-white/15 text-lg font-extrabold ring-1 ring-white/25 backdrop-blur">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-white/12 font-serif text-lg font-semibold ring-1 ring-white/20 backdrop-blur">
             N
           </div>
-          <div className="text-[15px] leading-tight font-bold">
+          <div className="text-[15px] leading-tight font-semibold">
             Nilovon Wiki
-            <span className="block text-xs font-medium text-white/70">Wissens-Hub</span>
+            <span className="block text-xs font-normal text-white/70">Wissens-Hub</span>
           </div>
         </div>
 
         <div className="relative max-w-md">
-          <h2 className="text-[34px] leading-[1.15] font-extrabold tracking-tight">
+          <h2 className="font-serif text-[38px] leading-[1.12] font-medium tracking-tight">
             Das Wissen deines Teams, an einem Ort.
           </h2>
           <p className="mt-4 text-[15px] leading-relaxed text-white/80">
@@ -83,16 +83,16 @@ export default function AuthLayout({
         <div className="w-full max-w-sm">
           {/* mobile logo */}
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-primary to-blue-800 text-lg font-extrabold text-white shadow-sm">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary font-serif text-lg font-semibold text-primary-foreground shadow-sm">
               N
             </div>
-            <div className="text-[15px] leading-tight font-bold">
+            <div className="text-[15px] leading-tight font-semibold">
               Nilovon Wiki
-              <span className="block text-xs font-medium text-muted-foreground">Wissens-Hub</span>
+              <span className="block text-xs font-normal text-muted-foreground">Wissens-Hub</span>
             </div>
           </div>
 
-          <h1 className="text-[26px] font-extrabold tracking-tight">{title}</h1>
+          <h1 className="font-serif text-[30px] font-semibold tracking-tight">{title}</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
 
           <div className="mt-8">{children}</div>
