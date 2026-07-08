@@ -4,11 +4,23 @@ import { orpc } from "@/utils/orpc";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@nilovon-wiki/ui/components/dialog";
+import { Input } from "@nilovon-wiki/ui/components/input";
+import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { FileText, Plus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_auth/")({
   component: RouteComponent,
@@ -138,25 +150,125 @@ function Favorites({ enabled }: { enabled: boolean }) {
   );
 }
 
+// Lets the caller create a page from the org-level dashboard, where no space is
+// in context yet — so it first asks which space, then reuses `pages.create`.
+function NewPageDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const { data: spaces } = useQuery(orpc.spaces.list.queryOptions({ input: {}, enabled: open }));
+
+  const [spaceId, setSpaceId] = useState("");
+  const [title, setTitle] = useState("");
+
+  const create = useMutation(
+    orpc.pages.create.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: orpc.pages.list.key() });
+        setTitle("");
+        onOpenChange(false);
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
+  // Default the picker to the first space once the list arrives.
+  const effectiveSpaceId = spaceId || spaces?.[0]?.id || "";
+
+  const submit = () => {
+    const trimmed = title.trim();
+    if (effectiveSpaceId && trimmed) {
+      create.mutate({ spaceId: effectiveSpaceId, title: trimmed });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Neue Seite</DialogTitle>
+          <DialogDescription>
+            Die Seite wird als Entwurf im gewählten Space angelegt.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+          className="space-y-3"
+        >
+          <NativeSelect
+            className="w-full"
+            value={effectiveSpaceId}
+            onChange={(e) => setSpaceId(e.target.value)}
+            disabled={!spaces?.length}
+          >
+            {spaces?.map((space) => (
+              <NativeSelectOption key={space.id} value={space.id}>
+                {space.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <Input
+            autoFocus
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Seitentitel"
+            maxLength={300}
+          />
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={create.isPending}
+            >
+              Abbrechen
+            </Button>
+            <Button type="submit" disabled={create.isPending || !effectiveSpaceId || !title.trim()}>
+              {create.isPending ? "Erstellen …" : "Erstellen"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function HeroCard() {
   const { auth } = Route.useRouteContext();
+  const { data: overview, isPending } = useQuery(
+    orpc.dashboard.overview.queryOptions({ input: {} }),
+  );
+  const [newPageOpen, setNewPageOpen] = useState(false);
 
   const now = new Date();
 
   const greeting =
     now.getHours() < 11 ? "Guten Morgen" : now.getHours() < 18 ? "Guten Tag" : "Guten Abend";
 
+  // "–" while the counts load; the members total comes from the already-loaded
+  // org context, so it renders immediately.
+  const n = (value: number | undefined) => (value === undefined ? "–" : value.toString());
+  const memberCount = auth.organization.members.length;
+
   const stats: [string, string, string][] = [
-    // TODO: Get real site data
-    ["Seiten", "48", "+3 diese Woche"],
-    // TODO: Filter real active member
+    ["Seiten", n(overview?.pageCount), `+${n(overview?.pagesCreatedThisWeek)} diese Woche`],
     [
       "Mitglieder",
-      auth.organization.members.length.toString(),
-      `${auth.organization.members.filter((member) => member.createdAt).length} aktiv jetzt`,
+      memberCount.toString(),
+      `${n(overview?.activeMembersThisWeek)} aktiv diese Woche`,
     ],
-    // TODO: Get real comment data
-    ["Offene Kommentare", "3", "2 dir zugewiesen"],
+    [
+      "Offene Kommentare",
+      n(overview?.openComments),
+      `${n(overview?.commentsResolvedThisWeek)} gelöst diese Woche`,
+    ],
   ];
 
   const dateLine = now.toLocaleDateString("de-DE", {
@@ -176,10 +288,12 @@ function HeroCard() {
             {greeting}, {auth.session.user.name}.
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Du hast 2 neue Kommentare und 3 aktualisierte Seiten seit gestern.
+            {overview
+              ? `Du hast ${overview.openComments} offene Kommentare und ${overview.pagesCreatedThisWeek} neue Seiten diese Woche.`
+              : " "}
           </p>
         </div>
-        <Button onClick={() => console.log("edit")} className="shrink-0">
+        <Button onClick={() => setNewPageOpen(true)} className="shrink-0">
           <Plus /> Neue Seite
         </Button>
       </div>
@@ -188,11 +302,15 @@ function HeroCard() {
         {stats.map(([label, value, delta]) => (
           <Card key={label} className="px-4 py-3">
             <div className="text-[13px] text-muted-foreground">{label}</div>
-            <div className="text-2xl font-semibold tracking-tight">{value}</div>
+            <div className="text-2xl font-semibold tracking-tight">
+              {isPending && label !== "Mitglieder" ? <Skeleton className="h-8 w-10" /> : value}
+            </div>
             <div className="text-[11.5px] text-muted-foreground">{delta}</div>
           </Card>
         ))}
       </div>
+
+      <NewPageDialog open={newPageOpen} onOpenChange={setNewPageOpen} />
     </Card>
   );
 }

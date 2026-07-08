@@ -4,6 +4,7 @@ import { publicProcedure } from "../index";
 import { activityRouter } from "./activity";
 import { attachmentRouter } from "./attachment";
 import { commentRouter } from "./comment";
+import { dashboardRouter } from "./dashboard";
 import { linkRouter } from "./link";
 import { onboardingRouter } from "./onboarding";
 import { pageRouter } from "./page";
@@ -33,6 +34,7 @@ export const appRouter = {
   search: searchRouter,
   me: userStateRouter,
   onboarding: onboardingRouter,
+  dashboard: dashboardRouter,
 };
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;

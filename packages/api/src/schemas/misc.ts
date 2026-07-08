@@ -57,6 +57,19 @@ export const ListActivityInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
+// --- Dashboard -----------------------------------------------------------
+
+// Aggregate counts for the dashboard hero, all scoped to spaces the caller may
+// read. Each headline value carries a "this week" companion so the sub-lines
+// render real numbers instead of mock deltas.
+export const DashboardOverviewSchema = z.object({
+  pageCount: z.number().int(),
+  pagesCreatedThisWeek: z.number().int(),
+  openComments: z.number().int(),
+  commentsResolvedThisWeek: z.number().int(),
+  activeMembersThisWeek: z.number().int(),
+});
+
 // --- Search --------------------------------------------------------------
 
 export const SearchInputSchema = z.object({
