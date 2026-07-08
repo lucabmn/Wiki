@@ -17,7 +17,7 @@ import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/na
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FileText, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -62,6 +62,7 @@ function timeAgo(date: Date): string {
 }
 
 function RecentActivity({ enabled }: { enabled: boolean }) {
+  const navigate = useNavigate();
   const { data, isPending } = useQuery(
     orpc.activity.list.queryOptions({ input: { limit: 5 }, enabled }),
   );
@@ -90,8 +91,9 @@ function RecentActivity({ enabled }: { enabled: boolean }) {
           <button
             type="button"
             key={r.id}
-            onClick={() => console.log("select page")}
-            className="group flex w-full items-center gap-3 border-b border-border px-4 py-3.5 text-left transition-colors last:border-0 hover:bg-muted/50"
+            disabled={!r.pageId}
+            onClick={() => r.pageId && navigate({ to: "/pages/$id", params: { id: r.pageId } })}
+            className="group flex w-full items-center gap-3 border-b border-border px-4 py-3.5 text-left transition-colors last:border-0 hover:bg-muted/50 disabled:cursor-default disabled:hover:bg-transparent"
           >
             <span
               className="flex size-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"

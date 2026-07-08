@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "./theme-provider";
-import { Link, linkOptions, useMatchRoute } from "@tanstack/react-router";
+import { Link, linkOptions, useMatchRoute, useNavigate } from "@tanstack/react-router";
 
 const nav = linkOptions([
   { to: "/", label: "Übersicht", icon: Home },
@@ -226,10 +226,15 @@ export default function MainSidebar() {
   const { auth } = Route.useRouteContext();
   const { theme, setTheme } = useTheme();
 
-  const [activePage, setActivePage] = useState<string | null>(null);
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
 
   const matchRoute = useMatchRoute();
+  const navigate = useNavigate();
+
+  // Highlight the open page by reading it back off the route, so the tree stays
+  // in sync on deep-links and back/forward — not just clicks.
+  const pageMatch = matchRoute({ to: "/pages/$id" });
+  const activePage = pageMatch ? pageMatch.id : null;
 
   return (
     <Sidebar collapsible="none" className="border-r border-border">
@@ -288,7 +293,10 @@ export default function MainSidebar() {
           <SidebarGroupAction title="Neuer Space" onClick={() => setCreateSpaceOpen(true)}>
             <Plus /> <span className="sr-only">Neuer Space</span>
           </SidebarGroupAction>
-          <SpacesTree activePage={activePage} onSelectPage={setActivePage} />
+          <SpacesTree
+            activePage={activePage}
+            onSelectPage={(id) => navigate({ to: "/pages/$id", params: { id } })}
+          />
         </SidebarGroup>
       </SidebarContent>
 
