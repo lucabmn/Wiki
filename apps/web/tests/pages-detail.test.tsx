@@ -1,15 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { data } = vi.hoisted(() => ({
+const { data, createCommentSpy } = vi.hoisted(() => ({
   data: {
     page: undefined as unknown,
     comments: [] as unknown[],
     spaces: [] as unknown[],
     error: false,
   },
+  createCommentSpy: vi.fn((_vars?: { pageId: string; body: string }) => Promise.resolve({})),
 }));
 
 // Passthrough the layout so the sidebar (and its many deps) stays out of scope.
@@ -44,6 +45,13 @@ vi.mock("@/utils/orpc", () => ({
           queryKey: ["comments"],
           queryFn: async () => data.comments,
           enabled,
+        }),
+        key: () => ["comments"],
+      },
+      create: {
+        mutationOptions: (opts: Record<string, unknown>) => ({
+          mutationFn: createCommentSpy,
+          ...opts,
         }),
       },
     },
@@ -137,5 +145,27 @@ describe("page view route", () => {
     data.error = true;
     renderView();
     expect(await screen.findByText("Seite nicht gefunden")).toBeDefined();
+  });
+
+  it("submits a new comment", async () => {
+    data.page = {
+      id: "p1",
+      spaceId: "s1",
+      title: "Blank",
+      slug: "blank",
+      icon: null,
+      status: "draft",
+      textContent: "body",
+      updatedAt: new Date("2026-01-02T10:00:00Z"),
+    };
+    renderView();
+
+    const textarea = await screen.findByPlaceholderText("Kommentar schreiben …");
+    fireEvent.change(textarea, { target: { value: "Looks good" } });
+    fireEvent.click(screen.getByRole("button", { name: "Kommentieren" }));
+
+    await waitFor(() =>
+      expect(createCommentSpy.mock.calls[0]?.[0]).toEqual({ pageId: "p1", body: "Looks good" }),
+    );
   });
 });

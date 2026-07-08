@@ -1,11 +1,15 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { orpc } from "@/utils/orpc";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
+import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
-import { useQuery } from "@tanstack/react-query";
+import { Textarea } from "@nilovon-wiki/ui/components/textarea";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { FileText } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_auth/pages/$id")({
   component: RouteComponent,
@@ -18,6 +22,49 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
+
+function CommentForm({ pageId }: { pageId: string }) {
+  const queryClient = useQueryClient();
+  const [body, setBody] = useState("");
+
+  const create = useMutation(
+    orpc.comments.create.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: orpc.comments.list.key() });
+        setBody("");
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
+  const submit = () => {
+    const trimmed = body.trim();
+    if (trimmed) create.mutate({ pageId, body: trimmed });
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      className="mt-3 space-y-2"
+    >
+      <Textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="Kommentar schreiben …"
+        rows={3}
+        maxLength={10_000}
+      />
+      <div className="flex justify-end">
+        <Button type="submit" disabled={create.isPending || !body.trim()}>
+          {create.isPending ? "Senden …" : "Kommentieren"}
+        </Button>
+      </div>
+    </form>
+  );
+}
 
 function RouteComponent() {
   const { id } = Route.useParams();
@@ -110,6 +157,7 @@ function RouteComponent() {
               ))}
             </div>
           )}
+          <CommentForm pageId={page.id} />
         </section>
       </div>
     </DashboardLayout>
