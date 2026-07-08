@@ -8,7 +8,13 @@ export const Route = createFileRoute("/_auth")({
   component: AuthLayout,
   beforeLoad: async () => {
     const auth = await getUser();
-    return { auth };
+
+    return {
+      auth: {
+        session: auth.session!,
+        organization: auth.organization!,
+      },
+    };
   },
 });
 

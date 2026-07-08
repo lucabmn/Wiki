@@ -36,7 +36,9 @@ app.use(
   cors({
     origin: env.CORS_ORIGIN,
     allowMethods: ["GET", "POST", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    // `x-orpc-batch` is sent by the client's BatchLinkPlugin; without it the
+    // CORS preflight rejects every batched /rpc call.
+    allowHeaders: ["Content-Type", "Authorization", "x-orpc-batch"],
     credentials: true,
   }),
 );

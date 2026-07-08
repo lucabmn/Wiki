@@ -5,14 +5,10 @@ import { z } from "zod";
 import type { Database } from "@nilovon-wiki/db";
 import { comment } from "@nilovon-wiki/db/schema/index";
 
-import {
-  assertActiveOrgRead,
-  assertOrgPermission,
-  hasOrgPermission,
-  protectedProcedure,
-} from "../index";
+import { assertOrgPermission, hasOrgPermission, protectedProcedure } from "../index";
+import { assertSpaceRead } from "../lib/access";
 import { recordActivity } from "../lib/activity";
-import { loadComment, loadPage, orgOfSpace } from "../lib/loaders";
+import { loadComment, loadPage, loadSpace, orgOfSpace } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import {
   CommentSchema,
@@ -36,7 +32,8 @@ export const commentRouter = {
     .input(ListCommentsInputSchema)
     .output(z.array(CommentSchema))
     .handler(async ({ input, context }) => {
-      assertActiveOrgRead(context, await orgOfComment(context.db, input.pageId));
+      const target = await loadPage(context.db, input.pageId);
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
       return context.db.query.comment.findMany({
         where: and(
           eq(comment.pageId, input.pageId),

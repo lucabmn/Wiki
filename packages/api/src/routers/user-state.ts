@@ -1,14 +1,23 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { favorite, page, pageSubscription } from "@nilovon-wiki/db/schema/index";
+import { favorite, page, pageSubscription, space } from "@nilovon-wiki/db/schema/index";
 
-import { assertActiveOrgRead, protectedProcedure } from "../index";
-import { loadPage, orgOfSpace } from "../lib/loaders";
+import { protectedProcedure } from "../index";
+import { assertSpaceRead, buildSpaceReadFilter } from "../lib/access";
+import { loadPage, loadSpace } from "../lib/loaders";
 import { PageSchema } from "../schemas/page";
 import { PageRefInputSchema, ToggleResultSchema } from "../schemas/user-state";
 
 const TAGS = ["Me"];
+
+// The space columns needed to evaluate read access alongside each page.
+const spaceAccessColumns = {
+  id: space.id,
+  organizationId: space.organizationId,
+  visibility: space.visibility,
+  createdBy: space.createdBy,
+};
 
 export const userStateRouter = {
   // --- Favorites ---------------------------------------------------------
@@ -23,13 +32,19 @@ export const userStateRouter = {
     .input(z.object({}))
     .output(z.array(PageSchema))
     .handler(async ({ context }) => {
-      const rows = await context.db
-        .select({ page })
-        .from(favorite)
-        .innerJoin(page, eq(favorite.pageId, page.id))
-        .where(eq(favorite.userId, context.session!.user.id))
-        .orderBy(desc(favorite.createdAt));
-      return rows.map((r) => r.page);
+      // A favorite may point at a space the caller has since lost access to —
+      // filter the result to spaces they can currently read.
+      const [rows, canRead] = await Promise.all([
+        context.db
+          .select({ page, space: spaceAccessColumns })
+          .from(favorite)
+          .innerJoin(page, eq(favorite.pageId, page.id))
+          .innerJoin(space, eq(page.spaceId, space.id))
+          .where(eq(favorite.userId, context.session!.user.id))
+          .orderBy(desc(favorite.createdAt)),
+        buildSpaceReadFilter(context.db, context),
+      ]);
+      return rows.filter((r) => canRead(r.space)).map((r) => r.page);
     }),
 
   addFavorite: protectedProcedure
@@ -43,7 +58,7 @@ export const userStateRouter = {
     .output(ToggleResultSchema)
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.pageId);
-      assertActiveOrgRead(context, await orgOfSpace(context.db, target.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
       await context.db
         .insert(favorite)
         .values({ userId: context.session!.user.id, pageId: input.pageId })
@@ -81,13 +96,17 @@ export const userStateRouter = {
     .input(z.object({}))
     .output(z.array(PageSchema))
     .handler(async ({ context }) => {
-      const rows = await context.db
-        .select({ page })
-        .from(pageSubscription)
-        .innerJoin(page, eq(pageSubscription.pageId, page.id))
-        .where(eq(pageSubscription.userId, context.session!.user.id))
-        .orderBy(desc(pageSubscription.createdAt));
-      return rows.map((r) => r.page);
+      const [rows, canRead] = await Promise.all([
+        context.db
+          .select({ page, space: spaceAccessColumns })
+          .from(pageSubscription)
+          .innerJoin(page, eq(pageSubscription.pageId, page.id))
+          .innerJoin(space, eq(page.spaceId, space.id))
+          .where(eq(pageSubscription.userId, context.session!.user.id))
+          .orderBy(desc(pageSubscription.createdAt)),
+        buildSpaceReadFilter(context.db, context),
+      ]);
+      return rows.filter((r) => canRead(r.space)).map((r) => r.page);
     }),
 
   subscribe: protectedProcedure
@@ -101,7 +120,7 @@ export const userStateRouter = {
     .output(ToggleResultSchema)
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.pageId);
-      assertActiveOrgRead(context, await orgOfSpace(context.db, target.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
       await context.db
         .insert(pageSubscription)
         .values({ userId: context.session!.user.id, pageId: input.pageId })

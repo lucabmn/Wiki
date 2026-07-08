@@ -4,14 +4,10 @@ import { z } from "zod";
 
 import { attachment } from "@nilovon-wiki/db/schema/index";
 
-import {
-  assertActiveOrgRead,
-  assertOrgPermission,
-  hasOrgPermission,
-  protectedProcedure,
-} from "../index";
+import { assertOrgPermission, hasOrgPermission, protectedProcedure } from "../index";
+import { assertSpaceRead } from "../lib/access";
 import { recordActivity } from "../lib/activity";
-import { loadPage, orgOfSpace } from "../lib/loaders";
+import { loadPage, loadSpace, orgOfSpace } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import {
   AttachmentSchema,
@@ -34,7 +30,7 @@ export const attachmentRouter = {
     .output(z.array(AttachmentSchema))
     .handler(async ({ input, context }) => {
       const spaceId = input.spaceId ?? (await loadPage(context.db, input.pageId!)).spaceId;
-      assertActiveOrgRead(context, await orgOfSpace(context.db, spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, spaceId));
       return context.db.query.attachment.findMany({
         where: and(
           eq(attachment.spaceId, spaceId),

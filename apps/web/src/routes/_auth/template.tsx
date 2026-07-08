@@ -282,7 +282,7 @@ function Article() {
 
 function RouteComponent() {
   const { auth } = Route.useRouteContext();
-  const userName = auth?.user?.name || "Sarah König";
+  const userName = auth.session.user.name;
   const firstName = userName.split(" ")[0];
   const initials =
     userName

@@ -1,4 +1,8 @@
 import { Route } from "@/routes/_auth";
+import { authClient } from "@/lib/auth-client";
+import { orpc } from "@/utils/orpc";
+import { CreateSpaceDialog } from "./create-space-dialog";
+import { CreatePageDialog } from "./create-page-dialog";
 import { Avatar, AvatarFallback } from "@nilovon-wiki/ui/components/avatar";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import {
@@ -7,6 +11,7 @@ import {
   CollapsibleTrigger,
 } from "@nilovon-wiki/ui/components/collapsible";
 import { Kbd } from "@nilovon-wiki/ui/components/kbd";
+import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import {
   Sidebar,
   SidebarContent,
@@ -16,12 +21,14 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@nilovon-wiki/ui/components/sidebar";
+import { useQuery } from "@tanstack/react-query";
 import {
   ChevronRight,
   ChevronsUpDown,
@@ -45,42 +52,6 @@ const nav = linkOptions([
   { to: "/template", label: "Mitglieder & Rechte", icon: Lock },
 ]);
 
-const tree = [
-  {
-    id: "onboarding",
-    label: "Onboarding",
-    pages: [
-      ["willkommen", "Willkommen"],
-      ["erste-schritte", "Erste Schritte bei Nordwind"],
-      ["it-setup", "IT-Setup"],
-    ],
-  },
-  {
-    id: "prozesse",
-    label: "Prozesse",
-    pages: [
-      ["urlaub", "Urlaub & Abwesenheit"],
-      ["spesen", "Spesenabrechnung"],
-      ["codereview", "Code-Review-Richtlinien"],
-    ],
-  },
-  {
-    id: "unternehmen",
-    label: "Unternehmen",
-    pages: [
-      ["leitbild", "Leitbild & Werte"],
-      ["orgchart", "Organigramm"],
-      ["benefits", "Benefits"],
-    ],
-  },
-] as const;
-
-const defaultOpen: Record<string, boolean> = {
-  onboarding: true,
-  prozesse: true,
-  unternehmen: false,
-};
-
 function ColorAvatar({
   initials,
   color,
@@ -101,11 +72,152 @@ function ColorAvatar({
   );
 }
 
+/** Top-level pages of one space, loaded lazily when the space is expanded. */
+function SpacePages({
+  spaceId,
+  activePage,
+  onSelectPage,
+}: {
+  spaceId: string;
+  activePage: string | null;
+  onSelectPage: (id: string) => void;
+}) {
+  const { data: pages, isPending } = useQuery(
+    orpc.pages.list.queryOptions({ input: { spaceId, parentId: null } }),
+  );
+
+  if (isPending) {
+    return (
+      <SidebarMenuSub className="mr-0 pr-0">
+        {[0, 1, 2].map((i) => (
+          <SidebarMenuSubItem key={i}>
+            <Skeleton className="mx-2 my-1 h-5 w-32" />
+          </SidebarMenuSubItem>
+        ))}
+      </SidebarMenuSub>
+    );
+  }
+
+  if (!pages?.length) {
+    return (
+      <SidebarMenuSub className="mr-0 pr-0">
+        <SidebarMenuSubItem>
+          <span className="px-2 py-1 text-[12px] text-muted-foreground">Keine Seiten</span>
+        </SidebarMenuSubItem>
+      </SidebarMenuSub>
+    );
+  }
+
+  return (
+    <SidebarMenuSub className="mr-0 pr-0">
+      {pages.map((page) => (
+        <SidebarMenuSubItem key={page.id}>
+          <SidebarMenuSubButton
+            isActive={activePage === page.id}
+            onClick={() => onSelectPage(page.id)}
+            className="cursor-pointer data-active:bg-primary/10 data-active:text-primary"
+          >
+            {page.icon ? <span className="text-sm leading-none">{page.icon}</span> : <FileText />}
+            <span>{page.title}</span>
+          </SidebarMenuSubButton>
+        </SidebarMenuSubItem>
+      ))}
+    </SidebarMenuSub>
+  );
+}
+
+/** The space list for the active organization; each space expands to its pages. */
+function SpacesTree({
+  activePage,
+  onSelectPage,
+}: {
+  activePage: string | null;
+  onSelectPage: (id: string) => void;
+}) {
+  const { data: session } = authClient.useSession();
+  const activeOrgId = session?.session.activeOrganizationId ?? null;
+  const [createPageSpaceId, setCreatePageSpaceId] = useState<string | null>(null);
+
+  const { data: spaces, isPending } = useQuery(
+    orpc.spaces.list.queryOptions({
+      input: { includeArchived: false },
+      enabled: Boolean(activeOrgId),
+    }),
+  );
+
+  if (!activeOrgId) {
+    return (
+      <p className="px-2 py-1.5 text-[12px] text-muted-foreground">Keine Organisation aktiv.</p>
+    );
+  }
+
+  if (isPending) {
+    return (
+      <SidebarMenu className="gap-0.5">
+        {[0, 1, 2].map((i) => (
+          <SidebarMenuItem key={i}>
+            <Skeleton className="mx-2 my-1 h-7 w-40" />
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+    );
+  }
+
+  if (!spaces?.length) {
+    return (
+      <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
+        Noch keine Spaces. Lege einen an, um loszulegen.
+      </p>
+    );
+  }
+
+  return (
+    <SidebarMenu className="gap-0.5">
+      {spaces.map((space, index) => (
+        <Collapsible key={space.id} defaultOpen={index === 0} className="group/collapsible">
+          <SidebarMenuItem>
+            <CollapsibleTrigger
+              render={
+                <SidebarMenuButton className="font-medium text-muted-foreground">
+                  <ChevronRight className="transition-transform group-data-open/collapsible:rotate-90" />
+                  {space.icon ? (
+                    <span className="text-sm leading-none">{space.icon}</span>
+                  ) : (
+                    <Folder style={space.color ? { color: space.color } : undefined} />
+                  )}
+                  <span>{space.name}</span>
+                </SidebarMenuButton>
+              }
+            />
+            <SidebarMenuAction
+              title="Neue Seite"
+              showOnHover
+              onClick={() => setCreatePageSpaceId(space.id)}
+            >
+              <Plus /> <span className="sr-only">Neue Seite</span>
+            </SidebarMenuAction>
+            <CollapsibleContent>
+              <SpacePages spaceId={space.id} activePage={activePage} onSelectPage={onSelectPage} />
+            </CollapsibleContent>
+          </SidebarMenuItem>
+        </Collapsible>
+      ))}
+      <CreatePageDialog
+        spaceId={createPageSpaceId}
+        onOpenChange={(open) => {
+          if (!open) setCreatePageSpaceId(null);
+        }}
+      />
+    </SidebarMenu>
+  );
+}
+
 export default function MainSidebar() {
   const { auth } = Route.useRouteContext();
   const { theme, setTheme } = useTheme();
 
-  const [activePage, setActivePage] = useState("erste-schritte");
+  const [activePage, setActivePage] = useState<string | null>(null);
+  const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
 
   const matchRoute = useMatchRoute();
 
@@ -117,10 +229,12 @@ export default function MainSidebar() {
           className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent"
         >
           <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
-            N
+            {auth.organization.name.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm leading-tight font-semibold">Nordwind GmbH</div>
+            <div className="truncate text-sm leading-tight font-semibold">
+              {auth.organization.name}
+            </div>
             <div className="text-[11.5px] leading-tight text-muted-foreground">Wissens-Hub</div>
           </div>
           <ChevronsUpDown className="size-4 text-muted-foreground" />
@@ -160,57 +274,18 @@ export default function MainSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Team-Handbuch</SidebarGroupLabel>
-          <SidebarGroupAction title="Neue Seite">
-            <Plus /> <span className="sr-only">Neue Seite</span>
+          <SidebarGroupLabel>Spaces</SidebarGroupLabel>
+          <SidebarGroupAction title="Neuer Space" onClick={() => setCreateSpaceOpen(true)}>
+            <Plus /> <span className="sr-only">Neuer Space</span>
           </SidebarGroupAction>
-          <SidebarMenu className="gap-0.5">
-            {tree.map((sec) => (
-              <Collapsible
-                key={sec.id}
-                defaultOpen={defaultOpen[sec.id]}
-                className="group/collapsible"
-              >
-                <SidebarMenuItem>
-                  <CollapsibleTrigger
-                    render={
-                      <SidebarMenuButton className="font-medium text-muted-foreground">
-                        <ChevronRight className="transition-transform group-data-open/collapsible:rotate-90" />
-                        <Folder />
-                        <span>{sec.label}</span>
-                      </SidebarMenuButton>
-                    }
-                  />
-                  <CollapsibleContent>
-                    <SidebarMenuSub className="mr-0 pr-0">
-                      {sec.pages.map(([pid, plabel]) => {
-                        const active = activePage === pid;
-                        return (
-                          <SidebarMenuSubItem key={pid}>
-                            <SidebarMenuSubButton
-                              isActive={active}
-                              onClick={() => setActivePage(pid)}
-                              className="cursor-pointer data-active:bg-primary/10 data-active:text-primary"
-                            >
-                              <FileText />
-                              <span>{plabel}</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        );
-                      })}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
-            ))}
-          </SidebarMenu>
+          <SpacesTree activePage={activePage} onSelectPage={setActivePage} />
         </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="flex-row items-center gap-2.5 border-t border-border">
         <ColorAvatar
           initials={
-            auth.user.name
+            auth.session.user.name
               .split(" ")
               .map((w) => w[0])
               .slice(0, 2)
@@ -221,7 +296,9 @@ export default function MainSidebar() {
           size="sm"
         />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] leading-tight font-semibold">{auth.user.name}</div>
+          <div className="truncate text-[13px] leading-tight font-semibold">
+            {auth.session.user.name}
+          </div>
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
             <span className="size-1.5 rounded-full bg-emerald-500" />
             Editor · Online
@@ -236,6 +313,8 @@ export default function MainSidebar() {
           {theme === "light" ? <Sun /> : <Moon />}
         </Button>
       </SidebarFooter>
+
+      <CreateSpaceDialog open={createSpaceOpen} onOpenChange={setCreateSpaceOpen} />
     </Sidebar>
   );
 }
