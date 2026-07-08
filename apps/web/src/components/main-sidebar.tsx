@@ -176,17 +176,27 @@ function SpacesTree({
       {spaces.map((space, index) => (
         <Collapsible key={space.id} defaultOpen={index === 0} className="group/collapsible">
           <SidebarMenuItem>
+            {/* Chevron toggles the page tree; the rest of the row navigates to
+                the space — kept as siblings so neither nests inside the other. */}
             <CollapsibleTrigger
               render={
-                <SidebarMenuButton className="font-medium text-muted-foreground">
+                <SidebarMenuAction title="Ein-/ausklappen" className="right-auto left-1">
                   <ChevronRight className="transition-transform group-data-open/collapsible:rotate-90" />
+                  <span className="sr-only">Ein-/ausklappen</span>
+                </SidebarMenuAction>
+              }
+            />
+            <SidebarMenuButton
+              className="pl-8 font-medium text-muted-foreground"
+              render={
+                <Link to="/spaces/$slug" params={{ slug: space.slug }}>
                   {space.icon ? (
                     <span className="text-sm leading-none">{space.icon}</span>
                   ) : (
                     <Folder style={space.color ? { color: space.color } : undefined} />
                   )}
                   <span>{space.name}</span>
-                </SidebarMenuButton>
+                </Link>
               }
             />
             <SidebarMenuAction
