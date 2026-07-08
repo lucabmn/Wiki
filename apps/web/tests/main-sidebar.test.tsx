@@ -11,7 +11,7 @@ const { navigateSpy, data } = vi.hoisted(() => ({
 
 // Route context (auth) and the session both come from mocked modules so no env
 // or real router is pulled in.
-vi.mock("@/routes/_auth", () => ({
+vi.mock("@/routes/_auth/route", () => ({
   Route: {
     useRouteContext: () => ({
       auth: { organization: { name: "Acme", members: [] }, session: { user: { name: "Luca" } } },

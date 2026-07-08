@@ -1,4 +1,6 @@
-import { Route } from "@/routes/_auth";
+// Read auth context from the _auth LAYOUT route (active on every child), not the
+// index route — the sidebar renders on all authed pages, not just "/".
+import { Route } from "@/routes/_auth/route";
 import { authClient } from "@/lib/auth-client";
 import { orpc } from "@/utils/orpc";
 import { CommandPalette } from "./command-palette";
