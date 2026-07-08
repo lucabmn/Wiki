@@ -5,9 +5,10 @@ import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { Textarea } from "@nilovon-wiki/ui/components/textarea";
+import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { FileText } from "lucide-react";
+import { Check, FileText, Star } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -22,6 +23,64 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
+
+function FavoriteButton({ pageId }: { pageId: string }) {
+  const queryClient = useQueryClient();
+  const { data: favorites } = useQuery(orpc.me.listFavorites.queryOptions({ input: {} }));
+  const isFavorite = favorites?.some((favorite) => favorite.id === pageId) ?? false;
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: orpc.me.listFavorites.key() });
+  const onError = (error: Error) => toast.error(error.message);
+  const add = useMutation(orpc.me.addFavorite.mutationOptions({ onSuccess: invalidate, onError }));
+  const remove = useMutation(
+    orpc.me.removeFavorite.mutationOptions({ onSuccess: invalidate, onError }),
+  );
+  const pending = add.isPending || remove.isPending;
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={pending}
+      onClick={() => (isFavorite ? remove : add).mutate({ pageId })}
+    >
+      <Star className={cn("size-4", isFavorite && "fill-amber-500 text-amber-500")} />
+      {isFavorite ? "Favorit" : "Merken"}
+    </Button>
+  );
+}
+
+function CommentCard({ comment }: { comment: { id: string; body: string; createdAt: Date } }) {
+  const queryClient = useQueryClient();
+  const resolve = useMutation(
+    orpc.comments.resolve.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.comments.list.key() }),
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
+  return (
+    <Card>
+      <CardContent className="py-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-xs text-muted-foreground">
+            {dateFormat.format(comment.createdAt)}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-my-1 h-7"
+            disabled={resolve.isPending}
+            onClick={() => resolve.mutate({ id: comment.id, resolved: true })}
+          >
+            <Check className="size-3.5" /> Auflösen
+          </Button>
+        </div>
+        <p className="mt-1 text-sm whitespace-pre-wrap">{comment.body}</p>
+      </CardContent>
+    </Card>
+  );
+}
 
 function CommentForm({ pageId }: { pageId: string }) {
   const queryClient = useQueryClient();
@@ -127,6 +186,7 @@ function RouteComponent() {
               <span>Zuletzt geändert {dateFormat.format(page.updatedAt)}</span>
             </div>
           </div>
+          <FavoriteButton pageId={page.id} />
         </div>
 
         <article className="mt-6 text-[15px] leading-7 whitespace-pre-wrap text-foreground/90">
@@ -146,14 +206,7 @@ function RouteComponent() {
           ) : (
             <div className="space-y-2">
               {openComments.map((comment) => (
-                <Card key={comment.id}>
-                  <CardContent className="py-3">
-                    <div className="text-xs text-muted-foreground">
-                      {dateFormat.format(comment.createdAt)}
-                    </div>
-                    <p className="mt-1 text-sm whitespace-pre-wrap">{comment.body}</p>
-                  </CardContent>
-                </Card>
+                <CommentCard key={comment.id} comment={comment} />
               ))}
             </div>
           )}

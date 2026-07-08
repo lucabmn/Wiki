@@ -3,14 +3,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { data, createCommentSpy } = vi.hoisted(() => ({
+const { data, createCommentSpy, addFavoriteSpy, resolveSpy } = vi.hoisted(() => ({
   data: {
     page: undefined as unknown,
     comments: [] as unknown[],
     spaces: [] as unknown[],
+    favorites: [] as Array<{ id: string }>,
     error: false,
   },
   createCommentSpy: vi.fn((_vars?: { pageId: string; body: string }) => Promise.resolve({})),
+  addFavoriteSpy: vi.fn((_vars?: { pageId: string }) => Promise.resolve({})),
+  resolveSpy: vi.fn((_vars?: { id: string; resolved: boolean }) => Promise.resolve({})),
 }));
 
 // Passthrough the layout so the sidebar (and its many deps) stays out of scope.
@@ -54,6 +57,24 @@ vi.mock("@/utils/orpc", () => ({
           ...opts,
         }),
       },
+      resolve: {
+        mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: resolveSpy, ...opts }),
+      },
+    },
+    me: {
+      listFavorites: {
+        queryOptions: () => ({ queryKey: ["favs"], queryFn: async () => data.favorites }),
+        key: () => ["favs"],
+      },
+      addFavorite: {
+        mutationOptions: (opts: Record<string, unknown>) => ({
+          mutationFn: addFavoriteSpy,
+          ...opts,
+        }),
+      },
+      removeFavorite: {
+        mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: vi.fn(), ...opts }),
+      },
     },
     spaces: {
       list: {
@@ -81,8 +102,20 @@ describe("page view route", () => {
     data.page = undefined;
     data.comments = [];
     data.spaces = [];
+    data.favorites = [];
     data.error = false;
   });
+
+  const somePage = {
+    id: "p1",
+    spaceId: "s1",
+    title: "Blank",
+    slug: "blank",
+    icon: null,
+    status: "draft",
+    textContent: "body",
+    updatedAt: new Date("2026-01-02T10:00:00Z"),
+  };
 
   it("renders title, content, back-link and comments", async () => {
     data.page = {
@@ -166,6 +199,32 @@ describe("page view route", () => {
 
     await waitFor(() =>
       expect(createCommentSpy.mock.calls[0]?.[0]).toEqual({ pageId: "p1", body: "Looks good" }),
+    );
+  });
+
+  it("adds the page to favorites", async () => {
+    data.page = somePage;
+    renderView();
+    fireEvent.click(await screen.findByRole("button", { name: "Merken" }));
+    await waitFor(() => expect(addFavoriteSpy.mock.calls[0]?.[0]).toEqual({ pageId: "p1" }));
+  });
+
+  it("reflects an already-favorited page", async () => {
+    data.page = somePage;
+    data.favorites = [{ id: "p1" }];
+    renderView();
+    expect(await screen.findByRole("button", { name: "Favorit" })).toBeDefined();
+  });
+
+  it("resolves a comment", async () => {
+    data.page = somePage;
+    data.comments = [
+      { id: "c1", body: "Q", resolvedAt: null, deletedAt: null, createdAt: new Date() },
+    ];
+    renderView();
+    fireEvent.click(await screen.findByRole("button", { name: "Auflösen" }));
+    await waitFor(() =>
+      expect(resolveSpy.mock.calls[0]?.[0]).toEqual({ id: "c1", resolved: true }),
     );
   });
 });
