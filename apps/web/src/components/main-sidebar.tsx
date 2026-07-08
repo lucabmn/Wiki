@@ -50,7 +50,7 @@ import { Link, linkOptions, useMatchRoute, useNavigate } from "@tanstack/react-r
 const nav = linkOptions([
   { to: "/", label: "Übersicht", icon: Home },
   { to: "/spaces", label: "Alle Spaces", icon: LayoutGrid },
-  { to: "/template", label: "Mitglieder & Rechte", icon: Lock },
+  { to: "/members", label: "Mitglieder & Rechte", icon: Lock },
 ]);
 
 function ColorAvatar({
