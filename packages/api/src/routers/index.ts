@@ -1,17 +1,36 @@
 import type { RouterClient } from "@orpc/server";
 
-import { protectedProcedure, publicProcedure } from "../index";
+import { publicProcedure } from "../index";
+import { activityRouter } from "./activity";
+import { attachmentRouter } from "./attachment";
+import { commentRouter } from "./comment";
+import { linkRouter } from "./link";
+import { pageRouter } from "./page";
+import { searchRouter } from "./search";
+import { spaceRouter } from "./space";
+import { tagRouter } from "./tag";
+import { userStateRouter } from "./user-state";
 
+/**
+ * The application API. Each entity lives in its own router module and every
+ * procedure carries REST metadata (`method`/`path`/`tags`/`summary`) so the
+ * OpenAPI document and the RPC surface stay in sync from one definition.
+ */
 export const appRouter = {
-  healthCheck: publicProcedure.handler(() => {
-    return "OK";
-  }),
-  privateData: protectedProcedure.handler(({ context }) => {
-    return {
-      message: "This is private",
-      user: context.session?.user,
-    };
-  }),
+  health: {
+    check: publicProcedure
+      .route({ method: "GET", path: "/health", tags: ["Health"], summary: "Liveness probe" })
+      .handler(() => "OK"),
+  },
+  spaces: spaceRouter,
+  pages: pageRouter,
+  comments: commentRouter,
+  tags: tagRouter,
+  attachments: attachmentRouter,
+  links: linkRouter,
+  activity: activityRouter,
+  search: searchRouter,
+  me: userStateRouter,
 };
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;

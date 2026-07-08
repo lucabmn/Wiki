@@ -25,3 +25,4 @@ catalog:
   "@orpc/client": ^1.14.6
   "@types/react": ^19.2.17
   "@types/react-dom": ^19.2.3
+  vitest: ^3.2.4

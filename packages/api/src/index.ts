@@ -24,6 +24,29 @@ const requireAuth = o.middleware(async ({ context, next }) => {
 
 export const protectedProcedure = publicProcedure.use(requireAuth);
 
+// Resolves the caller's active organization, throwing when none is set. Most
+// create/list flows are scoped to it. Cross-org mutations should instead gate
+// on the *resource's* org id (see `assertOrgPermission`).
+export function requireActiveOrg(context: Context): string {
+  const organizationId = context.session?.session.activeOrganizationId;
+  if (!organizationId) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "No active organization. Select one before continuing.",
+    });
+  }
+  return organizationId;
+}
+
+// Read gate for resource-targeting queries: the wiki permission statement has no
+// `read` action for spaces/pages (membership + visibility govern reads), so we
+// scope reads to the caller's active org. Cross-org reads are denied rather than
+// leaking a resource the caller may have no membership in.
+export function assertActiveOrgRead(context: Context, organizationId: string): void {
+  if (organizationId !== requireActiveOrg(context)) {
+    throw new ORPCError("FORBIDDEN");
+  }
+}
+
 // Resolves the caller's role from their member row in `organizationId` (or the
 // active org when omitted) and evaluates it — covering static and dynamic roles.
 // Pass the resource's org id explicitly; the active org can differ from the

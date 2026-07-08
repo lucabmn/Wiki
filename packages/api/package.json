@@ -9,7 +9,11 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check-types": "tsc --noEmit -p tsconfig.json"
+  },
   "dependencies": {
     "@nilovon-wiki/auth": "workspace:*",
     "@nilovon-wiki/db": "workspace:*",
@@ -19,11 +23,13 @@
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
     "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.2",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@nilovon-wiki/config": "workspace:*",
     "hono": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

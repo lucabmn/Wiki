@@ -1,0 +1,111 @@
+import { z } from "zod";
+
+import { IdSchema } from "./shared";
+
+export const PageStatusSchema = z.enum(["draft", "published", "archived"]);
+
+const SlugSchema = z
+  .string()
+  .min(1)
+  .max(80)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be a lowercase kebab-case slug");
+
+/** Rich-text document (ProseMirror/TipTap JSON). Opaque to the API layer. */
+const DocumentSchema = z.unknown();
+
+/** Full page representation returned by the API (search vector excluded). */
+export const PageSchema = z.object({
+  id: IdSchema,
+  spaceId: IdSchema,
+  parentId: IdSchema.nullable(),
+  title: z.string(),
+  slug: z.string(),
+  icon: z.string().nullable(),
+  coverImage: z.string().nullable(),
+  content: DocumentSchema.nullable(),
+  textContent: z.string(),
+  status: PageStatusSchema,
+  isTemplate: z.boolean(),
+  position: z.string(),
+  createdBy: IdSchema.nullable(),
+  lastEditedBy: IdSchema.nullable(),
+  publishedAt: z.date().nullable(),
+  archivedAt: z.date().nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+export type Page = z.infer<typeof PageSchema>;
+
+export const ListPagesInputSchema = z.object({
+  spaceId: IdSchema,
+  // Filter to direct children of a page; omit for the whole space.
+  parentId: IdSchema.nullish(),
+  status: PageStatusSchema.optional(),
+  includeArchived: z.boolean().default(false),
+});
+
+export const CreatePageInputSchema = z.object({
+  spaceId: IdSchema,
+  parentId: IdSchema.nullish(),
+  title: z.string().min(1).max(300).default("Untitled"),
+  slug: SlugSchema.optional(),
+  icon: z.string().max(64).nullish(),
+  coverImage: z.string().max(2048).nullish(),
+  content: DocumentSchema.optional(),
+  textContent: z.string().default(""),
+  isTemplate: z.boolean().default(false),
+});
+
+export const UpdatePageInputSchema = z.object({
+  id: IdSchema,
+  title: z.string().min(1).max(300).optional(),
+  slug: SlugSchema.optional(),
+  icon: z.string().max(64).nullish(),
+  coverImage: z.string().max(2048).nullish(),
+  content: DocumentSchema.optional(),
+  textContent: z.string().optional(),
+  isTemplate: z.boolean().optional(),
+});
+
+export const MovePageInputSchema = z
+  .object({
+    id: IdSchema,
+    // New parent (null = space root). Omit to keep the current parent.
+    parentId: IdSchema.nullish(),
+    // Reorder relative to a sibling; provide at most one.
+    beforeId: IdSchema.optional(),
+    afterId: IdSchema.optional(),
+  })
+  .refine((v) => !(v.beforeId && v.afterId), {
+    message: "provide beforeId or afterId, not both",
+  });
+
+/** Immutable version snapshot. */
+export const PageRevisionSchema = z.object({
+  id: IdSchema,
+  pageId: IdSchema,
+  version: z.number().int(),
+  title: z.string(),
+  content: DocumentSchema.nullable(),
+  textContent: z.string(),
+  summary: z.string().nullable(),
+  editedBy: IdSchema.nullable(),
+  createdAt: z.date(),
+});
+
+/** Per-user autosave draft. */
+export const PageDraftSchema = z.object({
+  id: IdSchema,
+  pageId: IdSchema,
+  userId: IdSchema,
+  title: z.string().nullable(),
+  content: DocumentSchema.nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export const SaveDraftInputSchema = z.object({
+  pageId: IdSchema,
+  title: z.string().max(300).nullish(),
+  content: DocumentSchema.optional(),
+});
