@@ -17,7 +17,7 @@ import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/na
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { FileText, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -70,13 +70,12 @@ function RecentActivity({ enabled }: { enabled: boolean }) {
     <section>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[15px] font-semibold">Zuletzt bearbeitet</h2>
-        <button
-          type="button"
-          onClick={() => console.log("spaces")}
+        <Link
+          to="/spaces"
           className="text-[13px] font-medium text-primary transition-colors hover:text-primary/80"
         >
           Alle Spaces
-        </button>
+        </Link>
       </div>
       {isPending && (
         <Card className="gap-0 py-0">

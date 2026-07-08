@@ -48,7 +48,7 @@ import { Link, linkOptions, useMatchRoute } from "@tanstack/react-router";
 
 const nav = linkOptions([
   { to: "/", label: "Übersicht", icon: Home },
-  { to: "/template", label: "Alle Spaces", icon: LayoutGrid },
+  { to: "/spaces", label: "Alle Spaces", icon: LayoutGrid },
   { to: "/template", label: "Mitglieder & Rechte", icon: Lock },
 ]);
 
