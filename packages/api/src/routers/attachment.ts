@@ -10,6 +10,7 @@ import {
   hasOrgPermission,
   protectedProcedure,
 } from "../index";
+import { recordActivity } from "../lib/activity";
 import { loadPage, orgOfSpace } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import {
@@ -53,25 +54,33 @@ export const attachmentRouter = {
     .input(CreateAttachmentInputSchema)
     .output(AttachmentSchema)
     .handler(async ({ input, context }) => {
-      await assertOrgPermission(
-        context.headers,
-        { attachment: ["create"] },
-        await orgOfSpace(context.db, input.spaceId),
-      );
-      const rows = await context.db
-        .insert(attachment)
-        .values({
-          spaceId: input.spaceId,
-          pageId: input.pageId ?? null,
-          fileName: input.fileName,
-          mimeType: input.mimeType,
-          size: input.size,
-          storageKey: input.storageKey,
-          checksum: input.checksum ?? null,
-          uploadedBy: context.session?.user.id,
-        })
-        .returning();
-      return firstRow(rows);
+      const organizationId = await orgOfSpace(context.db, input.spaceId);
+      await assertOrgPermission(context.headers, { attachment: ["create"] }, organizationId);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .insert(attachment)
+          .values({
+            spaceId: input.spaceId,
+            pageId: input.pageId ?? null,
+            fileName: input.fileName,
+            mimeType: input.mimeType,
+            size: input.size,
+            storageKey: input.storageKey,
+            checksum: input.checksum ?? null,
+            uploadedBy: context.session?.user.id,
+          })
+          .returning();
+        const row = firstRow(rows);
+        await recordActivity(tx, {
+          organizationId,
+          action: "attachment.uploaded",
+          actorId: context.session?.user.id,
+          spaceId: row.spaceId,
+          pageId: row.pageId,
+          metadata: { fileName: row.fileName, attachmentId: row.id },
+        });
+        return row;
+      });
     }),
 
   delete: protectedProcedure

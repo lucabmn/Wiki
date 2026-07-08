@@ -10,6 +10,7 @@ import {
   requireActiveOrg,
   requireOrgPermission,
 } from "../index";
+import { recordActivity } from "../lib/activity";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
 import {
@@ -96,20 +97,31 @@ export const spaceRouter = {
             where: and(eq(space.organizationId, organizationId), eq(space.slug, candidate)),
           })),
       );
-      const rows = await context.db
-        .insert(space)
-        .values({
+      const userId = context.session?.user.id;
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .insert(space)
+          .values({
+            organizationId,
+            slug,
+            name: input.name,
+            description: input.description ?? null,
+            icon: input.icon ?? null,
+            color: input.color ?? null,
+            visibility: input.visibility,
+            createdBy: userId,
+          })
+          .returning();
+        const row = firstRow(rows);
+        await recordActivity(tx, {
           organizationId,
-          slug,
-          name: input.name,
-          description: input.description ?? null,
-          icon: input.icon ?? null,
-          color: input.color ?? null,
-          visibility: input.visibility,
-          createdBy: context.session?.user.id,
-        })
-        .returning();
-      return firstRow(rows);
+          action: "space.created",
+          actorId: userId,
+          spaceId: row.id,
+          metadata: { name: row.name },
+        });
+        return row;
+      });
     }),
 
   update: protectedProcedure
@@ -127,8 +139,17 @@ export const spaceRouter = {
       // org can't authorize edits to a space living in another.
       await assertOrgPermission(context.headers, { space: ["update"] }, existing.organizationId);
       const { id, ...patch } = input;
-      const rows = await context.db.update(space).set(patch).where(eq(space.id, id)).returning();
-      return firstRow(rows);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx.update(space).set(patch).where(eq(space.id, id)).returning();
+        const row = firstRow(rows);
+        await recordActivity(tx, {
+          organizationId: existing.organizationId,
+          action: "space.updated",
+          actorId: context.session?.user.id,
+          spaceId: row.id,
+        });
+        return row;
+      });
     }),
 
   archive: protectedProcedure
@@ -143,12 +164,21 @@ export const spaceRouter = {
     .handler(async ({ input, context }) => {
       const existing = await getSpaceOrThrow(context.db, input.id);
       await assertOrgPermission(context.headers, { space: ["update"] }, existing.organizationId);
-      const rows = await context.db
-        .update(space)
-        .set({ archivedAt: new Date() })
-        .where(eq(space.id, input.id))
-        .returning();
-      return firstRow(rows);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .update(space)
+          .set({ archivedAt: new Date() })
+          .where(eq(space.id, input.id))
+          .returning();
+        const row = firstRow(rows);
+        await recordActivity(tx, {
+          organizationId: existing.organizationId,
+          action: "space.archived",
+          actorId: context.session?.user.id,
+          spaceId: row.id,
+        });
+        return row;
+      });
     }),
 
   delete: protectedProcedure

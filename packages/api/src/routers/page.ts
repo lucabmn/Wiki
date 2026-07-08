@@ -6,8 +6,10 @@ import type { Database } from "@nilovon-wiki/db";
 import { page, pageDraft, pageRevision } from "@nilovon-wiki/db/schema/index";
 
 import { assertActiveOrgRead, assertOrgPermission, protectedProcedure } from "../index";
+import { recordActivity } from "../lib/activity";
 import { generateKeyBetween } from "../lib/fractional";
 import { loadPage, orgOfSpace } from "../lib/loaders";
+import { extractPageLinks, syncPageLinks } from "../lib/page-links";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
 import {
@@ -155,24 +157,38 @@ export const pageRouter = {
       const position = await positionAtEnd(context.db, input.spaceId, parentId);
       const userId = context.session?.user.id;
 
-      const rows = await context.db
-        .insert(page)
-        .values({
-          spaceId: input.spaceId,
-          parentId,
-          title: input.title,
-          slug,
-          icon: input.icon ?? null,
-          coverImage: input.coverImage ?? null,
-          content: input.content ?? null,
-          textContent: input.textContent,
-          isTemplate: input.isTemplate,
-          position,
-          createdBy: userId,
-          lastEditedBy: userId,
-        })
-        .returning();
-      return firstRow(rows);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .insert(page)
+          .values({
+            spaceId: input.spaceId,
+            parentId,
+            title: input.title,
+            slug,
+            icon: input.icon ?? null,
+            coverImage: input.coverImage ?? null,
+            content: input.content ?? null,
+            textContent: input.textContent,
+            isTemplate: input.isTemplate,
+            position,
+            createdBy: userId,
+            lastEditedBy: userId,
+          })
+          .returning();
+        const row = firstRow(rows);
+        if (input.content !== undefined) {
+          await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(input.content));
+        }
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.created",
+          actorId: userId,
+          spaceId: row.spaceId,
+          pageId: row.id,
+          metadata: { title: row.title },
+        });
+        return row;
+      });
     }),
 
   update: protectedProcedure
@@ -181,11 +197,8 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      await assertOrgPermission(
-        context.headers,
-        { page: ["update"] },
-        await orgOfSpace(context.db, existing.spaceId),
-      );
+      const organizationId = await orgOfSpace(context.db, existing.spaceId);
+      await assertOrgPermission(context.headers, { page: ["update"] }, organizationId);
       const { id, ...patch } = input;
       // A caller-supplied slug is de-duplicated within the space (excluding this
       // page) so it can't collide on `page_space_slug_uq` and surface as a 500.
@@ -202,12 +215,26 @@ export const pageRouter = {
             })),
         );
       }
-      const rows = await context.db
-        .update(page)
-        .set({ ...patch, lastEditedBy: context.session?.user.id })
-        .where(eq(page.id, id))
-        .returning();
-      return firstRow(rows);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .update(page)
+          .set({ ...patch, lastEditedBy: context.session?.user.id })
+          .where(eq(page.id, id))
+          .returning();
+        const row = firstRow(rows);
+        if (patch.content !== undefined) {
+          await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(patch.content));
+        }
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.updated",
+          actorId: context.session?.user.id,
+          spaceId: row.spaceId,
+          pageId: row.id,
+          metadata: { title: row.title },
+        });
+        return row;
+      });
     }),
 
   publish: protectedProcedure
@@ -227,6 +254,7 @@ export const pageRouter = {
         await orgOfSpace(context.db, existing.spaceId),
       );
       const userId = context.session?.user.id;
+      const organizationId = await orgOfSpace(context.db, existing.spaceId);
       return context.db.transaction(async (tx) => {
         const latest = await tx.query.pageRevision.findFirst({
           where: eq(pageRevision.pageId, existing.id),
@@ -247,6 +275,14 @@ export const pageRouter = {
           .set({ status: "published", publishedAt: new Date(), lastEditedBy: userId })
           .where(eq(page.id, existing.id))
           .returning();
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.published",
+          actorId: userId,
+          spaceId: existing.spaceId,
+          pageId: existing.id,
+          metadata: { title: existing.title },
+        });
         return firstRow(rows);
       });
     }),
@@ -262,11 +298,8 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      await assertOrgPermission(
-        context.headers,
-        { page: ["move"] },
-        await orgOfSpace(context.db, existing.spaceId),
-      );
+      const organizationId = await orgOfSpace(context.db, existing.spaceId);
+      await assertOrgPermission(context.headers, { page: ["move"] }, organizationId);
       const parentId = input.parentId === undefined ? existing.parentId : input.parentId;
       await assertNoCycle(context.db, existing.id, parentId);
       const position = await positionForMove(
@@ -277,12 +310,23 @@ export const pageRouter = {
         input.beforeId,
         input.afterId,
       );
-      const rows = await context.db
-        .update(page)
-        .set({ parentId, position, lastEditedBy: context.session?.user.id })
-        .where(eq(page.id, existing.id))
-        .returning();
-      return firstRow(rows);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .update(page)
+          .set({ parentId, position, lastEditedBy: context.session?.user.id })
+          .where(eq(page.id, existing.id))
+          .returning();
+        const row = firstRow(rows);
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.moved",
+          actorId: context.session?.user.id,
+          spaceId: row.spaceId,
+          pageId: row.id,
+          metadata: { title: row.title },
+        });
+        return row;
+      });
     }),
 
   archive: protectedProcedure
@@ -296,17 +340,29 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      await assertOrgPermission(
-        context.headers,
-        { page: ["update"] },
-        await orgOfSpace(context.db, existing.spaceId),
-      );
-      const rows = await context.db
-        .update(page)
-        .set({ status: "archived", archivedAt: new Date(), lastEditedBy: context.session?.user.id })
-        .where(eq(page.id, existing.id))
-        .returning();
-      return firstRow(rows);
+      const organizationId = await orgOfSpace(context.db, existing.spaceId);
+      await assertOrgPermission(context.headers, { page: ["update"] }, organizationId);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .update(page)
+          .set({
+            status: "archived",
+            archivedAt: new Date(),
+            lastEditedBy: context.session?.user.id,
+          })
+          .where(eq(page.id, existing.id))
+          .returning();
+        const row = firstRow(rows);
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.archived",
+          actorId: context.session?.user.id,
+          spaceId: row.spaceId,
+          pageId: row.id,
+          metadata: { title: row.title },
+        });
+        return row;
+      });
     }),
 
   restore: protectedProcedure
@@ -320,17 +376,25 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      await assertOrgPermission(
-        context.headers,
-        { page: ["update"] },
-        await orgOfSpace(context.db, existing.spaceId),
-      );
-      const rows = await context.db
-        .update(page)
-        .set({ status: "draft", archivedAt: null, lastEditedBy: context.session?.user.id })
-        .where(eq(page.id, existing.id))
-        .returning();
-      return firstRow(rows);
+      const organizationId = await orgOfSpace(context.db, existing.spaceId);
+      await assertOrgPermission(context.headers, { page: ["update"] }, organizationId);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .update(page)
+          .set({ status: "draft", archivedAt: null, lastEditedBy: context.session?.user.id })
+          .where(eq(page.id, existing.id))
+          .returning();
+        const row = firstRow(rows);
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.restored",
+          actorId: context.session?.user.id,
+          spaceId: row.spaceId,
+          pageId: row.id,
+          metadata: { title: row.title },
+        });
+        return row;
+      });
     }),
 
   delete: protectedProcedure
@@ -344,13 +408,21 @@ export const pageRouter = {
     .output(z.object({ id: IdSchema }))
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      await assertOrgPermission(
-        context.headers,
-        { page: ["delete"] },
-        await orgOfSpace(context.db, existing.spaceId),
-      );
-      // `parentId` self-reference cascades, so children are removed with it.
-      await context.db.delete(page).where(eq(page.id, existing.id));
+      const organizationId = await orgOfSpace(context.db, existing.spaceId);
+      await assertOrgPermission(context.headers, { page: ["delete"] }, organizationId);
+      await context.db.transaction(async (tx) => {
+        // `parentId` self-reference cascades, so children are removed with it.
+        await tx.delete(page).where(eq(page.id, existing.id));
+        // `activity.pageId` is set-null on delete, so keep the id/title in
+        // metadata — the audit row must survive the page it describes.
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.deleted",
+          actorId: context.session?.user.id,
+          spaceId: existing.spaceId,
+          metadata: { pageId: existing.id, title: existing.title },
+        });
+      });
       return { id: existing.id };
     }),
 
@@ -385,28 +457,37 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      await assertOrgPermission(
-        context.headers,
-        { page: ["update"] },
-        await orgOfSpace(context.db, existing.spaceId),
-      );
+      const organizationId = await orgOfSpace(context.db, existing.spaceId);
+      await assertOrgPermission(context.headers, { page: ["update"] }, organizationId);
       const revision = await context.db.query.pageRevision.findFirst({
         where: and(eq(pageRevision.pageId, existing.id), eq(pageRevision.version, input.version)),
       });
       if (!revision) {
         throw new ORPCError("NOT_FOUND", { message: "Revision not found" });
       }
-      const rows = await context.db
-        .update(page)
-        .set({
-          title: revision.title,
-          content: revision.content,
-          textContent: revision.textContent,
-          lastEditedBy: context.session?.user.id,
-        })
-        .where(eq(page.id, existing.id))
-        .returning();
-      return firstRow(rows);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .update(page)
+          .set({
+            title: revision.title,
+            content: revision.content,
+            textContent: revision.textContent,
+            lastEditedBy: context.session?.user.id,
+          })
+          .where(eq(page.id, existing.id))
+          .returning();
+        const row = firstRow(rows);
+        await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(revision.content));
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.updated",
+          actorId: context.session?.user.id,
+          spaceId: row.spaceId,
+          pageId: row.id,
+          metadata: { title: row.title, restoredVersion: revision.version },
+        });
+        return row;
+      });
     }),
 
   // --- Per-user drafts ---------------------------------------------------

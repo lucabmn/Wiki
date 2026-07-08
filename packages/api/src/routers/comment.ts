@@ -11,6 +11,7 @@ import {
   hasOrgPermission,
   protectedProcedure,
 } from "../index";
+import { recordActivity } from "../lib/activity";
 import { loadComment, loadPage, orgOfSpace } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import {
@@ -51,22 +52,31 @@ export const commentRouter = {
     .input(CreateCommentInputSchema)
     .output(CommentSchema)
     .handler(async ({ input, context }) => {
-      await assertOrgPermission(
-        context.headers,
-        { comment: ["create"] },
-        await orgOfComment(context.db, input.pageId),
-      );
-      const rows = await context.db
-        .insert(comment)
-        .values({
-          pageId: input.pageId,
-          parentId: input.parentId ?? null,
-          authorId: context.session?.user.id,
-          body: input.body,
-          anchor: input.anchor ?? null,
-        })
-        .returning();
-      return firstRow(rows);
+      const target = await loadPage(context.db, input.pageId);
+      const organizationId = await orgOfSpace(context.db, target.spaceId);
+      await assertOrgPermission(context.headers, { comment: ["create"] }, organizationId);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .insert(comment)
+          .values({
+            pageId: input.pageId,
+            parentId: input.parentId ?? null,
+            authorId: context.session?.user.id,
+            body: input.body,
+            anchor: input.anchor ?? null,
+          })
+          .returning();
+        const row = firstRow(rows);
+        await recordActivity(tx, {
+          organizationId,
+          action: "comment.created",
+          actorId: context.session?.user.id,
+          spaceId: target.spaceId,
+          pageId: target.id,
+          metadata: { commentId: row.id },
+        });
+        return row;
+      });
     }),
 
   update: protectedProcedure
@@ -102,21 +112,33 @@ export const commentRouter = {
     .output(CommentSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadComment(context.db, input.id);
-      await assertOrgPermission(
-        context.headers,
-        { comment: ["update"] },
-        await orgOfComment(context.db, existing.pageId),
-      );
-      const rows = await context.db
-        .update(comment)
-        .set(
-          input.resolved
-            ? { resolvedAt: new Date(), resolvedBy: context.session?.user.id }
-            : { resolvedAt: null, resolvedBy: null },
-        )
-        .where(eq(comment.id, existing.id))
-        .returning();
-      return firstRow(rows);
+      const target = await loadPage(context.db, existing.pageId);
+      const organizationId = await orgOfSpace(context.db, target.spaceId);
+      await assertOrgPermission(context.headers, { comment: ["update"] }, organizationId);
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .update(comment)
+          .set(
+            input.resolved
+              ? { resolvedAt: new Date(), resolvedBy: context.session?.user.id }
+              : { resolvedAt: null, resolvedBy: null },
+          )
+          .where(eq(comment.id, existing.id))
+          .returning();
+        const row = firstRow(rows);
+        // Only resolution has a feed action; reopening has no matching enum.
+        if (input.resolved) {
+          await recordActivity(tx, {
+            organizationId,
+            action: "comment.resolved",
+            actorId: context.session?.user.id,
+            spaceId: target.spaceId,
+            pageId: target.id,
+            metadata: { commentId: row.id },
+          });
+        }
+        return row;
+      });
     }),
 
   delete: protectedProcedure
