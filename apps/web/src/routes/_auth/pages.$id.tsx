@@ -8,7 +8,7 @@ import { Textarea } from "@nilovon-wiki/ui/components/textarea";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Check, FileText, Star } from "lucide-react";
+import { Bell, Check, FileText, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -50,13 +50,44 @@ function FavoriteButton({ pageId }: { pageId: string }) {
   );
 }
 
+function SubscribeButton({ pageId }: { pageId: string }) {
+  const queryClient = useQueryClient();
+  const { data: subscriptions } = useQuery(orpc.me.listSubscriptions.queryOptions({ input: {} }));
+  const isSubscribed = subscriptions?.some((subscription) => subscription.id === pageId) ?? false;
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: orpc.me.listSubscriptions.key() });
+  const onError = (error: Error) => toast.error(error.message);
+  const subscribe = useMutation(
+    orpc.me.subscribe.mutationOptions({ onSuccess: invalidate, onError }),
+  );
+  const unsubscribe = useMutation(
+    orpc.me.unsubscribe.mutationOptions({ onSuccess: invalidate, onError }),
+  );
+  const pending = subscribe.isPending || unsubscribe.isPending;
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={pending}
+      onClick={() => (isSubscribed ? unsubscribe : subscribe).mutate({ pageId })}
+    >
+      <Bell className={cn("size-4", isSubscribed && "fill-current")} />
+      {isSubscribed ? "Abonniert" : "Abonnieren"}
+    </Button>
+  );
+}
+
 function CommentCard({ comment }: { comment: { id: string; body: string; createdAt: Date } }) {
   const queryClient = useQueryClient();
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: orpc.comments.list.key() });
+  const onError = (error: Error) => toast.error(error.message);
   const resolve = useMutation(
-    orpc.comments.resolve.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.comments.list.key() }),
-      onError: (error) => toast.error(error.message),
-    }),
+    orpc.comments.resolve.mutationOptions({ onSuccess: invalidate, onError }),
+  );
+  const remove = useMutation(
+    orpc.comments.delete.mutationOptions({ onSuccess: invalidate, onError }),
   );
 
   return (
@@ -66,15 +97,27 @@ function CommentCard({ comment }: { comment: { id: string; body: string; created
           <div className="text-xs text-muted-foreground">
             {dateFormat.format(comment.createdAt)}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-my-1 h-7"
-            disabled={resolve.isPending}
-            onClick={() => resolve.mutate({ id: comment.id, resolved: true })}
-          >
-            <Check className="size-3.5" /> Auflösen
-          </Button>
+          <div className="-my-1 flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7"
+              disabled={resolve.isPending}
+              onClick={() => resolve.mutate({ id: comment.id, resolved: true })}
+            >
+              <Check className="size-3.5" /> Auflösen
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 text-muted-foreground hover:text-destructive"
+              disabled={remove.isPending}
+              aria-label="Kommentar löschen"
+              onClick={() => remove.mutate({ id: comment.id })}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </div>
         </div>
         <p className="mt-1 text-sm whitespace-pre-wrap">{comment.body}</p>
       </CardContent>
@@ -186,7 +229,10 @@ function RouteComponent() {
               <span>Zuletzt geändert {dateFormat.format(page.updatedAt)}</span>
             </div>
           </div>
-          <FavoriteButton pageId={page.id} />
+          <div className="flex shrink-0 items-center gap-2">
+            <SubscribeButton pageId={page.id} />
+            <FavoriteButton pageId={page.id} />
+          </div>
         </div>
 
         <article className="mt-6 text-[15px] leading-7 whitespace-pre-wrap text-foreground/90">

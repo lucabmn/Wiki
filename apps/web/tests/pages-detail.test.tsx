@@ -3,18 +3,22 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { data, createCommentSpy, addFavoriteSpy, resolveSpy } = vi.hoisted(() => ({
-  data: {
-    page: undefined as unknown,
-    comments: [] as unknown[],
-    spaces: [] as unknown[],
-    favorites: [] as Array<{ id: string }>,
-    error: false,
-  },
-  createCommentSpy: vi.fn((_vars?: { pageId: string; body: string }) => Promise.resolve({})),
-  addFavoriteSpy: vi.fn((_vars?: { pageId: string }) => Promise.resolve({})),
-  resolveSpy: vi.fn((_vars?: { id: string; resolved: boolean }) => Promise.resolve({})),
-}));
+const { data, createCommentSpy, addFavoriteSpy, resolveSpy, subscribeSpy, deleteCommentSpy } =
+  vi.hoisted(() => ({
+    data: {
+      page: undefined as unknown,
+      comments: [] as unknown[],
+      spaces: [] as unknown[],
+      favorites: [] as Array<{ id: string }>,
+      subscriptions: [] as Array<{ id: string }>,
+      error: false,
+    },
+    createCommentSpy: vi.fn((_vars?: { pageId: string; body: string }) => Promise.resolve({})),
+    addFavoriteSpy: vi.fn((_vars?: { pageId: string }) => Promise.resolve({})),
+    resolveSpy: vi.fn((_vars?: { id: string; resolved: boolean }) => Promise.resolve({})),
+    subscribeSpy: vi.fn((_vars?: { pageId: string }) => Promise.resolve({})),
+    deleteCommentSpy: vi.fn((_vars?: { id: string }) => Promise.resolve({})),
+  }));
 
 // Passthrough the layout so the sidebar (and its many deps) stays out of scope.
 vi.mock("@/components/layouts/dashboard-layout", () => ({
@@ -60,6 +64,12 @@ vi.mock("@/utils/orpc", () => ({
       resolve: {
         mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: resolveSpy, ...opts }),
       },
+      delete: {
+        mutationOptions: (opts: Record<string, unknown>) => ({
+          mutationFn: deleteCommentSpy,
+          ...opts,
+        }),
+      },
     },
     me: {
       listFavorites: {
@@ -73,6 +83,16 @@ vi.mock("@/utils/orpc", () => ({
         }),
       },
       removeFavorite: {
+        mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: vi.fn(), ...opts }),
+      },
+      listSubscriptions: {
+        queryOptions: () => ({ queryKey: ["subs"], queryFn: async () => data.subscriptions }),
+        key: () => ["subs"],
+      },
+      subscribe: {
+        mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: subscribeSpy, ...opts }),
+      },
+      unsubscribe: {
         mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: vi.fn(), ...opts }),
       },
     },
@@ -103,6 +123,7 @@ describe("page view route", () => {
     data.comments = [];
     data.spaces = [];
     data.favorites = [];
+    data.subscriptions = [];
     data.error = false;
   });
 
@@ -226,5 +247,29 @@ describe("page view route", () => {
     await waitFor(() =>
       expect(resolveSpy.mock.calls[0]?.[0]).toEqual({ id: "c1", resolved: true }),
     );
+  });
+
+  it("deletes a comment", async () => {
+    data.page = somePage;
+    data.comments = [
+      { id: "c1", body: "Q", resolvedAt: null, deletedAt: null, createdAt: new Date() },
+    ];
+    renderView();
+    fireEvent.click(await screen.findByRole("button", { name: "Kommentar löschen" }));
+    await waitFor(() => expect(deleteCommentSpy.mock.calls[0]?.[0]).toEqual({ id: "c1" }));
+  });
+
+  it("subscribes to the page", async () => {
+    data.page = somePage;
+    renderView();
+    fireEvent.click(await screen.findByRole("button", { name: "Abonnieren" }));
+    await waitFor(() => expect(subscribeSpy.mock.calls[0]?.[0]).toEqual({ pageId: "p1" }));
+  });
+
+  it("reflects an already-subscribed page", async () => {
+    data.page = somePage;
+    data.subscriptions = [{ id: "p1" }];
+    renderView();
+    expect(await screen.findByRole("button", { name: "Abonniert" })).toBeDefined();
   });
 });
