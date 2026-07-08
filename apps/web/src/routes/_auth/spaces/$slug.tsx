@@ -6,7 +6,7 @@ import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { FileText, Folder } from "lucide-react";
 
 export const Route = createFileRoute("/_auth/spaces/$slug")({
@@ -87,17 +87,19 @@ function RouteComponent() {
             </CardContent>
           ) : (
             pages.map((page) => (
-              <div
-                key={page.id}
-                className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-0"
-              >
-                {page.icon ? (
-                  <span className="leading-none">{page.icon}</span>
-                ) : (
-                  <FileText className="size-4 shrink-0 text-muted-foreground" />
-                )}
-                <span className="truncate text-sm">{page.title}</span>
-              </div>
+              <Link to="/pages/$id" params={{ id: page.id }}>
+                <div
+                  key={page.id}
+                  className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-0"
+                >
+                  {page.icon ? (
+                    <span className="leading-none">{page.icon}</span>
+                  ) : (
+                    <FileText className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="truncate text-sm">{page.title}</span>
+                </div>
+              </Link>
             ))
           )}
         </Card>

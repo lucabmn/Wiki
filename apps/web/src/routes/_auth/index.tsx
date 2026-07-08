@@ -110,14 +110,16 @@ function Favorites({ enabled }: { enabled: boolean }) {
             <p className="text-sm text-muted-foreground">Noch keine Favoriten.</p>
           ) : (
             data.map((page) => (
-              <div key={page.id} className="flex items-center gap-2 text-sm">
-                {page.icon ? (
-                  <span className="leading-none">{page.icon}</span>
-                ) : (
-                  <FileText className="size-4 text-muted-foreground" />
-                )}
-                <span className="truncate">{page.title}</span>
-              </div>
+              <Link to="/pages/$id" params={{ id: page.id }}>
+                <div key={page.id} className="flex items-center gap-2 text-sm">
+                  {page.icon ? (
+                    <span className="leading-none">{page.icon}</span>
+                  ) : (
+                    <FileText className="size-4 text-muted-foreground" />
+                  )}
+                  <span className="truncate">{page.title}</span>
+                </div>
+              </Link>
             ))
           )}
         </CardContent>
