@@ -25,5 +25,9 @@ export const comment = wikiSchema.table(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("comment_page_idx").on(t.pageId), index("comment_parent_idx").on(t.parentId)],
+  (t) => [
+    index("comment_page_idx").on(t.pageId),
+    index("comment_parent_idx").on(t.parentId),
+    index("comment_author_idx").on(t.authorId),
+  ],
 );

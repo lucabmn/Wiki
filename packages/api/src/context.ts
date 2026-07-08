@@ -23,3 +23,8 @@ export async function createContext({ context }: CreateContextOptions) {
 }
 
 export type Context = Awaited<ReturnType<typeof createContext>>;
+
+/** `Context` after the auth guard has run — the session is proven non-null. */
+export type AuthedContext = Context & {
+  session: NonNullable<Context["session"]>;
+};

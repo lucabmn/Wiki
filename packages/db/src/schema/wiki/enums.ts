@@ -1,9 +1,9 @@
 import { wikiSchema } from "./_schema";
 
 export const spaceVisibility = wikiSchema.enum("space_visibility", [
-  "public", // every org member can access (with `defaultRole`)
+  "public", // any org member can read; space_member rows grant elevated roles
   "private", // only explicit members (users/teams) in space_member
-  "restricted", // only the creator + explicit members
+  "restricted", // the creator + explicit members
 ]);
 
 export const pageStatus = wikiSchema.enum("page_status", [
@@ -16,6 +16,7 @@ export const activityAction = wikiSchema.enum("activity_action", [
   "space.created",
   "space.updated",
   "space.archived",
+  "space.deleted",
   "page.created",
   "page.updated",
   "page.published",
@@ -25,7 +26,9 @@ export const activityAction = wikiSchema.enum("activity_action", [
   "page.deleted",
   "comment.created",
   "comment.resolved",
+  "comment.deleted",
   "attachment.uploaded",
+  "attachment.deleted",
 ]);
 
 export const wikiRole = wikiSchema.enum("wiki_role", ["viewer", "commenter", "editor", "admin"]);

@@ -5,6 +5,7 @@ import { activity, comment, page } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg } from "../index";
 import { readableSpaceIds } from "../lib/access";
+import { firstRow } from "../lib/rows";
 import { DashboardOverviewSchema } from "../schemas/misc";
 
 const TAGS = ["Dashboard"];
@@ -72,11 +73,11 @@ export const dashboardRouter = {
         ]);
 
       return {
-        pageCount: pageCount[0]!.n,
-        pagesCreatedThisWeek: pagesCreatedThisWeek[0]!.n,
-        openComments: openComments[0]!.n,
-        commentsResolvedThisWeek: commentsResolvedThisWeek[0]!.n,
-        activeMembersThisWeek: members[0]!.n,
+        pageCount: firstRow(pageCount).n,
+        pagesCreatedThisWeek: firstRow(pagesCreatedThisWeek).n,
+        openComments: firstRow(openComments).n,
+        commentsResolvedThisWeek: firstRow(commentsResolvedThisWeek).n,
+        activeMembersThisWeek: firstRow(members).n,
       };
     }),
 };

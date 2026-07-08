@@ -5,8 +5,12 @@ pre-commit:
   parallel: true
   jobs:
     - name: oxlint
+      # oxlint only handles JS/TS; without a glob it exits 1 ("No files found
+      # to lint") when a commit stages only markdown/yaml/etc. and blocks it.
+      glob: "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"
       run: pnpm oxlint --fix {staged_files}
       stage_fixed: true
     - name: oxfmt
+      glob: "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,md,css}"
       run: pnpm oxfmt --write {staged_files}
       stage_fixed: true

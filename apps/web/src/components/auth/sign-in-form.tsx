@@ -137,7 +137,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
               disabled={!canSubmit || isSubmitting}
               form="sign-in-form"
             >
-              {isSubmitting ? "Anmelden …" : "Anmelden"}
+              {isSubmitting ? "Wird angemeldet …" : "Anmelden"}
             </Button>
           )}
         </form.Subscribe>

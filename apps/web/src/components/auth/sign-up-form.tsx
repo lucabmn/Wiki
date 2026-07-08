@@ -44,7 +44,6 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
             toast.success("Erfolgreich registriert");
           },
           onError: (error) => {
-            console.error(error);
             toast.error(error.error.message || error.error.statusText);
           },
         },

@@ -9,15 +9,6 @@ const { navigateSpy, data } = vi.hoisted(() => ({
   data: { spaces: [] as unknown[], pages: [] as unknown[] },
 }));
 
-// Route context (auth) and the session both come from mocked modules so no env
-// or real router is pulled in.
-vi.mock("@/routes/_auth/route", () => ({
-  Route: {
-    useRouteContext: () => ({
-      auth: { organization: { name: "Acme", members: [] }, session: { user: { name: "Luca" } } },
-    }),
-  },
-}));
 vi.mock("@/lib/auth-client", () => ({
   authClient: { useSession: () => ({ data: { session: { activeOrganizationId: "o1" } } }) },
 }));
@@ -34,6 +25,13 @@ vi.mock("@/components/create-page-dialog", () => ({ CreatePageDialog: () => null
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigateSpy,
   useMatchRoute: () => () => false,
+  // The sidebar reads the auth context off the _auth layout route by id.
+  useRouteContext: () => ({
+    auth: {
+      organization: { name: "Acme", members: [] },
+      session: { user: { name: "Luca", email: "luca@acme.io" } },
+    },
+  }),
   linkOptions: (x: unknown) => x,
   Link: ({
     to,

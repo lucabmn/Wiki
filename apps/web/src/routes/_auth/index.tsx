@@ -1,47 +1,22 @@
+import { CreatePageDialog } from "@/components/create-page-dialog";
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { authClient } from "@/lib/auth-client";
+import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
+import { ACTION_LABEL } from "@/lib/labels";
 import { orpc } from "@/utils/orpc";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@nilovon-wiki/ui/components/dialog";
-import { Input } from "@nilovon-wiki/ui/components/input";
-import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FileText, Plus } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_auth/")({
   component: RouteComponent,
 });
-
-// Human-readable German labels for each audit action.
-const ACTION_LABEL: Record<string, string> = {
-  "space.created": "Space erstellt",
-  "space.updated": "Space aktualisiert",
-  "space.archived": "Space archiviert",
-  "page.created": "Seite erstellt",
-  "page.updated": "Seite bearbeitet",
-  "page.published": "Seite veröffentlicht",
-  "page.moved": "Seite verschoben",
-  "page.archived": "Seite archiviert",
-  "page.restored": "Seite wiederhergestellt",
-  "page.deleted": "Seite gelöscht",
-  "comment.created": "Kommentar hinzugefügt",
-  "comment.resolved": "Kommentar gelöst",
-  "attachment.uploaded": "Datei hochgeladen",
-};
 
 const eyebrow = "text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
 
@@ -97,7 +72,7 @@ function RecentActivity({ enabled }: { enabled: boolean }) {
           >
             <span
               className="flex size-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
-              style={{ backgroundColor: `${r.space?.color ?? "#1E6DE1"}` }}
+              style={{ backgroundColor: r.space?.color ?? DEFAULT_SPACE_COLOR }}
             >
               <FileText className="size-4.5" />
             </span>
@@ -148,96 +123,6 @@ function Favorites({ enabled }: { enabled: boolean }) {
         </CardContent>
       </Card>
     </section>
-  );
-}
-
-// Lets the caller create a page from the org-level dashboard, where no space is
-// in context yet — so it first asks which space, then reuses `pages.create`.
-function NewPageDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const queryClient = useQueryClient();
-  const { data: spaces } = useQuery(orpc.spaces.list.queryOptions({ input: {}, enabled: open }));
-
-  const [spaceId, setSpaceId] = useState("");
-  const [title, setTitle] = useState("");
-
-  const create = useMutation(
-    orpc.pages.create.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: orpc.pages.list.key() });
-        setTitle("");
-        onOpenChange(false);
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
-
-  // Default the picker to the first space once the list arrives.
-  const effectiveSpaceId = spaceId || spaces?.[0]?.id || "";
-
-  const submit = () => {
-    const trimmed = title.trim();
-    if (effectiveSpaceId && trimmed) {
-      create.mutate({ spaceId: effectiveSpaceId, title: trimmed });
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Neue Seite</DialogTitle>
-          <DialogDescription>
-            Die Seite wird als Entwurf im gewählten Space angelegt.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-          className="space-y-3"
-        >
-          <NativeSelect
-            className="w-full"
-            value={effectiveSpaceId}
-            onChange={(e) => setSpaceId(e.target.value)}
-            disabled={!spaces?.length}
-          >
-            {spaces?.map((space) => (
-              <NativeSelectOption key={space.id} value={space.id}>
-                {space.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-          <Input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Seitentitel"
-            maxLength={300}
-          />
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={create.isPending}
-            >
-              Abbrechen
-            </Button>
-            <Button type="submit" disabled={create.isPending || !effectiveSpaceId || !title.trim()}>
-              {create.isPending ? "Erstellen …" : "Erstellen"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -311,7 +196,7 @@ function HeroCard() {
         ))}
       </div>
 
-      <NewPageDialog open={newPageOpen} onOpenChange={setNewPageOpen} />
+      <CreatePageDialog open={newPageOpen} onOpenChange={setNewPageOpen} />
     </Card>
   );
 }

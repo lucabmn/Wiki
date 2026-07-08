@@ -2,7 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
 
 import type { Database } from "@nilovon-wiki/db";
-import { comment, page, space } from "@nilovon-wiki/db/schema/index";
+import { attachment, comment, page, space, tag } from "@nilovon-wiki/db/schema/index";
 
 type Row<T> = NonNullable<Awaited<T>>;
 
@@ -29,6 +29,24 @@ export async function loadComment(db: Database, id: string) {
   const row = await db.query.comment.findFirst({ where: eq(comment.id, id) });
   if (!row) {
     throw new ORPCError("NOT_FOUND", { message: "Comment not found" });
+  }
+  return row;
+}
+
+/** Loads a tag or throws NOT_FOUND. */
+export async function loadTag(db: Database, id: string) {
+  const row = await db.query.tag.findFirst({ where: eq(tag.id, id) });
+  if (!row) {
+    throw new ORPCError("NOT_FOUND", { message: "Tag not found" });
+  }
+  return row;
+}
+
+/** Loads an attachment or throws NOT_FOUND. */
+export async function loadAttachment(db: Database, id: string) {
+  const row = await db.query.attachment.findFirst({ where: eq(attachment.id, id) });
+  if (!row) {
+    throw new ORPCError("NOT_FOUND", { message: "Attachment not found" });
   }
   return row;
 }

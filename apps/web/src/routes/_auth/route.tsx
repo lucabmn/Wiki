@@ -1,6 +1,7 @@
-import { Outlet, createFileRoute } from "@tanstack/react-router";
+import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
 import { getUser } from "@/functions/get-user";
+import MainSidebar from "@/components/main-sidebar";
 import { SidebarInset, SidebarProvider } from "@nilovon-wiki/ui/components/sidebar";
 
 export const Route = createFileRoute("/_auth")({
@@ -9,10 +10,15 @@ export const Route = createFileRoute("/_auth")({
   beforeLoad: async () => {
     const auth = await getUser();
 
+    // The auth middleware already redirects unauthenticated/org-less requests,
+    // but guard here too so the context below is genuinely non-null.
+    if (!auth.session) throw redirect({ to: "/auth/login" });
+    if (!auth.organization) throw redirect({ to: "/auth/onboarding" });
+
     return {
       auth: {
-        session: auth.session!,
-        organization: auth.organization!,
+        session: auth.session,
+        organization: auth.organization,
       },
     };
   },
@@ -21,6 +27,7 @@ export const Route = createFileRoute("/_auth")({
 function AuthLayout() {
   return (
     <SidebarProvider>
+      <MainSidebar />
       <SidebarInset>
         <Outlet />
       </SidebarInset>

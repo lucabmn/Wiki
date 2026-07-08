@@ -1,4 +1,6 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { STATUS_LABEL } from "@/lib/labels";
+import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
 import {
   AlertDialog,
@@ -16,94 +18,108 @@ import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { Textarea } from "@nilovon-wiki/ui/components/textarea";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Archive, Bell, Check, FileText, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_auth/pages/$id")({
   component: RouteComponent,
 });
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Entwurf",
-  published: "Veröffentlicht",
-  archived: "Archiviert",
-};
-
 const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
 
-function FavoriteButton({ pageId }: { pageId: string }) {
-  const queryClient = useQueryClient();
-  const { data: favorites } = useQuery(orpc.me.listFavorites.queryOptions({ input: {} }));
-  const isFavorite = favorites?.some((favorite) => favorite.id === pageId) ?? false;
-
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: orpc.me.listFavorites.key() });
-  const onError = (error: Error) => toast.error(error.message);
-  const add = useMutation(orpc.me.addFavorite.mutationOptions({ onSuccess: invalidate, onError }));
-  const remove = useMutation(
-    orpc.me.removeFavorite.mutationOptions({ onSuccess: invalidate, onError }),
-  );
-  const pending = add.isPending || remove.isPending;
-
+/** Outline button that flips a per-page flag (favorite, subscription, …). */
+function PageToggleButton({
+  isOn,
+  pending,
+  onToggle,
+  labelOn,
+  labelOff,
+  icon: Icon,
+  iconOnClass,
+}: {
+  isOn: boolean;
+  pending: boolean;
+  onToggle: () => void;
+  labelOn: string;
+  labelOff: string;
+  icon: typeof Star;
+  iconOnClass: string;
+}) {
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      disabled={pending}
-      onClick={() => (isFavorite ? remove : add).mutate({ pageId })}
-    >
-      <Star className={cn("size-4", isFavorite && "fill-amber-500 text-amber-500")} />
-      {isFavorite ? "Favorit" : "Merken"}
+    <Button variant="outline" size="sm" disabled={pending} onClick={onToggle}>
+      <Icon className={cn("size-4", isOn && iconOnClass)} />
+      {isOn ? labelOn : labelOff}
     </Button>
   );
 }
 
+function FavoriteButton({ pageId }: { pageId: string }) {
+  const { data: favorites } = useQuery(orpc.me.listFavorites.queryOptions({ input: {} }));
+  const isFavorite = favorites?.some((favorite) => favorite.id === pageId) ?? false;
+
+  const invalidate = useInvalidate(orpc.me.listFavorites.key());
+  const add = useMutation(
+    orpc.me.addFavorite.mutationOptions({ onSuccess: invalidate, onError: toastError }),
+  );
+  const remove = useMutation(
+    orpc.me.removeFavorite.mutationOptions({ onSuccess: invalidate, onError: toastError }),
+  );
+
+  return (
+    <PageToggleButton
+      isOn={isFavorite}
+      pending={add.isPending || remove.isPending}
+      onToggle={() => (isFavorite ? remove : add).mutate({ pageId })}
+      labelOn="Favorit"
+      labelOff="Merken"
+      icon={Star}
+      iconOnClass="fill-amber-500 text-amber-500"
+    />
+  );
+}
+
 function SubscribeButton({ pageId }: { pageId: string }) {
-  const queryClient = useQueryClient();
   const { data: subscriptions } = useQuery(orpc.me.listSubscriptions.queryOptions({ input: {} }));
   const isSubscribed = subscriptions?.some((subscription) => subscription.id === pageId) ?? false;
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: orpc.me.listSubscriptions.key() });
-  const onError = (error: Error) => toast.error(error.message);
+  const invalidate = useInvalidate(orpc.me.listSubscriptions.key());
   const subscribe = useMutation(
-    orpc.me.subscribe.mutationOptions({ onSuccess: invalidate, onError }),
+    orpc.me.subscribe.mutationOptions({ onSuccess: invalidate, onError: toastError }),
   );
   const unsubscribe = useMutation(
-    orpc.me.unsubscribe.mutationOptions({ onSuccess: invalidate, onError }),
+    orpc.me.unsubscribe.mutationOptions({ onSuccess: invalidate, onError: toastError }),
   );
-  const pending = subscribe.isPending || unsubscribe.isPending;
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      disabled={pending}
-      onClick={() => (isSubscribed ? unsubscribe : subscribe).mutate({ pageId })}
-    >
-      <Bell className={cn("size-4", isSubscribed && "fill-current")} />
-      {isSubscribed ? "Abonniert" : "Abonnieren"}
-    </Button>
+    <PageToggleButton
+      isOn={isSubscribed}
+      pending={subscribe.isPending || unsubscribe.isPending}
+      onToggle={() => (isSubscribed ? unsubscribe : subscribe).mutate({ pageId })}
+      labelOn="Abonniert"
+      labelOff="Abonnieren"
+      icon={Bell}
+      iconOnClass="fill-current"
+    />
   );
 }
 
 function ArchiveButton({ pageId, spaceSlug }: { pageId: string; spaceSlug?: string }) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const invalidatePages = useInvalidate(orpc.pages.list.key());
   const [open, setOpen] = useState(false);
 
   const archive = useMutation(
     orpc.pages.archive.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: orpc.pages.list.key() });
+        invalidatePages();
         setOpen(false);
         // The page is now hidden — send the reader back to its space (or home).
         if (spaceSlug) navigate({ to: "/spaces/$slug", params: { slug: spaceSlug } });
         else navigate({ to: "/" });
       },
-      onError: (error) => toast.error(error.message),
+      onError: toastError,
     }),
   );
 
@@ -139,14 +155,12 @@ function ArchiveButton({ pageId, spaceSlug }: { pageId: string; spaceSlug?: stri
 }
 
 function CommentCard({ comment }: { comment: { id: string; body: string; createdAt: Date } }) {
-  const queryClient = useQueryClient();
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: orpc.comments.list.key() });
-  const onError = (error: Error) => toast.error(error.message);
+  const invalidate = useInvalidate(orpc.comments.list.key());
   const resolve = useMutation(
-    orpc.comments.resolve.mutationOptions({ onSuccess: invalidate, onError }),
+    orpc.comments.resolve.mutationOptions({ onSuccess: invalidate, onError: toastError }),
   );
   const remove = useMutation(
-    orpc.comments.delete.mutationOptions({ onSuccess: invalidate, onError }),
+    orpc.comments.delete.mutationOptions({ onSuccess: invalidate, onError: toastError }),
   );
 
   return (
@@ -185,16 +199,16 @@ function CommentCard({ comment }: { comment: { id: string; body: string; created
 }
 
 function CommentForm({ pageId }: { pageId: string }) {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidate(orpc.comments.list.key());
   const [body, setBody] = useState("");
 
   const create = useMutation(
     orpc.comments.create.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: orpc.comments.list.key() });
+        invalidate();
         setBody("");
       },
-      onError: (error) => toast.error(error.message),
+      onError: toastError,
     }),
   );
 

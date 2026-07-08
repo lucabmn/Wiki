@@ -105,7 +105,7 @@ export const onboardingRouter = {
     .output(z.object({ spaces: z.number().int(), pages: z.number().int() }))
     .handler(async ({ context }) => {
       const organizationId = requireActiveOrg(context);
-      const userId = context.session?.user.id;
+      const userId = context.session.user.id;
 
       return context.db.transaction(async (tx) => {
         // Idempotency guard: never seed an organization that already has content.
@@ -135,14 +135,12 @@ export const onboardingRouter = {
               })
               .returning(),
           );
-          if (userId) {
-            await tx.insert(spaceMember).values({
-              spaceId: spaceRow.id,
-              subject: "user",
-              userId,
-              role: "admin",
-            });
-          }
+          await tx.insert(spaceMember).values({
+            spaceId: spaceRow.id,
+            subject: "user",
+            userId,
+            role: "admin",
+          });
           await recordActivity(tx, {
             organizationId,
             action: "space.created",

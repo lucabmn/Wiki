@@ -23,5 +23,9 @@ export const attachment = wikiSchema.table(
     uploadedBy: text("uploaded_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamps.createdAt,
   },
-  (t) => [index("attachment_space_idx").on(t.spaceId), index("attachment_page_idx").on(t.pageId)],
+  (t) => [
+    index("attachment_space_idx").on(t.spaceId),
+    index("attachment_page_idx").on(t.pageId),
+    index("attachment_uploaded_by_idx").on(t.uploadedBy),
+  ],
 );

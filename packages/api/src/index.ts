@@ -2,22 +2,24 @@ import { ORPCError, os } from "@orpc/server";
 import { auth } from "@nilovon-wiki/auth";
 import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 
-import type { Context } from "./context";
+import type { AuthedContext, Context } from "./context";
 
 export const o = os.$context<Context>();
 
 export const publicProcedure = o;
 
 const requireAuth = o.middleware(async ({ context, next }) => {
-  if (!context.session?.user) {
+  const { session } = context;
+  if (!session?.user) {
     throw new ORPCError("UNAUTHORIZED");
   }
   // Forward headers so downstream permission checks can re-issue authenticated
-  // better-auth calls with the caller's session.
+  // better-auth calls with the caller's session. Returning the narrowed
+  // `session` types it non-null for every downstream handler.
   return next({
     context: {
       headers: context.headers,
-      session: context.session,
+      session,
     },
   });
 });
@@ -27,8 +29,8 @@ export const protectedProcedure = publicProcedure.use(requireAuth);
 // Resolves the caller's active organization, throwing when none is set. Most
 // create/list flows are scoped to it. Cross-org mutations should instead gate
 // on the *resource's* org id (see `assertOrgPermission`).
-export function requireActiveOrg(context: Context): string {
-  const organizationId = context.session?.session.activeOrganizationId;
+export function requireActiveOrg(context: AuthedContext): string {
+  const organizationId = context.session.session.activeOrganizationId;
   if (!organizationId) {
     throw new ORPCError("BAD_REQUEST", {
       message: "No active organization. Select one before continuing.",
@@ -62,6 +64,30 @@ export async function assertOrgPermission(
   if (!(await hasOrgPermission(headers, permissions, organizationId))) {
     throw new ORPCError("FORBIDDEN");
   }
+}
+
+// Owner-aware guard for mutations on user-authored resources: the resource
+// owner may act when they hold any of `ownerPermissions`; anyone else needs
+// `otherPermissions` (typically a moderate/delete-others grant).
+export async function assertOwnerOrPermission(opts: {
+  headers: Headers;
+  organizationId: string;
+  isOwner: boolean;
+  /** Checked in order for the owner; the first grant that succeeds wins. */
+  ownerPermissions: PermissionRequest[];
+  /** Required when the caller does not own the resource. */
+  otherPermissions: PermissionRequest;
+}): Promise<void> {
+  const { headers, organizationId } = opts;
+  if (!opts.isOwner) {
+    return assertOrgPermission(headers, opts.otherPermissions, organizationId);
+  }
+  for (const permissions of opts.ownerPermissions) {
+    if (await hasOrgPermission(headers, permissions, organizationId)) {
+      return;
+    }
+  }
+  throw new ORPCError("FORBIDDEN");
 }
 
 // Gates a route behind an org permission, checked against the active org. For

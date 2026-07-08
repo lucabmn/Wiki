@@ -8,6 +8,20 @@
       "when": 1783429920602,
       "tag": "0000_vengeful_the_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783520184981,
+      "tag": "0001_wonderful_blazing_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783520578627,
+      "tag": "0002_yellow_vivisector",
+      "breakpoints": true
     }
   ]
 }

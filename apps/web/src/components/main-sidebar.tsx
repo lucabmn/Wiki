@@ -1,7 +1,5 @@
-// Read auth context from the _auth LAYOUT route (active on every child), not the
-// index route — the sidebar renders on all authed pages, not just "/".
-import { Route } from "@/routes/_auth/route";
 import { authClient } from "@/lib/auth-client";
+import { initials } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
 import { CommandPalette } from "./command-palette";
 import { CreateSpaceDialog } from "./create-space-dialog";
@@ -47,33 +45,19 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "./theme-provider";
-import { Link, linkOptions, useMatchRoute, useNavigate } from "@tanstack/react-router";
+import {
+  Link,
+  linkOptions,
+  useMatchRoute,
+  useNavigate,
+  useRouteContext,
+} from "@tanstack/react-router";
 
 const nav = linkOptions([
   { to: "/", label: "Übersicht", icon: Home },
   { to: "/spaces", label: "Alle Spaces", icon: LayoutGrid },
   { to: "/members", label: "Mitglieder & Rechte", icon: Lock },
 ]);
-
-function ColorAvatar({
-  initials,
-  color,
-  size = "default",
-  className,
-}: {
-  initials: string;
-  color: string;
-  size?: "default" | "sm" | "lg";
-  className?: string;
-}) {
-  return (
-    <Avatar size={size} className={className}>
-      <AvatarFallback style={{ backgroundColor: color, color: "#fff" }} className="font-semibold">
-        {initials}
-      </AvatarFallback>
-    </Avatar>
-  );
-}
 
 /** Top-level pages of one space, loaded lazily when the space is expanded. */
 function SpacePages({
@@ -216,6 +200,7 @@ function SpacesTree({
         </Collapsible>
       ))}
       <CreatePageDialog
+        open={createPageSpaceId !== null}
         spaceId={createPageSpaceId}
         onOpenChange={(open) => {
           if (!open) setCreatePageSpaceId(null);
@@ -226,7 +211,10 @@ function SpacesTree({
 }
 
 export default function MainSidebar() {
-  const { auth } = Route.useRouteContext();
+  // Read auth context from the _auth LAYOUT route (active on every child) via the
+  // route id — importing the route module here would be a circular import, since
+  // the layout route renders this sidebar.
+  const { auth } = useRouteContext({ from: "/_auth" });
   const { theme, setTheme } = useTheme();
 
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
@@ -305,25 +293,17 @@ export default function MainSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="flex-row items-center gap-2.5 border-t border-border">
-        <ColorAvatar
-          initials={
-            auth.session.user.name
-              .split(" ")
-              .map((w) => w[0])
-              .slice(0, 2)
-              .join("")
-              .toUpperCase() || "SK"
-          }
-          color="#8b5cf6"
-          size="sm"
-        />
+        <Avatar size="sm">
+          <AvatarFallback className="font-semibold">
+            {initials(auth.session.user.name)}
+          </AvatarFallback>
+        </Avatar>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] leading-tight font-semibold">
             {auth.session.user.name}
           </div>
-          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-emerald-500" />
-            Editor · Online
+          <div className="truncate text-[11px] text-muted-foreground">
+            {auth.session.user.email}
           </div>
         </div>
         <Button

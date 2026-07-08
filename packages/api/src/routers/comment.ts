@@ -1,11 +1,10 @@
-import { ORPCError } from "@orpc/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@nilovon-wiki/db";
 import { comment } from "@nilovon-wiki/db/schema/index";
 
-import { assertOrgPermission, hasOrgPermission, protectedProcedure } from "../index";
+import { assertOrgPermission, assertOwnerOrPermission, protectedProcedure } from "../index";
 import { assertSpaceRead } from "../lib/access";
 import { recordActivity } from "../lib/activity";
 import { loadComment, loadPage, loadSpace, orgOfSpace } from "../lib/loaders";
@@ -58,7 +57,7 @@ export const commentRouter = {
           .values({
             pageId: input.pageId,
             parentId: input.parentId ?? null,
-            authorId: context.session?.user.id,
+            authorId: context.session.user.id,
             body: input.body,
             anchor: input.anchor ?? null,
           })
@@ -67,7 +66,7 @@ export const commentRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "comment.created",
-          actorId: context.session?.user.id,
+          actorId: context.session.user.id,
           spaceId: target.spaceId,
           pageId: target.id,
           metadata: { commentId: row.id },
@@ -85,11 +84,13 @@ export const commentRouter = {
       // Authors may edit their own comment; otherwise `comment:moderate` is
       // required (comments have no separate edit-others permission).
       const organizationId = await orgOfComment(context.db, existing.pageId);
-      if (existing.authorId !== context.session?.user.id) {
-        await assertOrgPermission(context.headers, { comment: ["moderate"] }, organizationId);
-      } else {
-        await assertOrgPermission(context.headers, { comment: ["update"] }, organizationId);
-      }
+      await assertOwnerOrPermission({
+        headers: context.headers,
+        organizationId,
+        isOwner: existing.authorId === context.session.user.id,
+        ownerPermissions: [{ comment: ["update"] }],
+        otherPermissions: { comment: ["moderate"] },
+      });
       const rows = await context.db
         .update(comment)
         .set({ body: input.body })
@@ -117,7 +118,7 @@ export const commentRouter = {
           .update(comment)
           .set(
             input.resolved
-              ? { resolvedAt: new Date(), resolvedBy: context.session?.user.id }
+              ? { resolvedAt: new Date(), resolvedBy: context.session.user.id }
               : { resolvedAt: null, resolvedBy: null },
           )
           .where(eq(comment.id, existing.id))
@@ -128,7 +129,7 @@ export const commentRouter = {
           await recordActivity(tx, {
             organizationId,
             action: "comment.resolved",
-            actorId: context.session?.user.id,
+            actorId: context.session.user.id,
             spaceId: target.spaceId,
             pageId: target.id,
             metadata: { commentId: row.id },
@@ -149,20 +150,27 @@ export const commentRouter = {
     .output(z.object({ id: IdSchema }))
     .handler(async ({ input, context }) => {
       const existing = await loadComment(context.db, input.id);
-      const organizationId = await orgOfComment(context.db, existing.pageId);
-      const isAuthor = existing.authorId === context.session?.user.id;
+      const target = await loadPage(context.db, existing.pageId);
+      const organizationId = await orgOfSpace(context.db, target.spaceId);
       // Authors delete their own; moderators delete anyone's.
-      if (!isAuthor) {
-        await assertOrgPermission(context.headers, { comment: ["moderate"] }, organizationId);
-      } else if (
-        !(await hasOrgPermission(context.headers, { comment: ["delete"] }, organizationId))
-      ) {
-        throw new ORPCError("FORBIDDEN");
-      }
-      await context.db
-        .update(comment)
-        .set({ deletedAt: new Date() })
-        .where(eq(comment.id, existing.id));
-      return { id: existing.id };
+      await assertOwnerOrPermission({
+        headers: context.headers,
+        organizationId,
+        isOwner: existing.authorId === context.session.user.id,
+        ownerPermissions: [{ comment: ["delete"] }],
+        otherPermissions: { comment: ["moderate"] },
+      });
+      return context.db.transaction(async (tx) => {
+        await tx.update(comment).set({ deletedAt: new Date() }).where(eq(comment.id, existing.id));
+        await recordActivity(tx, {
+          organizationId,
+          action: "comment.deleted",
+          actorId: context.session.user.id,
+          spaceId: target.spaceId,
+          pageId: target.id,
+          metadata: { commentId: existing.id },
+        });
+        return { id: existing.id };
+      });
     }),
 };

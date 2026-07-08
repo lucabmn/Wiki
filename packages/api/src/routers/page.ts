@@ -156,7 +156,7 @@ export const pageRouter = {
           })),
       );
       const position = await positionAtEnd(context.db, input.spaceId, parentId);
-      const userId = context.session?.user.id;
+      const userId = context.session.user.id;
 
       return context.db.transaction(async (tx) => {
         const rows = await tx
@@ -219,7 +219,7 @@ export const pageRouter = {
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .update(page)
-          .set({ ...patch, lastEditedBy: context.session?.user.id })
+          .set({ ...patch, lastEditedBy: context.session.user.id })
           .where(eq(page.id, id))
           .returning();
         const row = firstRow(rows);
@@ -229,7 +229,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.updated",
-          actorId: context.session?.user.id,
+          actorId: context.session.user.id,
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -249,13 +249,9 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      await assertOrgPermission(
-        context.headers,
-        { page: ["publish"] },
-        await orgOfSpace(context.db, existing.spaceId),
-      );
-      const userId = context.session?.user.id;
       const organizationId = await orgOfSpace(context.db, existing.spaceId);
+      await assertOrgPermission(context.headers, { page: ["publish"] }, organizationId);
+      const userId = context.session.user.id;
       return context.db.transaction(async (tx) => {
         const latest = await tx.query.pageRevision.findFirst({
           where: eq(pageRevision.pageId, existing.id),
@@ -314,14 +310,14 @@ export const pageRouter = {
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .update(page)
-          .set({ parentId, position, lastEditedBy: context.session?.user.id })
+          .set({ parentId, position, lastEditedBy: context.session.user.id })
           .where(eq(page.id, existing.id))
           .returning();
         const row = firstRow(rows);
         await recordActivity(tx, {
           organizationId,
           action: "page.moved",
-          actorId: context.session?.user.id,
+          actorId: context.session.user.id,
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -349,7 +345,7 @@ export const pageRouter = {
           .set({
             status: "archived",
             archivedAt: new Date(),
-            lastEditedBy: context.session?.user.id,
+            lastEditedBy: context.session.user.id,
           })
           .where(eq(page.id, existing.id))
           .returning();
@@ -357,7 +353,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.archived",
-          actorId: context.session?.user.id,
+          actorId: context.session.user.id,
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -382,14 +378,14 @@ export const pageRouter = {
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .update(page)
-          .set({ status: "draft", archivedAt: null, lastEditedBy: context.session?.user.id })
+          .set({ status: "draft", archivedAt: null, lastEditedBy: context.session.user.id })
           .where(eq(page.id, existing.id))
           .returning();
         const row = firstRow(rows);
         await recordActivity(tx, {
           organizationId,
           action: "page.restored",
-          actorId: context.session?.user.id,
+          actorId: context.session.user.id,
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -419,7 +415,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.deleted",
-          actorId: context.session?.user.id,
+          actorId: context.session.user.id,
           spaceId: existing.spaceId,
           metadata: { pageId: existing.id, title: existing.title },
         });
@@ -473,7 +469,7 @@ export const pageRouter = {
             title: revision.title,
             content: revision.content,
             textContent: revision.textContent,
-            lastEditedBy: context.session?.user.id,
+            lastEditedBy: context.session.user.id,
           })
           .where(eq(page.id, existing.id))
           .returning();
@@ -482,7 +478,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.updated",
-          actorId: context.session?.user.id,
+          actorId: context.session.user.id,
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title, restoredVersion: revision.version },
@@ -508,7 +504,7 @@ export const pageRouter = {
       const row = await context.db.query.pageDraft.findFirst({
         where: and(
           eq(pageDraft.pageId, existing.id),
-          eq(pageDraft.userId, context.session!.user.id),
+          eq(pageDraft.userId, context.session.user.id),
         ),
       });
       return row ?? null;
@@ -531,7 +527,7 @@ export const pageRouter = {
         { page: ["update"] },
         await orgOfSpace(context.db, existing.spaceId),
       );
-      const userId = context.session!.user.id;
+      const userId = context.session.user.id;
       const rows = await context.db
         .insert(pageDraft)
         .values({
@@ -563,7 +559,7 @@ export const pageRouter = {
       await context.db
         .delete(pageDraft)
         .where(
-          and(eq(pageDraft.pageId, existing.id), eq(pageDraft.userId, context.session!.user.id)),
+          and(eq(pageDraft.pageId, existing.id), eq(pageDraft.userId, context.session.user.id)),
         );
       return { pageId: existing.id };
     }),

@@ -40,7 +40,7 @@ export const userStateRouter = {
           .from(favorite)
           .innerJoin(page, eq(favorite.pageId, page.id))
           .innerJoin(space, eq(page.spaceId, space.id))
-          .where(eq(favorite.userId, context.session!.user.id))
+          .where(eq(favorite.userId, context.session.user.id))
           .orderBy(desc(favorite.createdAt)),
         buildSpaceReadFilter(context.db, context),
       ]);
@@ -61,7 +61,7 @@ export const userStateRouter = {
       await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
       await context.db
         .insert(favorite)
-        .values({ userId: context.session!.user.id, pageId: input.pageId })
+        .values({ userId: context.session.user.id, pageId: input.pageId })
         .onConflictDoNothing();
       return { pageId: input.pageId, active: true };
     }),
@@ -79,7 +79,7 @@ export const userStateRouter = {
       await context.db
         .delete(favorite)
         .where(
-          and(eq(favorite.userId, context.session!.user.id), eq(favorite.pageId, input.pageId)),
+          and(eq(favorite.userId, context.session.user.id), eq(favorite.pageId, input.pageId)),
         );
       return { pageId: input.pageId, active: false };
     }),
@@ -102,7 +102,7 @@ export const userStateRouter = {
           .from(pageSubscription)
           .innerJoin(page, eq(pageSubscription.pageId, page.id))
           .innerJoin(space, eq(page.spaceId, space.id))
-          .where(eq(pageSubscription.userId, context.session!.user.id))
+          .where(eq(pageSubscription.userId, context.session.user.id))
           .orderBy(desc(pageSubscription.createdAt)),
         buildSpaceReadFilter(context.db, context),
       ]);
@@ -123,7 +123,7 @@ export const userStateRouter = {
       await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
       await context.db
         .insert(pageSubscription)
-        .values({ userId: context.session!.user.id, pageId: input.pageId })
+        .values({ userId: context.session.user.id, pageId: input.pageId })
         .onConflictDoNothing();
       return { pageId: input.pageId, active: true };
     }),
@@ -142,7 +142,7 @@ export const userStateRouter = {
         .delete(pageSubscription)
         .where(
           and(
-            eq(pageSubscription.userId, context.session!.user.id),
+            eq(pageSubscription.userId, context.session.user.id),
             eq(pageSubscription.pageId, input.pageId),
           ),
         );

@@ -8,7 +8,7 @@ import { pageTag, tag } from "@nilovon-wiki/db/schema/index";
 
 import { assertOrgPermission, protectedProcedure } from "../index";
 import { assertSpaceRead } from "../lib/access";
-import { loadPage, loadSpace, orgOfSpace } from "../lib/loaders";
+import { loadPage, loadSpace, loadTag, orgOfSpace } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import { IdSchema } from "../schemas/shared";
 import {
@@ -60,10 +60,7 @@ export const tagRouter = {
     .input(UpdateTagInputSchema)
     .output(TagSchema)
     .handler(async ({ input, context }) => {
-      const existing = await context.db.query.tag.findFirst({ where: eq(tag.id, input.id) });
-      if (!existing) {
-        throw new ORPCError("NOT_FOUND", { message: "Tag not found" });
-      }
+      const existing = await loadTag(context.db, input.id);
       await assertOrgPermission(
         context.headers,
         MANAGE,
@@ -79,10 +76,7 @@ export const tagRouter = {
     .input(z.object({ id: IdSchema }))
     .output(z.object({ id: IdSchema }))
     .handler(async ({ input, context }) => {
-      const existing = await context.db.query.tag.findFirst({ where: eq(tag.id, input.id) });
-      if (!existing) {
-        throw new ORPCError("NOT_FOUND", { message: "Tag not found" });
-      }
+      const existing = await loadTag(context.db, input.id);
       await assertOrgPermission(
         context.headers,
         MANAGE,

@@ -1,8 +1,9 @@
-import { SidebarInset, SidebarProvider } from "@nilovon-wiki/ui/components/sidebar";
 import { ReactNode } from "react";
-import MainSidebar from "../main-sidebar";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 
+// The sidebar chrome (SidebarProvider + MainSidebar + SidebarInset) lives in the
+// _auth layout route, so it mounts once and keeps its state across navigation.
+// This wrapper only provides the page content column.
 export default function DashboardLayout({
   children,
   className,
@@ -10,12 +11,5 @@ export default function DashboardLayout({
   children: ReactNode;
   className?: string;
 }) {
-  return (
-    <SidebarProvider>
-      <MainSidebar />
-      <SidebarInset>
-        <main className={cn("flex flex-1 flex-col gap-4", className)}>{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
-  );
+  return <main className={cn("flex flex-1 flex-col gap-4", className)}>{children}</main>;
 }

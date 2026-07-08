@@ -59,6 +59,8 @@ export const page = wikiSchema.table(
     uniqueIndex("page_space_slug_uq").on(t.spaceId, t.slug),
     index("page_space_status_idx").on(t.spaceId, t.status),
     index("page_parent_idx").on(t.parentId),
+    index("page_created_by_idx").on(t.createdBy),
+    index("page_last_edited_by_idx").on(t.lastEditedBy),
     index("page_search_idx").using("gin", t.searchVector),
   ],
 );

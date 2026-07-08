@@ -2,21 +2,13 @@ import { z } from "zod";
 
 import { IdSchema } from "./shared";
 
-// --- Links / backlinks ---------------------------------------------------
-
-export const PageLinkSchema = z.object({
-  id: IdSchema,
-  sourcePageId: IdSchema,
-  targetPageId: IdSchema,
-  createdAt: z.date(),
-});
-
 // --- Activity feed -------------------------------------------------------
 
 export const ActivityActionSchema = z.enum([
   "space.created",
   "space.updated",
   "space.archived",
+  "space.deleted",
   "page.created",
   "page.updated",
   "page.published",
@@ -26,7 +18,9 @@ export const ActivityActionSchema = z.enum([
   "page.deleted",
   "comment.created",
   "comment.resolved",
+  "comment.deleted",
   "attachment.uploaded",
+  "attachment.deleted",
 ]);
 
 export const ActivitySchema = z.object({

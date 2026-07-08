@@ -159,6 +159,26 @@ describe("space.get visibility gating", () => {
   });
 });
 
+describe("space.delete", () => {
+  it("hard-deletes the space and records space.deleted with identifying metadata", async () => {
+    const created = await call(
+      spaceRouter.create,
+      { name: "Doomed", visibility: "public" },
+      { context: ctx() },
+    );
+    await call(spaceRouter.delete, { id: created.id }, { context: ctx() });
+
+    const gone = await db.query.space.findFirst({ where: eq(space.id, created.id) });
+    expect(gone).toBeUndefined();
+
+    // The audit row survives the space, so the id/name live in metadata.
+    const acts = await db.query.activity.findMany();
+    const deleted = acts.find((a) => a.action === "space.deleted");
+    expect(deleted?.spaceId).toBeNull();
+    expect(deleted?.metadata).toMatchObject({ spaceId: created.id, name: "Doomed" });
+  });
+});
+
 describe("space.list", () => {
   it("returns only spaces the caller can read", async () => {
     const list = await call(spaceRouter.list, { includeArchived: false }, { context: ctx() });

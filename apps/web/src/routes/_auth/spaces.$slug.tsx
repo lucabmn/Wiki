@@ -1,4 +1,6 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
+import { VISIBILITY_LABEL } from "@/lib/labels";
 import { orpc } from "@/utils/orpc";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
@@ -10,12 +12,6 @@ import { FileText, Folder } from "lucide-react";
 export const Route = createFileRoute("/_auth/spaces/$slug")({
   component: RouteComponent,
 });
-
-const VISIBILITY_LABEL: Record<string, string> = {
-  public: "Öffentlich",
-  private: "Privat",
-  restricted: "Eingeschränkt",
-};
 
 function RouteComponent() {
   const { slug } = Route.useParams();
@@ -59,7 +55,7 @@ function RouteComponent() {
       <div className="flex items-center gap-3">
         <span
           className="flex size-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
-          style={{ backgroundColor: space.color ?? "#1E6DE1" }}
+          style={{ backgroundColor: space.color ?? DEFAULT_SPACE_COLOR }}
         >
           {space.icon ? (
             <span className="text-lg leading-none">{space.icon}</span>

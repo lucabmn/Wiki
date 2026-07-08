@@ -8,7 +8,7 @@ import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { BatchHandlerPlugin } from "@orpc/server/plugins";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-import { initLogger } from "evlog";
+import { initLogger, log, parseError } from "evlog";
 import { createAuthMiddleware, type BetterAuthInstance } from "evlog/better-auth";
 import { evlog, type EvlogVariables } from "evlog/hono";
 import { Hono } from "hono";
@@ -53,7 +53,7 @@ export const apiHandler = new OpenAPIHandler(appRouter, {
   ],
   interceptors: [
     onError((error) => {
-      console.error(error);
+      log.error({ source: "orpc", handler: "openapi", ...parseError(error) });
     }),
   ],
 });
@@ -64,7 +64,7 @@ export const rpcHandler = new RPCHandler(appRouter, {
   plugins: [new BatchHandlerPlugin()],
   interceptors: [
     onError((error) => {
-      console.error(error);
+      log.error({ source: "orpc", handler: "rpc", ...parseError(error) });
     }),
   ],
 });

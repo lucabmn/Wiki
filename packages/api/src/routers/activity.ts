@@ -10,6 +10,25 @@ import { ActivitySchema, ListActivityInputSchema } from "../schemas/misc";
 
 const TAGS = ["Activity"];
 
+// The joined feed projection, shared by the scoped and org-wide queries.
+const activityFeedColumns = {
+  id: activity.id,
+  organizationId: activity.organizationId,
+  spaceId: activity.spaceId,
+  pageId: activity.pageId,
+  actorId: activity.actorId,
+  action: activity.action,
+  metadata: activity.metadata,
+  createdAt: activity.createdAt,
+  actor: {
+    name: user.name,
+  },
+  space: {
+    name: space.name,
+    color: space.color,
+  },
+};
+
 export const activityRouter = {
   list: protectedProcedure
     .route({
@@ -26,23 +45,7 @@ export const activityRouter = {
         const spaceId = input.spaceId ?? (await loadPage(context.db, input.pageId!)).spaceId;
         await assertSpaceRead(context.db, context, await loadSpace(context.db, spaceId));
         return context.db
-          .select({
-            id: activity.id,
-            organizationId: activity.organizationId,
-            spaceId: activity.spaceId,
-            pageId: activity.pageId,
-            actorId: activity.actorId,
-            action: activity.action,
-            metadata: activity.metadata,
-            createdAt: activity.createdAt,
-            actor: {
-              name: user.name,
-            },
-            space: {
-              name: space.name,
-              color: space.color,
-            },
-          })
+          .select(activityFeedColumns)
           .from(activity)
           .where(
             and(
@@ -60,23 +63,7 @@ export const activityRouter = {
       const organizationId = requireActiveOrg(context);
       const readable = await readableSpaceIds(context.db, context, organizationId);
       const data = context.db
-        .select({
-          id: activity.id,
-          organizationId: activity.organizationId,
-          spaceId: activity.spaceId,
-          pageId: activity.pageId,
-          actorId: activity.actorId,
-          action: activity.action,
-          metadata: activity.metadata,
-          createdAt: activity.createdAt,
-          actor: {
-            name: user.name,
-          },
-          space: {
-            name: space.name,
-            color: space.color,
-          },
-        })
+        .select(activityFeedColumns)
         .from(activity)
         .where(
           and(

@@ -30,9 +30,9 @@ export const space = wikiSchema.table(
 /**
  * Explicit grants to a space for a user OR a team. Combine with
  * `space.visibility` to resolve access:
- *   open       -> org members get `defaultRole`, overridden by rows here
- *   restricted -> only subjects listed here
- *   private    -> creator + subjects listed here
+ *   public     -> any org member can read; rows here grant elevated roles
+ *   private    -> only subjects listed here
+ *   restricted -> creator + subjects listed here
  */
 export const spaceMember = wikiSchema.table(
   "space_member",

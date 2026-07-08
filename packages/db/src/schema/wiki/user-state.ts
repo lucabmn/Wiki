@@ -1,4 +1,4 @@
-import { text, primaryKey } from "drizzle-orm/pg-core";
+import { text, primaryKey, index } from "drizzle-orm/pg-core";
 
 import { wikiSchema } from "./_schema";
 import { timestamps } from "../_helpers";
@@ -31,5 +31,10 @@ export const pageSubscription = wikiSchema.table(
       .references(() => page.id, { onDelete: "cascade" }),
     createdAt: timestamps.createdAt,
   },
-  (t) => [primaryKey({ columns: [t.userId, t.pageId] })],
+  (t) => [
+    primaryKey({ columns: [t.userId, t.pageId] }),
+    // The composite PK leads with userId, so it can't serve pageId-only
+    // lookups ("who watches this page?") needed to notify subscribers.
+    index("page_subscription_page_idx").on(t.pageId),
+  ],
 );

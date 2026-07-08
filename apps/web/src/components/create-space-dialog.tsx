@@ -1,3 +1,4 @@
+import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import {
@@ -9,9 +10,8 @@ import {
   DialogTitle,
 } from "@nilovon-wiki/ui/components/dialog";
 import { Input } from "@nilovon-wiki/ui/components/input";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { toast } from "sonner";
 
 /**
  * Controlled dialog that creates a space in the active organization. Real data
@@ -25,16 +25,16 @@ export function CreateSpaceDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [name, setName] = useState("");
-  const queryClient = useQueryClient();
+  const invalidateSpaces = useInvalidate(orpc.spaces.list.key());
 
   const create = useMutation(
     orpc.spaces.create.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: orpc.spaces.list.key() });
+        invalidateSpaces();
         setName("");
         onOpenChange(false);
       },
-      onError: (error) => toast.error(error.message),
+      onError: toastError,
     }),
   );
 

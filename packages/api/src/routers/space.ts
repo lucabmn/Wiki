@@ -12,6 +12,7 @@ import {
 } from "../index";
 import { assertSpaceRead, buildSpaceReadFilter } from "../lib/access";
 import { recordActivity } from "../lib/activity";
+import { loadSpace } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
 import {
@@ -21,21 +22,8 @@ import {
   UpdateSpaceInputSchema,
 } from "../schemas/space";
 import { IdSchema } from "../schemas/shared";
-import type { Context } from "../context";
 
 const TAGS = ["Spaces"];
-
-/**
- * Loads a space by id or throws NOT_FOUND. Shared by every resource-targeting
- * route so the not-found shape stays consistent.
- */
-async function getSpaceOrThrow(db: Context["db"], id: string) {
-  const row = await db.query.space.findFirst({ where: eq(space.id, id) });
-  if (!row) {
-    throw new ORPCError("NOT_FOUND", { message: "Space not found" });
-  }
-  return row;
-}
 
 export const spaceRouter = {
   list: protectedProcedure
@@ -48,8 +36,10 @@ export const spaceRouter = {
     .input(ListSpacesInputSchema)
     .output(z.array(SpaceSchema))
     .handler(async ({ input, context }) => {
-      const organizationId = input.organizationId ?? requireActiveOrg(context);
-      if (organizationId !== requireActiveOrg(context)) {
+      const organizationId = requireActiveOrg(context);
+      // The input field stays for API-surface compatibility, but only the
+      // active org may be listed — anything else is a cross-org read.
+      if (input.organizationId && input.organizationId !== organizationId) {
         throw new ORPCError("FORBIDDEN");
       }
       const [candidates, canRead] = await Promise.all([
@@ -76,7 +66,7 @@ export const spaceRouter = {
     .input(z.object({ id: IdSchema }))
     .output(SpaceSchema)
     .handler(async ({ input, context }) => {
-      const row = await getSpaceOrThrow(context.db, input.id);
+      const row = await loadSpace(context.db, input.id);
       await assertSpaceRead(context.db, context, row);
       return row;
     }),
@@ -99,7 +89,7 @@ export const spaceRouter = {
             where: and(eq(space.organizationId, organizationId), eq(space.slug, candidate)),
           })),
       );
-      const userId = context.session?.user.id;
+      const userId = context.session.user.id;
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .insert(space)
@@ -117,14 +107,12 @@ export const spaceRouter = {
         const row = firstRow(rows);
         // Grant the creator explicit admin membership so private spaces are
         // usable by their author and they appear in member lists.
-        if (userId) {
-          await tx.insert(spaceMember).values({
-            spaceId: row.id,
-            subject: "user",
-            userId,
-            role: "admin",
-          });
-        }
+        await tx.insert(spaceMember).values({
+          spaceId: row.id,
+          subject: "user",
+          userId,
+          role: "admin",
+        });
         await recordActivity(tx, {
           organizationId,
           action: "space.created",
@@ -146,7 +134,7 @@ export const spaceRouter = {
     .input(UpdateSpaceInputSchema)
     .output(SpaceSchema)
     .handler(async ({ input, context }) => {
-      const existing = await getSpaceOrThrow(context.db, input.id);
+      const existing = await loadSpace(context.db, input.id);
       // Gate on the resource's own org — not the active org — so rights in one
       // org can't authorize edits to a space living in another.
       await assertOrgPermission(context.headers, { space: ["update"] }, existing.organizationId);
@@ -157,7 +145,7 @@ export const spaceRouter = {
         await recordActivity(tx, {
           organizationId: existing.organizationId,
           action: "space.updated",
-          actorId: context.session?.user.id,
+          actorId: context.session.user.id,
           spaceId: row.id,
         });
         return row;
@@ -174,7 +162,7 @@ export const spaceRouter = {
     .input(z.object({ id: IdSchema }))
     .output(SpaceSchema)
     .handler(async ({ input, context }) => {
-      const existing = await getSpaceOrThrow(context.db, input.id);
+      const existing = await loadSpace(context.db, input.id);
       await assertOrgPermission(context.headers, { space: ["update"] }, existing.organizationId);
       return context.db.transaction(async (tx) => {
         const rows = await tx
@@ -186,7 +174,7 @@ export const spaceRouter = {
         await recordActivity(tx, {
           organizationId: existing.organizationId,
           action: "space.archived",
-          actorId: context.session?.user.id,
+          actorId: context.session.user.id,
           spaceId: row.id,
         });
         return row;
@@ -203,11 +191,21 @@ export const spaceRouter = {
     .input(z.object({ id: IdSchema }))
     .output(z.object({ id: IdSchema }))
     .handler(async ({ input, context }) => {
-      const existing = await getSpaceOrThrow(context.db, input.id);
+      const existing = await loadSpace(context.db, input.id);
       // Hard delete is the destructive `space:["delete"]` grant (owner/admin);
       // cascades remove pages, comments, attachments, etc.
       await assertOrgPermission(context.headers, { space: ["delete"] }, existing.organizationId);
-      await context.db.delete(space).where(eq(space.id, input.id));
+      await context.db.transaction(async (tx) => {
+        await tx.delete(space).where(eq(space.id, input.id));
+        // `activity.spaceId` is set-null on delete, so keep the id/name in
+        // metadata — the audit row must survive the space it describes.
+        await recordActivity(tx, {
+          organizationId: existing.organizationId,
+          action: "space.deleted",
+          actorId: context.session.user.id,
+          metadata: { spaceId: existing.id, name: existing.name },
+        });
+      });
       return { id: input.id };
     }),
 };

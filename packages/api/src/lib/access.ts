@@ -5,7 +5,7 @@ import type { Database } from "@nilovon-wiki/db";
 import { space, spaceMember } from "@nilovon-wiki/db/schema/index";
 import { teamMember } from "@nilovon-wiki/db/schema/auth";
 
-import type { Context } from "../context";
+import type { AuthedContext } from "../context";
 
 export type SpaceVisibility = "public" | "private" | "restricted";
 
@@ -71,12 +71,12 @@ async function isSpaceMember(
 /** Whether the caller may read this space (and thus its pages/comments/etc). */
 export async function canReadSpace(
   db: Database,
-  context: Context,
+  context: AuthedContext,
   target: SpaceAccessInput,
 ): Promise<boolean> {
   // Cross-org reads are denied outright — active-org rights never reach another
   // org's spaces.
-  if (target.organizationId !== context.session?.session.activeOrganizationId) {
+  if (target.organizationId !== context.session.session.activeOrganizationId) {
     return false;
   }
   const userId = context.session.user.id;
@@ -91,7 +91,7 @@ export async function canReadSpace(
 /** Throwing variant used at the top of space-scoped read handlers. */
 export async function assertSpaceRead(
   db: Database,
-  context: Context,
+  context: AuthedContext,
   target: SpaceAccessInput,
 ): Promise<void> {
   if (!(await canReadSpace(db, context, target))) {
@@ -106,10 +106,10 @@ export async function assertSpaceRead(
  */
 export async function buildSpaceReadFilter(
   db: Database,
-  context: Context,
+  context: AuthedContext,
 ): Promise<(target: SpaceAccessInput) => boolean> {
-  const userId = context.session!.user.id;
-  const activeOrg = context.session?.session.activeOrganizationId;
+  const userId = context.session.user.id;
+  const activeOrg = context.session.session.activeOrganizationId;
   const teamIds = await userTeamIds(db, userId);
   const memberRows = await db
     .select({ spaceId: spaceMember.spaceId })
@@ -132,7 +132,7 @@ export async function buildSpaceReadFilter(
  */
 export async function readableSpaceIds(
   db: Database,
-  context: Context,
+  context: AuthedContext,
   organizationId: string,
 ): Promise<string[]> {
   const [spaces, canRead] = await Promise.all([

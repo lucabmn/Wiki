@@ -1,4 +1,6 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { initials } from "@/lib/format";
+import { ROLE_LABEL, ROLE_VARIANT } from "@/lib/labels";
 import { Avatar, AvatarFallback } from "@nilovon-wiki/ui/components/avatar";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Card } from "@nilovon-wiki/ui/components/card";
@@ -15,26 +17,6 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/_auth/members")({
   component: RouteComponent,
 });
-
-const ROLE_LABEL: Record<string, string> = {
-  owner: "Inhaber",
-  admin: "Administrator",
-  member: "Mitglied",
-};
-
-const ROLE_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
-  owner: "default",
-  admin: "secondary",
-};
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((part) => part.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
 
 function RouteComponent() {
   const { auth } = Route.useRouteContext();

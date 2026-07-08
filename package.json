@@ -1,10 +1,6 @@
 {
   "name": "nilovon-wiki",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "type": "module",
   "scripts": {
     "dev": "turbo run dev",
