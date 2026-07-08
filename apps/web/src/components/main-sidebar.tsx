@@ -1,6 +1,7 @@
 import { Route } from "@/routes/_auth";
 import { authClient } from "@/lib/auth-client";
 import { orpc } from "@/utils/orpc";
+import { CommandPalette } from "./command-palette";
 import { CreateSpaceDialog } from "./create-space-dialog";
 import { CreatePageDialog } from "./create-page-dialog";
 import { Avatar, AvatarFallback } from "@nilovon-wiki/ui/components/avatar";
@@ -227,6 +228,7 @@ export default function MainSidebar() {
   const { theme, setTheme } = useTheme();
 
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const matchRoute = useMatchRoute();
   const navigate = useNavigate();
@@ -258,7 +260,7 @@ export default function MainSidebar() {
         <div className="px-2 pt-2">
           <Button
             variant="outline"
-            onClick={() => console.log("cmdk + k")}
+            onClick={() => setSearchOpen(true)}
             className="h-9 w-full justify-start gap-2.5 px-2.5 font-normal text-muted-foreground"
           >
             <Search className="size-4" />
@@ -333,6 +335,7 @@ export default function MainSidebar() {
       </SidebarFooter>
 
       <CreateSpaceDialog open={createSpaceOpen} onOpenChange={setCreateSpaceOpen} />
+      <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
     </Sidebar>
   );
 }
