@@ -38,8 +38,8 @@ vi.mock("@/utils/orpc", () => ({
   },
 }));
 
-import { Route as BrowseRoute } from "@/routes/_auth/spaces.$slug";
-import { Route as IndexRoute } from "@/routes/_auth/spaces.index";
+import { Route as BrowseRoute } from "@/routes/_auth/spaces/$slug";
+import { Route as IndexRoute } from "@/routes/_auth/spaces";
 
 const SpaceBrowse = (BrowseRoute as unknown as { component: () => ReactNode }).component;
 const SpacesIndex = (IndexRoute as unknown as { component: () => ReactNode }).component;

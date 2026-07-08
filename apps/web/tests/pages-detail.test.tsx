@@ -119,7 +119,7 @@ vi.mock("@/utils/orpc", () => ({
   },
 }));
 
-import { Route } from "@/routes/_auth/pages.$id";
+import { Route } from "@/routes/_auth/pages/$id";
 
 const PageView = (Route as unknown as { component: () => ReactNode }).component;
 
