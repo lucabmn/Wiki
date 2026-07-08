@@ -1,24 +1,34 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { data, createCommentSpy, addFavoriteSpy, resolveSpy, subscribeSpy, deleteCommentSpy } =
-  vi.hoisted(() => ({
-    data: {
-      page: undefined as unknown,
-      comments: [] as unknown[],
-      spaces: [] as unknown[],
-      favorites: [] as Array<{ id: string }>,
-      subscriptions: [] as Array<{ id: string }>,
-      error: false,
-    },
-    createCommentSpy: vi.fn((_vars?: { pageId: string; body: string }) => Promise.resolve({})),
-    addFavoriteSpy: vi.fn((_vars?: { pageId: string }) => Promise.resolve({})),
-    resolveSpy: vi.fn((_vars?: { id: string; resolved: boolean }) => Promise.resolve({})),
-    subscribeSpy: vi.fn((_vars?: { pageId: string }) => Promise.resolve({})),
-    deleteCommentSpy: vi.fn((_vars?: { id: string }) => Promise.resolve({})),
-  }));
+const {
+  data,
+  createCommentSpy,
+  addFavoriteSpy,
+  resolveSpy,
+  subscribeSpy,
+  deleteCommentSpy,
+  archiveSpy,
+  navigateSpy,
+} = vi.hoisted(() => ({
+  data: {
+    page: undefined as unknown,
+    comments: [] as unknown[],
+    spaces: [] as unknown[],
+    favorites: [] as Array<{ id: string }>,
+    subscriptions: [] as Array<{ id: string }>,
+    error: false,
+  },
+  createCommentSpy: vi.fn((_vars?: { pageId: string; body: string }) => Promise.resolve({})),
+  addFavoriteSpy: vi.fn((_vars?: { pageId: string }) => Promise.resolve({})),
+  resolveSpy: vi.fn((_vars?: { id: string; resolved: boolean }) => Promise.resolve({})),
+  subscribeSpy: vi.fn((_vars?: { pageId: string }) => Promise.resolve({})),
+  deleteCommentSpy: vi.fn((_vars?: { id: string }) => Promise.resolve({})),
+  archiveSpy: vi.fn((_vars?: { id: string }) => Promise.resolve({})),
+  navigateSpy: vi.fn(),
+}));
 
 // Passthrough the layout so the sidebar (and its many deps) stays out of scope.
 vi.mock("@/components/layouts/dashboard-layout", () => ({
@@ -31,6 +41,7 @@ vi.mock("@tanstack/react-router", () => ({
     ...opts,
   }),
   Link: ({ children, ...props }: { children: ReactNode }) => <a {...props}>{children}</a>,
+  useNavigate: () => navigateSpy,
 }));
 
 vi.mock("@/utils/orpc", () => ({
@@ -45,6 +56,10 @@ vi.mock("@/utils/orpc", () => ({
           },
         }),
       },
+      archive: {
+        mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: archiveSpy, ...opts }),
+      },
+      list: { key: () => ["pages"] },
     },
     comments: {
       list: {
@@ -271,5 +286,21 @@ describe("page view route", () => {
     data.subscriptions = [{ id: "p1" }];
     renderView();
     expect(await screen.findByRole("button", { name: "Abonniert" })).toBeDefined();
+  });
+
+  it("archives the page after confirming and returns to the space", async () => {
+    data.page = somePage;
+    data.spaces = [{ id: "s1", slug: "ops", name: "Operations", visibility: "public" }];
+    renderView();
+
+    // Open the confirm dialog, then confirm inside it.
+    fireEvent.click(await screen.findByRole("button", { name: "Archivieren" }));
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Archivieren" }));
+
+    await waitFor(() => expect(archiveSpy.mock.calls[0]?.[0]).toEqual({ id: "p1" }));
+    await waitFor(() =>
+      expect(navigateSpy).toHaveBeenCalledWith({ to: "/spaces/$slug", params: { slug: "ops" } }),
+    );
   });
 });

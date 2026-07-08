@@ -1,5 +1,15 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { orpc } from "@/utils/orpc";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@nilovon-wiki/ui/components/alert-dialog";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
@@ -7,8 +17,8 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { Textarea } from "@nilovon-wiki/ui/components/textarea";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, createFileRoute } from "@tanstack/react-router";
-import { Bell, Check, FileText, Star, Trash2 } from "lucide-react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Archive, Bell, Check, FileText, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -76,6 +86,55 @@ function SubscribeButton({ pageId }: { pageId: string }) {
       <Bell className={cn("size-4", isSubscribed && "fill-current")} />
       {isSubscribed ? "Abonniert" : "Abonnieren"}
     </Button>
+  );
+}
+
+function ArchiveButton({ pageId, spaceSlug }: { pageId: string; spaceSlug?: string }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const archive = useMutation(
+    orpc.pages.archive.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: orpc.pages.list.key() });
+        setOpen(false);
+        // The page is now hidden — send the reader back to its space (or home).
+        if (spaceSlug) navigate({ to: "/spaces/$slug", params: { slug: spaceSlug } });
+        else navigate({ to: "/" });
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
+  return (
+    <>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <Archive className="size-4" /> Archivieren
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Seite archivieren?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Die Seite wird ausgeblendet. Du kannst sie später wiederherstellen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archive.isPending}>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={archive.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                archive.mutate({ id: pageId });
+              }}
+            >
+              {archive.isPending ? "Archivieren …" : "Archivieren"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -232,6 +291,7 @@ function RouteComponent() {
           <div className="flex shrink-0 items-center gap-2">
             <SubscribeButton pageId={page.id} />
             <FavoriteButton pageId={page.id} />
+            <ArchiveButton pageId={page.id} spaceSlug={space?.slug} />
           </div>
         </div>
 
