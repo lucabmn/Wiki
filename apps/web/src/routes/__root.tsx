@@ -9,6 +9,7 @@ import { evlogErrorHandler } from "evlog/nitro/v3";
 import type { orpc } from "@/utils/orpc";
 
 import appCss from "../index.css?url";
+import { ThemeProvider } from "@/components/theme-provider";
 export interface RouterAppContext {
   orpc: typeof orpc;
   queryClient: QueryClient;
@@ -50,13 +51,15 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 function RootDocument() {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
         <div className="grid h-svh grid-rows-[auto_1fr]">
-          <Outlet />
+          <ThemeProvider defaultTheme="system" storageKey="theme">
+            <Outlet />
+          </ThemeProvider>
         </div>
         <Toaster richColors />
         <TanStackRouterDevtools position="bottom-left" />

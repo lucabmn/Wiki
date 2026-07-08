@@ -8,16 +8,15 @@ import z from "zod";
 
 import { authClient } from "@/lib/auth-client";
 
-import AuthLayout from "./auth-layout";
-import Loader from "./loader";
+import AuthLayout from "../layouts/auth-layout";
+import Loader from "../loader";
 
 const formSchema = z.object({
-  name: z.string().min(2, "Name muss mindestens 2 Zeichen haben"),
   email: z.email("Ungültige E-Mail-Adresse"),
   password: z.string().min(8, "Passwort muss mindestens 8 Zeichen haben"),
 });
 
-export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
+export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
   const navigate = useNavigate({
     from: "/",
   });
@@ -27,24 +26,21 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
     defaultValues: {
       email: "",
       password: "",
-      name: "",
     },
     onSubmit: async ({ value }) => {
-      await authClient.signUp.email(
+      await authClient.signIn.email(
         {
           email: value.email,
           password: value.password,
-          name: value.name,
         },
         {
           onSuccess: () => {
             navigate({
               to: "/",
             });
-            toast.success("Erfolgreich registriert");
+            toast.success("Erfolgreich angemeldet");
           },
           onError: (error) => {
-            console.error(error);
             toast.error(error.error.message || error.error.statusText);
           },
         },
@@ -61,19 +57,19 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
 
   return (
     <AuthLayout
-      title="Konto erstellen"
-      subtitle="Leg los mit deinem Wissens-Hub."
+      title="Willkommen zurück"
+      subtitle="Melde dich in deinem Wissens-Hub an."
       footer={
         <>
-          Bereits ein Konto?{" "}
-          <Button variant="link" onClick={onSwitchToSignIn} className="h-auto p-0 font-semibold">
-            Anmelden
+          Noch kein Konto?{" "}
+          <Button variant="link" onClick={onSwitchToSignUp} className="h-auto p-0 font-semibold">
+            Registrieren
           </Button>
         </>
       }
     >
       <form
-        id="sign-up-form"
+        id="sign-in-form"
         onSubmit={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -82,28 +78,6 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
         className="flex flex-col gap-4"
       >
         <FieldGroup>
-          <form.Field
-            name="name"
-            children={(field) => {
-              const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>Name</FieldLabel>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    aria-invalid={isInvalid}
-                    placeholder="Name"
-                    autoComplete="off"
-                  />
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              );
-            }}
-          />
           <form.Field
             name="email"
             children={(field) => {
@@ -161,9 +135,9 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
               size="lg"
               className="mt-1 w-full"
               disabled={!canSubmit || isSubmitting}
-              form="sign-up-form"
+              form="sign-in-form"
             >
-              {isSubmitting ? "Wird erstellt …" : "Registrieren"}
+              {isSubmitting ? "Anmelden …" : "Anmelden"}
             </Button>
           )}
         </form.Subscribe>
