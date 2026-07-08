@@ -5,6 +5,7 @@ import { activityRouter } from "./activity";
 import { attachmentRouter } from "./attachment";
 import { commentRouter } from "./comment";
 import { linkRouter } from "./link";
+import { onboardingRouter } from "./onboarding";
 import { pageRouter } from "./page";
 import { searchRouter } from "./search";
 import { spaceRouter } from "./space";
@@ -31,6 +32,7 @@ export const appRouter = {
   activity: activityRouter,
   search: searchRouter,
   me: userStateRouter,
+  onboarding: onboardingRouter,
 };
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;

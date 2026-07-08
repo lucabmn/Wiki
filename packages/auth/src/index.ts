@@ -6,6 +6,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, organization, twoFactor } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { ac, roles } from "./permissions";
+import { localization } from "better-auth-localization";
 
 export function createAuth() {
   const db = createDb();
@@ -45,6 +46,10 @@ export function createAuth() {
         teams: {
           enabled: true,
         },
+      }),
+      localization({
+        defaultLocale: "de-DE-informal",
+        fallbackLocale: "default",
       }),
     ],
   });

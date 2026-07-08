@@ -18,6 +18,7 @@
     "@nilovon-wiki/env": "workspace:*",
     "@simplewebauthn/server": "13.3.2",
     "better-auth": "catalog:",
+    "better-auth-localization": "^3.0.0",
     "dotenv": "catalog:",
     "zod": "catalog:"
   },
