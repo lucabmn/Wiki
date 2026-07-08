@@ -3,8 +3,9 @@ import { z } from "zod";
 
 import { page, pageLink } from "@nilovon-wiki/db/schema/index";
 
-import { assertActiveOrgRead, protectedProcedure } from "../index";
-import { loadPage, orgOfSpace } from "../lib/loaders";
+import { protectedProcedure } from "../index";
+import { assertSpaceRead } from "../lib/access";
+import { loadPage, loadSpace } from "../lib/loaders";
 import { PageSchema } from "../schemas/page";
 import { IdSchema } from "../schemas/shared";
 
@@ -22,7 +23,7 @@ export const linkRouter = {
     .output(z.array(PageSchema))
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.id);
-      assertActiveOrgRead(context, await orgOfSpace(context.db, target.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
       const rows = await context.db
         .select({ page })
         .from(pageLink)
@@ -43,7 +44,7 @@ export const linkRouter = {
     .output(z.array(PageSchema))
     .handler(async ({ input, context }) => {
       const source = await loadPage(context.db, input.id);
-      assertActiveOrgRead(context, await orgOfSpace(context.db, source.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, source.spaceId));
       const rows = await context.db
         .select({ page })
         .from(pageLink)

@@ -5,10 +5,11 @@ import { z } from "zod";
 import type { Database } from "@nilovon-wiki/db";
 import { page, pageDraft, pageRevision } from "@nilovon-wiki/db/schema/index";
 
-import { assertActiveOrgRead, assertOrgPermission, protectedProcedure } from "../index";
+import { assertOrgPermission, protectedProcedure } from "../index";
+import { assertSpaceRead } from "../lib/access";
 import { recordActivity } from "../lib/activity";
 import { generateKeyBetween } from "../lib/fractional";
-import { loadPage, orgOfSpace } from "../lib/loaders";
+import { loadPage, loadSpace, orgOfSpace } from "../lib/loaders";
 import { extractPageLinks, syncPageLinks } from "../lib/page-links";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
@@ -112,7 +113,7 @@ export const pageRouter = {
     .input(ListPagesInputSchema)
     .output(z.array(PageSchema))
     .handler(async ({ input, context }) => {
-      assertActiveOrgRead(context, await orgOfSpace(context.db, input.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, input.spaceId));
       return context.db.query.page.findMany({
         where: and(
           eq(page.spaceId, input.spaceId),
@@ -134,7 +135,7 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const row = await loadPage(context.db, input.id);
-      assertActiveOrgRead(context, await orgOfSpace(context.db, row.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, row.spaceId));
       return row;
     }),
 
@@ -439,7 +440,7 @@ export const pageRouter = {
     .output(z.array(PageRevisionSchema))
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      assertActiveOrgRead(context, await orgOfSpace(context.db, existing.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, existing.spaceId));
       return context.db.query.pageRevision.findMany({
         where: eq(pageRevision.pageId, existing.id),
         orderBy: [desc(pageRevision.version)],
@@ -503,7 +504,7 @@ export const pageRouter = {
     .output(PageDraftSchema.nullable())
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      assertActiveOrgRead(context, await orgOfSpace(context.db, existing.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, existing.spaceId));
       const row = await context.db.query.pageDraft.findFirst({
         where: and(
           eq(pageDraft.pageId, existing.id),
@@ -558,7 +559,7 @@ export const pageRouter = {
     .output(z.object({ pageId: IdSchema }))
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      assertActiveOrgRead(context, await orgOfSpace(context.db, existing.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, existing.spaceId));
       await context.db
         .delete(pageDraft)
         .where(

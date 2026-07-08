@@ -1,10 +1,11 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { page, space } from "@nilovon-wiki/db/schema/index";
+import { page } from "@nilovon-wiki/db/schema/index";
 
-import { assertActiveOrgRead, protectedProcedure, requireActiveOrg } from "../index";
-import { orgOfSpace } from "../lib/loaders";
+import { protectedProcedure, requireActiveOrg } from "../index";
+import { assertSpaceRead, readableSpaceIds } from "../lib/access";
+import { loadSpace } from "../lib/loaders";
 import { SearchHitSchema, SearchInputSchema } from "../schemas/misc";
 
 const TAGS = ["Search"];
@@ -20,10 +21,18 @@ export const searchRouter = {
     .input(SearchInputSchema)
     .output(z.array(SearchHitSchema))
     .handler(async ({ input, context }) => {
-      const organizationId = input.spaceId
-        ? await orgOfSpace(context.db, input.spaceId)
-        : requireActiveOrg(context);
-      assertActiveOrgRead(context, organizationId);
+      // Restrict the corpus to spaces the caller may read, so search can't leak
+      // titles/snippets from private spaces.
+      let spaceIds: string[];
+      if (input.spaceId) {
+        await assertSpaceRead(context.db, context, await loadSpace(context.db, input.spaceId));
+        spaceIds = [input.spaceId];
+      } else {
+        spaceIds = await readableSpaceIds(context.db, context, requireActiveOrg(context));
+      }
+      if (spaceIds.length === 0) {
+        return [];
+      }
 
       const tsquery = sql`websearch_to_tsquery('english', ${input.query})`;
       return context.db
@@ -37,11 +46,9 @@ export const searchRouter = {
           rank: sql<number>`ts_rank(${page.searchVector}, ${tsquery})`,
         })
         .from(page)
-        .innerJoin(space, eq(page.spaceId, space.id))
         .where(
           and(
-            eq(space.organizationId, organizationId),
-            input.spaceId ? eq(page.spaceId, input.spaceId) : undefined,
+            inArray(page.spaceId, spaceIds),
             isNull(page.archivedAt),
             sql`${page.searchVector} @@ ${tsquery}`,
           ),

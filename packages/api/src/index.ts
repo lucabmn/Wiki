@@ -37,16 +37,6 @@ export function requireActiveOrg(context: Context): string {
   return organizationId;
 }
 
-// Read gate for resource-targeting queries: the wiki permission statement has no
-// `read` action for spaces/pages (membership + visibility govern reads), so we
-// scope reads to the caller's active org. Cross-org reads are denied rather than
-// leaking a resource the caller may have no membership in.
-export function assertActiveOrgRead(context: Context, organizationId: string): void {
-  if (organizationId !== requireActiveOrg(context)) {
-    throw new ORPCError("FORBIDDEN");
-  }
-}
-
 // Resolves the caller's role from their member row in `organizationId` (or the
 // active org when omitted) and evaluates it — covering static and dynamic roles.
 // Pass the resource's org id explicitly; the active org can differ from the

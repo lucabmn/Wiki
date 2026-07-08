@@ -1,0 +1,114 @@
+import { call } from "@orpc/server";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { hasPermission } = vi.hoisted(() => ({ hasPermission: vi.fn() }));
+vi.mock("@nilovon-wiki/auth", () => ({ auth: { api: { hasPermission } } }));
+
+import { organization, user, member, space } from "@nilovon-wiki/db/schema/index";
+
+import { pageRouter } from "../../src/routers/page";
+import { createTestDb, type TestDb } from "./db";
+import { testContext } from "./context";
+
+let db: TestDb;
+const now = new Date();
+const ctx = () => testContext(db, { userId: "u1", activeOrganizationId: "oA" });
+
+beforeAll(async () => {
+  db = await createTestDb();
+  await db
+    .insert(user)
+    .values({ id: "u1", name: "A", email: "a@x.io", createdAt: now, updatedAt: now });
+  await db.insert(organization).values({ id: "oA", name: "OrgA", slug: "orga", createdAt: now });
+  await db.insert(member).values({ id: "mA", organizationId: "oA", userId: "u1", createdAt: now });
+  // public space so reads pass; mutations are gated by the mocked permission
+  await db.insert(space).values({
+    id: "sp",
+    organizationId: "oA",
+    slug: "docs",
+    name: "Docs",
+    visibility: "public",
+    createdBy: "u1",
+  });
+});
+afterAll(async () => {
+  await db.$end();
+});
+beforeEach(() => {
+  hasPermission.mockReset();
+  hasPermission.mockResolvedValue({ success: true });
+});
+
+describe("page.create", () => {
+  it("de-duplicates slugs within a space", async () => {
+    const a = await call(pageRouter.create, { spaceId: "sp", title: "Notes" }, { context: ctx() });
+    const b = await call(pageRouter.create, { spaceId: "sp", title: "Notes" }, { context: ctx() });
+    expect(a.slug).toBe("notes");
+    expect(b.slug).toBe("notes-2");
+  });
+
+  it("appends siblings in fractional order and emits activity", async () => {
+    const first = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "First" },
+      { context: ctx() },
+    );
+    const second = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "Second" },
+      { context: ctx() },
+    );
+    expect(first.position < second.position).toBe(true);
+
+    const acts = await db.query.activity.findMany();
+    expect(acts.some((x) => x.action === "page.created" && x.pageId === first.id)).toBe(true);
+  });
+});
+
+describe("page.move cycle guard", () => {
+  it("rejects moving a page underneath its own descendant", async () => {
+    const parent = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "Parent" },
+      { context: ctx() },
+    );
+    const child = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "Child", parentId: parent.id },
+      { context: ctx() },
+    );
+    // move parent under child -> would create parent->child->parent
+    await expect(
+      call(pageRouter.move, { id: parent.id, parentId: child.id }, { context: ctx() }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+describe("page.publish", () => {
+  it("publishes, snapshots a revision, and records activity", async () => {
+    const p = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "Release", textContent: "notes" },
+      { context: ctx() },
+    );
+    const published = await call(pageRouter.publish, { id: p.id }, { context: ctx() });
+    expect(published.status).toBe("published");
+    expect(published.publishedAt).not.toBeNull();
+
+    const revisions = await call(pageRouter.listRevisions, { id: p.id }, { context: ctx() });
+    expect(revisions).toHaveLength(1);
+    expect(revisions[0]!.version).toBe(1);
+
+    const acts = await db.query.activity.findMany();
+    expect(acts.some((x) => x.action === "page.published" && x.pageId === p.id)).toBe(true);
+  });
+});
+
+describe("page mutation authorization", () => {
+  it("rejects create when the permission check denies", async () => {
+    hasPermission.mockResolvedValue({ success: false });
+    await expect(
+      call(pageRouter.create, { spaceId: "sp", title: "Nope" }, { context: ctx() }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});

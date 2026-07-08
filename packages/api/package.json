@@ -27,6 +27,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@nilovon-wiki/config": "workspace:*",
     "hono": "catalog:",
     "typescript": "catalog:",

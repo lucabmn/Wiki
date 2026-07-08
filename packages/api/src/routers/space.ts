@@ -2,7 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { space } from "@nilovon-wiki/db/schema/index";
+import { space, spaceMember } from "@nilovon-wiki/db/schema/index";
 
 import {
   assertOrgPermission,
@@ -10,6 +10,7 @@ import {
   requireActiveOrg,
   requireOrgPermission,
 } from "../index";
+import { assertSpaceRead, buildSpaceReadFilter } from "../lib/access";
 import { recordActivity } from "../lib/activity";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
@@ -48,18 +49,21 @@ export const spaceRouter = {
     .output(z.array(SpaceSchema))
     .handler(async ({ input, context }) => {
       const organizationId = input.organizationId ?? requireActiveOrg(context);
-      // Reads are scoped to the caller's active org; cross-org reads are denied
-      // to avoid leaking spaces the caller has no membership in.
       if (organizationId !== requireActiveOrg(context)) {
         throw new ORPCError("FORBIDDEN");
       }
-      return context.db.query.space.findMany({
-        where: and(
-          eq(space.organizationId, organizationId),
-          input.includeArchived ? undefined : isNull(space.archivedAt),
-        ),
-        orderBy: [desc(space.createdAt)],
-      });
+      const [candidates, canRead] = await Promise.all([
+        context.db.query.space.findMany({
+          where: and(
+            eq(space.organizationId, organizationId),
+            input.includeArchived ? undefined : isNull(space.archivedAt),
+          ),
+          orderBy: [desc(space.createdAt)],
+        }),
+        buildSpaceReadFilter(context.db, context),
+      ]);
+      // Drop spaces the caller can't see (private/restricted without membership).
+      return candidates.filter(canRead);
     }),
 
   get: protectedProcedure
@@ -73,9 +77,7 @@ export const spaceRouter = {
     .output(SpaceSchema)
     .handler(async ({ input, context }) => {
       const row = await getSpaceOrThrow(context.db, input.id);
-      if (row.organizationId !== requireActiveOrg(context)) {
-        throw new ORPCError("FORBIDDEN");
-      }
+      await assertSpaceRead(context.db, context, row);
       return row;
     }),
 
@@ -113,6 +115,16 @@ export const spaceRouter = {
           })
           .returning();
         const row = firstRow(rows);
+        // Grant the creator explicit admin membership so private spaces are
+        // usable by their author and they appear in member lists.
+        if (userId) {
+          await tx.insert(spaceMember).values({
+            spaceId: row.id,
+            subject: "user",
+            userId,
+            role: "admin",
+          });
+        }
         await recordActivity(tx, {
           organizationId,
           action: "space.created",

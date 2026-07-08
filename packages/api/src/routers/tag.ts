@@ -6,8 +6,9 @@ import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 import type { Database } from "@nilovon-wiki/db";
 import { pageTag, tag } from "@nilovon-wiki/db/schema/index";
 
-import { assertActiveOrgRead, assertOrgPermission, protectedProcedure } from "../index";
-import { loadPage, orgOfSpace } from "../lib/loaders";
+import { assertOrgPermission, protectedProcedure } from "../index";
+import { assertSpaceRead } from "../lib/access";
+import { loadPage, loadSpace, orgOfSpace } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import { IdSchema } from "../schemas/shared";
 import {
@@ -30,7 +31,7 @@ export const tagRouter = {
     .input(ListTagsInputSchema)
     .output(z.array(TagSchema))
     .handler(async ({ input, context }) => {
-      assertActiveOrgRead(context, await orgOfSpace(context.db, input.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, input.spaceId));
       return context.db.query.tag.findMany({
         where: eq(tag.spaceId, input.spaceId),
         orderBy: [asc(tag.name)],
@@ -160,7 +161,7 @@ export const tagRouter = {
     .output(z.array(TagSchema))
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.pageId);
-      assertActiveOrgRead(context, await orgOfSpace(context.db, target.spaceId));
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
       return listPageTags(context.db, input.pageId);
     }),
 };

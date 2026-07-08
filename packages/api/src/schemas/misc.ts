@@ -38,6 +38,17 @@ export const ActivitySchema = z.object({
   action: ActivityActionSchema,
   metadata: z.unknown().nullable(),
   createdAt: z.date(),
+  actor: z
+    .object({
+      name: z.string(),
+    })
+    .nullable(),
+  space: z
+    .object({
+      name: z.string(),
+      color: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 export const ListActivityInputSchema = z.object({
