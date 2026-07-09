@@ -4,11 +4,13 @@ import { z } from "zod";
 
 import type { Database } from "@nilovon-wiki/db";
 import { page, pageDraft, pageRevision } from "@nilovon-wiki/db/schema/index";
+import { env } from "@nilovon-wiki/env/server";
 
 import { isOrgManager, protectedProcedure } from "../index";
 import { filterReadablePages, loadSpaceRole } from "../lib/access";
 import { requirePageCapability, requireSpaceCapabilityById } from "../lib/authz";
 import { recordActivity } from "../lib/activity";
+import { COLLAB_TOKEN_TTL_SECONDS, collabDocName, signCollabToken } from "../lib/collab-token";
 import { generateKeyBetween } from "../lib/fractional";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { extractPageLinks, syncPageLinks } from "../lib/page-links";
@@ -515,6 +517,14 @@ export const pageRouter = {
             title: revision.title,
             content: revision.content,
             textContent: revision.textContent,
+            // Drop the live Yjs snapshot: the collab server prefers `yjsState`
+            // over `content` when seeding, so leaving it would make the restore a
+            // silent no-op on the next open. Cleared, the next fresh session
+            // re-seeds from the restored `content`. (An actively-connected collab
+            // session still holds the old doc in memory until all clients
+            // disconnect — restore from within the editor takes the live path
+            // instead; see `RevisionHistory`'s `onRestore`.)
+            yjsState: null,
             lastEditedBy: context.session.user.id,
           })
           .where(eq(page.id, existing.id))
@@ -604,5 +614,39 @@ export const pageRouter = {
           and(eq(pageDraft.pageId, existing.id), eq(pageDraft.userId, context.session.user.id)),
         );
       return { pageId: existing.id };
+    }),
+
+  collabToken: protectedProcedure
+    .route({
+      method: "POST",
+      path: "/pages/{id}/collab-token",
+      tags: TAGS,
+      summary: "Mint a short-lived token for the real-time collaboration socket",
+    })
+    .input(z.object({ id: IdSchema }))
+    .output(
+      z.object({
+        token: z.string(),
+        docName: z.string(),
+        expiresInSeconds: z.number(),
+      }),
+    )
+    .handler(async ({ input, context }) => {
+      const existing = await loadPage(context.db, input.id);
+      // The token IS the capability grant, so the full page-write check (incl.
+      // the org-manager override and per-page ACLs) runs here, on the
+      // authoritative server. The collab process only verifies the signature.
+      await requirePageCapability(context.db, context, context.headers, existing, "write");
+      const user = context.session.user;
+      const token = await signCollabToken(env.BETTER_AUTH_SECRET, {
+        u: user.id,
+        n: user.name || user.email || "Anonym",
+        p: existing.id,
+      });
+      return {
+        token,
+        docName: collabDocName(existing.id),
+        expiresInSeconds: COLLAB_TOKEN_TTL_SECONDS,
+      };
     }),
 };

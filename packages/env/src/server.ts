@@ -9,6 +9,8 @@ export const env = createEnv({
     BETTER_AUTH_URL: z.url(),
     CORS_ORIGIN: z.url(),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    // Port the real-time collaboration service (`apps/collab`) listens on.
+    COLLAB_PORT: z.coerce.number().int().positive().default(1234),
   },
   runtimeEnv: process.env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

@@ -22,3 +22,18 @@ export const tsvector = customType<{ data: string }>({
     return "tsvector";
   },
 });
+
+// Raw binary column (Postgres `bytea`). Used to persist the Yjs CRDT snapshot of
+// a collaboratively edited page. Drizzle has no first-class bytea type, so we
+// map it to a Node/Bun `Uint8Array` in both directions.
+export const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+  toDriver(value) {
+    return Buffer.from(value);
+  },
+  fromDriver(value) {
+    return new Uint8Array(value);
+  },
+});

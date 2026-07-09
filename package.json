@@ -10,6 +10,7 @@
     "dev:web": "turbo run dev -F web",
     "dev:tui": "turbo run dev -F tui",
     "dev:server": "turbo run dev -F server",
+    "dev:collab": "turbo run dev -F collab",
     "db:push": "turbo run db:push -F @nilovon-wiki/db",
     "db:studio": "turbo run db:studio -F @nilovon-wiki/db",
     "db:generate": "turbo run db:generate -F @nilovon-wiki/db",
