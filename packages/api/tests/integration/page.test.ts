@@ -16,12 +16,18 @@ const ctx = () => testContext(db, { userId: "u1", activeOrganizationId: "oA" });
 
 beforeAll(async () => {
   db = await createTestDb();
-  await db
-    .insert(user)
-    .values({ id: "u1", name: "A", email: "a@x.io", createdAt: now, updatedAt: now });
+  await db.insert(user).values([
+    { id: "u1", name: "A", email: "a@x.io", createdAt: now, updatedAt: now },
+    // u2 is an org member but NOT a space member — only a viewer of the public
+    // space, so they cannot write (per-space role enforcement).
+    { id: "u2", name: "B", email: "b@x.io", createdAt: now, updatedAt: now },
+  ]);
   await db.insert(organization).values({ id: "oA", name: "OrgA", slug: "orga", createdAt: now });
-  await db.insert(member).values({ id: "mA", organizationId: "oA", userId: "u1", createdAt: now });
-  // public space so reads pass; mutations are gated by the mocked permission
+  await db.insert(member).values([
+    { id: "mA", organizationId: "oA", userId: "u1", createdAt: now },
+    { id: "mB", organizationId: "oA", userId: "u2", createdAt: now },
+  ]);
+  // Public space: everyone reads; u1 is the creator (space admin) so u1 writes.
   await db.insert(space).values({
     id: "sp",
     organizationId: "oA",
@@ -105,10 +111,24 @@ describe("page.publish", () => {
 });
 
 describe("page mutation authorization", () => {
-  it("rejects create when the permission check denies", async () => {
+  const ctxU2 = () => testContext(db, { userId: "u2", activeOrganizationId: "oA" });
+
+  it("rejects create for a viewer (non-editor) of the space", async () => {
+    // u2 is not an org manager and only a viewer of the public space.
     hasPermission.mockResolvedValue({ success: false });
     await expect(
-      call(pageRouter.create, { spaceId: "sp", title: "Nope" }, { context: ctx() }),
+      call(pageRouter.create, { spaceId: "sp", title: "Nope" }, { context: ctxU2() }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("allows create for an org manager even without a space membership", async () => {
+    // hasPermission=true ⇒ isOrgManager ⇒ admin override on the readable space.
+    hasPermission.mockResolvedValue({ success: true });
+    const created = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "By Manager" },
+      { context: ctxU2() },
+    );
+    expect(created.createdBy).toBe("u2");
   });
 });

@@ -25,6 +25,8 @@ export const PageSchema = z.object({
   content: DocumentSchema.nullable(),
   textContent: z.string(),
   status: PageStatusSchema,
+  // Per-page access override; null = inherit the space's access.
+  visibility: z.enum(["public", "private", "restricted"]).nullable(),
   isTemplate: z.boolean(),
   position: z.string(),
   createdBy: IdSchema.nullable(),
@@ -109,3 +111,53 @@ export const SaveDraftInputSchema = z.object({
   title: z.string().max(300).nullish(),
   content: DocumentSchema.optional(),
 });
+
+// --- Page access (per-page ACL) --------------------------------------------
+
+export const WikiRoleSchema = z.enum(["viewer", "commenter", "editor", "admin"]);
+
+export const PageMemberSchema = z.object({
+  id: IdSchema,
+  pageId: IdSchema,
+  subject: z.enum(["user", "team", "role"]),
+  role: WikiRoleSchema,
+  // For subject="role" grants (org groups): the granted group's name.
+  roleName: z.string().nullable(),
+  user: z.object({ id: IdSchema, name: z.string(), email: z.string() }).nullable(),
+  team: z.object({ id: IdSchema, name: z.string() }).nullable(),
+  createdAt: z.date(),
+});
+
+export const PageAccessSchema = z.object({
+  pageId: IdSchema,
+  visibility: z.enum(["public", "private", "restricted"]).nullable(),
+  members: z.array(PageMemberSchema),
+});
+
+export const MyPageRoleSchema = z.object({
+  role: WikiRoleSchema.nullable(),
+  canWrite: z.boolean(),
+  canManage: z.boolean(),
+});
+
+export const SetPageVisibilityInputSchema = z.object({
+  pageId: IdSchema,
+  visibility: z.enum(["public", "private", "restricted"]).nullable(),
+});
+
+export const AddPageMemberInputSchema = z
+  .object({
+    pageId: IdSchema,
+    subject: z.enum(["user", "team", "role"]),
+    userId: IdSchema.optional(),
+    teamId: IdSchema.optional(),
+    roleName: z.string().min(1).optional(),
+    role: WikiRoleSchema.default("viewer"),
+  })
+  .refine(
+    (v) => (v.subject === "user" ? !!v.userId : v.subject === "team" ? !!v.teamId : !!v.roleName),
+    { message: "Provide userId (user), teamId (team), or roleName (group)" },
+  );
+
+export const UpdatePageMemberInputSchema = z.object({ id: IdSchema, role: WikiRoleSchema });
+export const RemovePageMemberInputSchema = z.object({ id: IdSchema });

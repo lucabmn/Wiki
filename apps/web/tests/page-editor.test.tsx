@@ -14,7 +14,6 @@ const { data, saveDraftSpy, deleteDraftSpy, updateSpy, publishSpy, onDoneSpy } =
   onDoneSpy: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions", () => ({ usePermission: () => data.canPublish }));
 vi.mock("@/components/editor/revision-history", () => ({ RevisionHistory: () => null }));
 
 // Stub the TipTap surface: exposes a button that reports an edit upward, and a
@@ -87,7 +86,7 @@ function renderEditor() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <PageEditor page={page} onDone={onDoneSpy} />
+      <PageEditor page={page} canPublish={data.canPublish} onDone={onDoneSpy} />
     </QueryClientProvider>,
   );
 }

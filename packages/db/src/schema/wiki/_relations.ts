@@ -2,7 +2,7 @@ import { relations } from "drizzle-orm";
 
 import { user, organization, team } from "../auth";
 import { space, spaceMember } from "./spaces";
-import { page, pageRevision, pageDraft } from "./pages";
+import { page, pageRevision, pageDraft, pageMember } from "./pages";
 import { comment } from "./comments";
 import { attachment } from "./attachments";
 import { tag, pageTag } from "./tags";
@@ -41,8 +41,15 @@ export const pageRelations = relations(page, ({ one, many }) => ({
   comments: many(comment),
   attachments: many(attachment),
   tags: many(pageTag),
+  members: many(pageMember),
   outgoingLinks: many(pageLink, { relationName: "page_outgoing" }),
   backlinks: many(pageLink, { relationName: "page_incoming" }),
+}));
+
+export const pageMemberRelations = relations(pageMember, ({ one }) => ({
+  page: one(page, { fields: [pageMember.pageId], references: [page.id] }),
+  user: one(user, { fields: [pageMember.userId], references: [user.id] }),
+  team: one(team, { fields: [pageMember.teamId], references: [team.id] }),
 }));
 
 export const pageRevisionRelations = relations(pageRevision, ({ one }) => ({

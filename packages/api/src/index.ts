@@ -55,6 +55,14 @@ export async function hasOrgPermission(
   return success;
 }
 
+// True when the caller is an org owner/admin (holds member-management). Used as
+// the global override for per-space write authorization — computed once per
+// request and threaded into the space-role resolver. Owner/admin hold
+// `member:["update"]`; a custom group granted member-management counts too.
+export async function isOrgManager(headers: Headers, organizationId?: string): Promise<boolean> {
+  return hasOrgPermission(headers, { member: ["update"] }, organizationId);
+}
+
 // Throwing variant for use inside handlers once the resource's org is known.
 export async function assertOrgPermission(
   headers: Headers,

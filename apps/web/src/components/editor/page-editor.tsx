@@ -1,5 +1,4 @@
 import { toastError, useInvalidate } from "@/lib/query";
-import { usePermission } from "@/lib/permissions";
 import { orpc } from "@/utils/orpc";
 import type { Page } from "@nilovon-wiki/api/schemas/page";
 import { Button } from "@nilovon-wiki/ui/components/button";
@@ -31,9 +30,16 @@ type SaveState = "idle" | "saving" | "saved";
  * The draft is per-user, so two editors don't clobber each other's autosaves,
  * but the final save of whoever presses "Speichern" last wins the page.
  */
-export function PageEditor({ page, onDone }: { page: Page; onDone: () => void }) {
-  const canPublish = usePermission({ page: ["publish"] });
-
+export function PageEditor({
+  page,
+  onDone,
+  canPublish,
+}: {
+  page: Page;
+  onDone: () => void;
+  // Passed from the page view, which resolves the caller's effective page role.
+  canPublish: boolean;
+}) {
   // The autosave draft must be resolved before the editor mounts, because the
   // editor is uncontrolled — its initial content is set once.
   const { data: draft, isPending: draftPending } = useQuery(
@@ -205,7 +211,7 @@ function PageEditorForm({
         onChange={(event) => onTitleChange(event.target.value)}
         placeholder="Seitentitel"
         maxLength={300}
-        className="mb-3 h-auto border-0 bg-transparent px-0 text-[28px] font-semibold tracking-tight shadow-none focus-visible:ring-0"
+        className="mb-3 border border-border bg-card/40"
       />
 
       <RichTextEditor

@@ -1,4 +1,5 @@
 import { CreatePageDialog } from "@/components/create-page-dialog";
+import { SpaceSettingsSheet } from "@/components/spaces/space-settings-sheet";
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { STATUS_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
@@ -19,7 +20,7 @@ import { Separator } from "@nilovon-wiki/ui/components/separator";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { ChevronRight, FilePlus, FileText, Folder, Plus, Search, X } from "lucide-react";
+import { ChevronRight, FilePlus, FileText, Folder, Plus, Search, Settings, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/_auth/spaces/$slug")({
@@ -41,6 +42,7 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
 function RouteComponent() {
   const { slug } = Route.useParams();
   const [createPageOpen, setCreatePageOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   const { auth } = useRouteContext({ from: "/_auth" });
@@ -65,6 +67,15 @@ function RouteComponent() {
       enabled: Boolean(space),
     }),
   );
+
+  // The caller's effective role in this space, to gate the manage affordance.
+  const { data: myRole } = useQuery(
+    orpc.spaceMembers.myRole.queryOptions({
+      input: { spaceId: space?.id ?? "" },
+      enabled: Boolean(space),
+    }),
+  );
+  const canManageSpace = myRole?.role === "admin";
 
   const filtered = useMemo(() => {
     if (!pages) return [];
@@ -155,10 +166,18 @@ function RouteComponent() {
               ) : null}
             </div>
           </div>
-          <Button onClick={() => setCreatePageOpen(true)}>
-            <Plus className="size-4" />
-            Neue Seite
-          </Button>
+          <div className="flex items-center gap-2">
+            {canManageSpace ? (
+              <Button variant="outline" onClick={() => setSettingsOpen(true)}>
+                <Settings className="size-4" />
+                Einstellungen
+              </Button>
+            ) : null}
+            <Button onClick={() => setCreatePageOpen(true)}>
+              <Plus className="size-4" />
+              Neue Seite
+            </Button>
+          </div>
         </div>
 
         <div className="mt-7 flex flex-col gap-8 lg:flex-row">
@@ -266,6 +285,14 @@ function RouteComponent() {
       </div>
 
       <CreatePageDialog open={createPageOpen} spaceId={space.id} onOpenChange={setCreatePageOpen} />
+      {canManageSpace ? (
+        <SpaceSettingsSheet
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          space={{ id: space.id, name: space.name, visibility: space.visibility }}
+          organizationId={auth.organization.id}
+        />
+      ) : null}
     </DashboardLayout>
   );
 }

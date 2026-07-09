@@ -5,11 +5,12 @@ import { z } from "zod";
 import type { Database } from "@nilovon-wiki/db";
 import { page, pageDraft, pageRevision } from "@nilovon-wiki/db/schema/index";
 
-import { assertOrgPermission, protectedProcedure } from "../index";
-import { assertSpaceRead } from "../lib/access";
+import { isOrgManager, protectedProcedure } from "../index";
+import { filterReadablePages, loadSpaceRole } from "../lib/access";
+import { requirePageCapability, requireSpaceCapabilityById } from "../lib/authz";
 import { recordActivity } from "../lib/activity";
 import { generateKeyBetween } from "../lib/fractional";
-import { loadPage, loadSpace, orgOfSpace } from "../lib/loaders";
+import { loadPage, loadSpace } from "../lib/loaders";
 import { extractPageLinks, syncPageLinks } from "../lib/page-links";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
@@ -113,8 +114,11 @@ export const pageRouter = {
     .input(ListPagesInputSchema)
     .output(z.array(PageSchema))
     .handler(async ({ input, context }) => {
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, input.spaceId));
-      return context.db.query.page.findMany({
+      const spaceRow = await loadSpace(context.db, input.spaceId);
+      const manager = await isOrgManager(context.headers, spaceRow.organizationId);
+      const spaceRole = await loadSpaceRole(context.db, context, spaceRow, manager);
+      if (spaceRole === null) throw new ORPCError("FORBIDDEN");
+      const rows = await context.db.query.page.findMany({
         where: and(
           eq(page.spaceId, input.spaceId),
           input.parentId === undefined
@@ -127,6 +131,8 @@ export const pageRouter = {
         ),
         orderBy: [asc(page.position)],
       });
+      // Drop pages restricted by a per-page override the caller can't read.
+      return filterReadablePages(context.db, context, rows, spaceRole);
     }),
 
   get: protectedProcedure
@@ -135,7 +141,7 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const row = await loadPage(context.db, input.id);
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, row.spaceId));
+      await requirePageCapability(context.db, context, context.headers, row, "read");
       return row;
     }),
 
@@ -144,8 +150,13 @@ export const pageRouter = {
     .input(CreatePageInputSchema)
     .output(PageSchema)
     .handler(async ({ input, context }) => {
-      const organizationId = await orgOfSpace(context.db, input.spaceId);
-      await assertOrgPermission(context.headers, { page: ["create"] }, organizationId);
+      const { organizationId } = await requireSpaceCapabilityById(
+        context.db,
+        context,
+        context.headers,
+        input.spaceId,
+        "write",
+      );
 
       const parentId = input.parentId ?? null;
       const slug = await uniqueSlug(
@@ -198,8 +209,13 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      const organizationId = await orgOfSpace(context.db, existing.spaceId);
-      await assertOrgPermission(context.headers, { page: ["update"] }, organizationId);
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        existing,
+        "write",
+      );
       const { id, ...patch } = input;
       // A caller-supplied slug is de-duplicated within the space (excluding this
       // page) so it can't collide on `page_space_slug_uq` and surface as a 500.
@@ -249,8 +265,13 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      const organizationId = await orgOfSpace(context.db, existing.spaceId);
-      await assertOrgPermission(context.headers, { page: ["publish"] }, organizationId);
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        existing,
+        "write",
+      );
       const userId = context.session.user.id;
       return context.db.transaction(async (tx) => {
         const latest = await tx.query.pageRevision.findFirst({
@@ -295,8 +316,13 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      const organizationId = await orgOfSpace(context.db, existing.spaceId);
-      await assertOrgPermission(context.headers, { page: ["move"] }, organizationId);
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        existing,
+        "write",
+      );
       const parentId = input.parentId === undefined ? existing.parentId : input.parentId;
       await assertNoCycle(context.db, existing.id, parentId);
       const position = await positionForMove(
@@ -337,8 +363,13 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      const organizationId = await orgOfSpace(context.db, existing.spaceId);
-      await assertOrgPermission(context.headers, { page: ["update"] }, organizationId);
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        existing,
+        "write",
+      );
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .update(page)
@@ -373,8 +404,13 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      const organizationId = await orgOfSpace(context.db, existing.spaceId);
-      await assertOrgPermission(context.headers, { page: ["update"] }, organizationId);
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        existing,
+        "write",
+      );
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .update(page)
@@ -405,8 +441,13 @@ export const pageRouter = {
     .output(z.object({ id: IdSchema }))
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      const organizationId = await orgOfSpace(context.db, existing.spaceId);
-      await assertOrgPermission(context.headers, { page: ["delete"] }, organizationId);
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        existing,
+        "write",
+      );
       await context.db.transaction(async (tx) => {
         // `parentId` self-reference cascades, so children are removed with it.
         await tx.delete(page).where(eq(page.id, existing.id));
@@ -436,7 +477,7 @@ export const pageRouter = {
     .output(z.array(PageRevisionSchema))
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, existing.spaceId));
+      await requirePageCapability(context.db, context, context.headers, existing, "read");
       return context.db.query.pageRevision.findMany({
         where: eq(pageRevision.pageId, existing.id),
         orderBy: [desc(pageRevision.version)],
@@ -454,8 +495,13 @@ export const pageRouter = {
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      const organizationId = await orgOfSpace(context.db, existing.spaceId);
-      await assertOrgPermission(context.headers, { page: ["update"] }, organizationId);
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        existing,
+        "write",
+      );
       const revision = await context.db.query.pageRevision.findFirst({
         where: and(eq(pageRevision.pageId, existing.id), eq(pageRevision.version, input.version)),
       });
@@ -500,7 +546,7 @@ export const pageRouter = {
     .output(PageDraftSchema.nullable())
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, existing.spaceId));
+      await requirePageCapability(context.db, context, context.headers, existing, "read");
       const row = await context.db.query.pageDraft.findFirst({
         where: and(
           eq(pageDraft.pageId, existing.id),
@@ -522,11 +568,7 @@ export const pageRouter = {
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.pageId);
       // Drafting requires write access to the page.
-      await assertOrgPermission(
-        context.headers,
-        { page: ["update"] },
-        await orgOfSpace(context.db, existing.spaceId),
-      );
+      await requirePageCapability(context.db, context, context.headers, existing, "write");
       const userId = context.session.user.id;
       const rows = await context.db
         .insert(pageDraft)
@@ -555,7 +597,7 @@ export const pageRouter = {
     .output(z.object({ pageId: IdSchema }))
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, existing.spaceId));
+      await requirePageCapability(context.db, context, context.headers, existing, "read");
       await context.db
         .delete(pageDraft)
         .where(

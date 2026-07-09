@@ -12,9 +12,9 @@ import {
 
 import { wikiSchema } from "./_schema";
 import { id, timestamps, tsvector } from "../_helpers";
-import { pageStatus } from "./enums";
+import { pageStatus, permissionSubject, spaceVisibility, wikiRole } from "./enums";
 import { space } from "./spaces";
-import { user } from "../auth";
+import { team, user } from "../auth";
 
 /** A wiki page. Pages form a tree within a space via `parentId`. `wiki.page`. */
 export const page = wikiSchema.table(
@@ -39,6 +39,9 @@ export const page = wikiSchema.table(
     // and previews without parsing the JSON doc.
     textContent: text("text_content").notNull().default(""),
     status: pageStatus("status").notNull().default("draft"),
+    // Per-page access override. NULL = inherit the space's access. A set value
+    // *restricts* within the space (page ACLs never grant beyond space access).
+    visibility: spaceVisibility("visibility"),
     isTemplate: boolean("is_template").notNull().default(false),
     // Fractional / LexoRank ordering among siblings (cheap reorders).
     position: text("position").notNull().default("a0"),
@@ -62,6 +65,34 @@ export const page = wikiSchema.table(
     index("page_created_by_idx").on(t.createdBy),
     index("page_last_edited_by_idx").on(t.lastEditedBy),
     index("page_search_idx").using("gin", t.searchVector),
+  ],
+);
+
+/**
+ * Explicit per-page grants for a user OR a team, mirroring `spaceMember`. Only
+ * consulted when the page's `visibility` is non-NULL (an override); otherwise
+ * access inherits from the space.
+ */
+export const pageMember = wikiSchema.table(
+  "page_member",
+  {
+    id: id(),
+    pageId: text("page_id")
+      .notNull()
+      .references(() => page.id, { onDelete: "cascade" }),
+    subject: permissionSubject("subject").notNull(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    teamId: text("team_id").references(() => team.id, { onDelete: "cascade" }),
+    // For subject="role": the org role (group) name this grant applies to.
+    roleName: text("role_name"),
+    role: wikiRole("role").notNull().default("viewer"),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("page_member_user_uq").on(t.pageId, t.userId),
+    uniqueIndex("page_member_team_uq").on(t.pageId, t.teamId),
+    uniqueIndex("page_member_role_uq").on(t.pageId, t.roleName),
+    index("page_member_page_idx").on(t.pageId),
   ],
 );
 

@@ -4,13 +4,9 @@ import { z } from "zod";
 
 import { space, spaceMember } from "@nilovon-wiki/db/schema/index";
 
-import {
-  assertOrgPermission,
-  protectedProcedure,
-  requireActiveOrg,
-  requireOrgPermission,
-} from "../index";
+import { protectedProcedure, requireActiveOrg, requireOrgPermission } from "../index";
 import { assertSpaceRead, buildSpaceReadFilter } from "../lib/access";
+import { requireSpaceManage } from "../lib/authz";
 import { recordActivity } from "../lib/activity";
 import { loadSpace } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
@@ -135,9 +131,11 @@ export const spaceRouter = {
     .output(SpaceSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadSpace(context.db, input.id);
-      // Gate on the resource's own org — not the active org — so rights in one
-      // org can't authorize edits to a space living in another.
-      await assertOrgPermission(context.headers, { space: ["update"] }, existing.organizationId);
+      // Space admins manage their own space; org-wide `space:["update"]` still
+      // works too. Gated on the resource's own org, not the active org.
+      await requireSpaceManage(context.db, context, context.headers, existing, {
+        space: ["update"],
+      });
       const { id, ...patch } = input;
       return context.db.transaction(async (tx) => {
         const rows = await tx.update(space).set(patch).where(eq(space.id, id)).returning();
@@ -163,7 +161,9 @@ export const spaceRouter = {
     .output(SpaceSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadSpace(context.db, input.id);
-      await assertOrgPermission(context.headers, { space: ["update"] }, existing.organizationId);
+      await requireSpaceManage(context.db, context, context.headers, existing, {
+        space: ["update"],
+      });
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .update(space)
@@ -192,9 +192,11 @@ export const spaceRouter = {
     .output(z.object({ id: IdSchema }))
     .handler(async ({ input, context }) => {
       const existing = await loadSpace(context.db, input.id);
-      // Hard delete is the destructive `space:["delete"]` grant (owner/admin);
-      // cascades remove pages, comments, attachments, etc.
-      await assertOrgPermission(context.headers, { space: ["delete"] }, existing.organizationId);
+      // Hard delete: space admin, or the org-wide `space:["delete"]` grant.
+      // Cascades remove pages, comments, attachments, etc.
+      await requireSpaceManage(context.db, context, context.headers, existing, {
+        space: ["delete"],
+      });
       await context.db.transaction(async (tx) => {
         await tx.delete(space).where(eq(space.id, input.id));
         // `activity.spaceId` is set-null on delete, so keep the id/name in

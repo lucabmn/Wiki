@@ -2,7 +2,12 @@
 
 How authorization works in this project, and how to use it in the backend and frontend.
 
-The system is built on **Better Auth's organization plugin with Dynamic Access Control**. There is no second permission layer — Better Auth is the single source of truth. Roles and their permissions are enforced **server-side**; the frontend only mirrors them for UI gating.
+Authorization has **two layers**:
+
+1. **Org RBAC** (Better Auth Dynamic Access Control) — org-level capabilities: who may create spaces, manage members, and manage roles/groups. Owner/admin (anyone with `member:["update"]`) act as **org managers**, a global override. Covered by the rest of this document.
+2. **Space & page roles** — who may read/write **content** within a specific space or page. Content actions (pages, comments, attachments, tags) are **no longer** gated by org RBAC `page:*`/`comment:*`/`attachment:*`; those are governed here. See [Space & page access](#space--page-access-content-authorization).
+
+Both are enforced **server-side**; the frontend only mirrors them for UI gating.
 
 ---
 
@@ -235,3 +240,64 @@ After a DB migration (`pnpm --filter @nilovon-wiki/db db:push`), a quick end-to-
 4. `hasPermission({ permissions: { page: ["delete"] } })` returns `true`; `{ page: ["publish"] }` (not granted) returns `false`.
 
 Type-checking alone won't catch the active-org and cross-org pitfalls above — exercise a real check.
+
+---
+
+## Space & page access (content authorization)
+
+Content lives in **spaces** (which hold **pages**). Who can see and edit it is governed by **per-space roles**, optionally narrowed by **per-page ACLs** — a layer distinct from org RBAC.
+
+### Space roles (`wikiRole`)
+
+Every `spaceMember` row carries a role. Effective role = the strongest of: an org manager (→ `admin`), the space creator (→ `admin`), a direct/team `spaceMember` row, or a `viewer` baseline on **public** spaces.
+
+| Role        | Capabilities                                              |
+| ----------- | --------------------------------------------------------- |
+| `viewer`    | read                                                      |
+| `commenter` | read + comment                                            |
+| `editor`    | read + write pages/attachments/tags + comment             |
+| `admin`     | editor + manage the space (settings, visibility, members) |
+
+Visibility still gates **read**: `public` (any org member reads; writing needs a role), `private` (members only), `restricted` (creator + members). Org managers only reach spaces they can already read — **private stays private** even for owners/admins who aren't members.
+
+### Page ACLs (optional override)
+
+A page's `visibility` is `NULL` by default (**inherit the space**). Setting it (`public`/`private`/`restricted`) plus `pageMember` rows creates a per-page override that can only **narrow** access (effective role = `min(spaceRole, pageRole)`); a **space admin is never locked out**. Child pages do **not** auto-inherit a parent page's override (v1 — each page inherits the space unless it has its own ACL).
+
+### Where it lives
+
+| File                                       | Contents                                                                                                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/api/src/lib/access.ts`           | Pure resolvers (`resolveSpaceRole`, `resolvePageRole`, `filterReadablePages`) + async loaders. Auth-free (unit-tested).                                                         |
+| `packages/api/src/lib/authz.ts`            | Router-facing gates that fold in the org-manager override: `requireSpaceCapability`, `requirePageCapability`, `requireSpaceManage`, `requirePageManage`, `resolveMyPageAccess`. |
+| `packages/api/src/routers/space-member.ts` | Space member CRUD (`spaceMembers.*`) + `myRole`.                                                                                                                                |
+| `packages/api/src/routers/page-access.ts`  | Page ACL (`pageAccess.*`): `get`, `setVisibility`, member CRUD, `myRole`.                                                                                                       |
+
+### Backend usage
+
+```ts
+// Gate a content write on the page (respects space + page ACL):
+const existing = await loadPage(db, id);
+await requirePageCapability(db, context, headers, existing, "write");
+
+// Gate on the space (bare space content, e.g. creating a page):
+await requireSpaceCapabilityById(db, context, headers, spaceId, "write");
+```
+
+### Frontend usage
+
+Gate content affordances on the **effective role**, not org RBAC:
+
+```ts
+const { data: access } = useQuery(orpc.pageAccess.myRole.queryOptions({ input: { pageId } }));
+// access.canWrite → show edit/publish; access.canManage → show the sharing panel
+```
+
+Space settings (visibility + members) live on the space page; page sharing lives on the page view — both gated on `canManage`.
+
+### Known limitations (v1)
+
+- **Search** filters by space access but **not** per-page overrides (page.list and the page tree do). A restricted page can still surface in search results to an excluded member.
+- **Attachment delete** and **space-level tag CRUD** gate on space role, not per-page.
+- **Page ACL management** is limited to space admins and the page's author (not every editor).
+- Draft/archived `pageStatus` is **not** an access control (it never was); use `visibility` for that.

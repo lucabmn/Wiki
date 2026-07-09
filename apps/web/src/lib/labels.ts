@@ -41,3 +41,18 @@ export const ROLE_VARIANT: Record<string, "default" | "secondary" | "outline"> =
   owner: "default",
   admin: "secondary",
 };
+
+/** Per-space roles (wikiRole), distinct from org roles above. */
+export const WIKI_ROLE_LABEL: Record<string, string> = {
+  viewer: "Leser",
+  commenter: "Kommentator",
+  editor: "Bearbeiter",
+  admin: "Administrator",
+};
+
+export const WIKI_ROLE_DESCRIPTION: Record<string, string> = {
+  viewer: "Kann lesen.",
+  commenter: "Kann lesen und kommentieren.",
+  editor: "Kann Inhalte erstellen und bearbeiten.",
+  admin: "Kann den Space verwalten und Mitglieder festlegen.",
+};
