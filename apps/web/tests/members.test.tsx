@@ -4,24 +4,41 @@ import { describe, expect, it, vi } from "vitest";
 
 const { members } = vi.hoisted(() => ({ members: [] as unknown[] }));
 
-vi.mock("@/components/layouts/dashboard-layout", () => ({
-  default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-}));
-
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (opts: Record<string, unknown>) => ({
-    useRouteContext: () => ({
-      auth: { organization: { name: "Acme", members } },
-    }),
+    useRouteContext: () => ({ auth: { organization: { id: "o1", name: "Acme" } } }),
     ...opts,
   }),
 }));
 
-import { Route } from "@/routes/_auth/members";
+// Drive each org query off its queryKey so the members table renders from the
+// hoisted fixture; roles/invitations stay empty.
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: (opts: { queryKey: unknown[] }) => {
+    const kind = opts.queryKey[1];
+    if (kind === "members") return { data: { members, total: members.length }, isPending: false };
+    return { data: [], isPending: false };
+  },
+  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+vi.mock("@/lib/org-queries", () => ({
+  membersQueryOptions: (id: string) => ({ queryKey: ["organization", "members", id] }),
+  invitationsQueryOptions: (id: string) => ({ queryKey: ["organization", "invitations", id] }),
+  rolesQueryOptions: (id: string) => ({ queryKey: ["organization", "roles", id] }),
+  useOrgRefresh: () => async () => {},
+}));
+
+// Dialogs pull their own better-auth wiring — out of scope for the table render.
+vi.mock("@/components/settings/invite-member-dialog", () => ({ InviteMemberDialog: () => null }));
+vi.mock("@/components/settings/member-roles-dialog", () => ({ MemberRolesDialog: () => null }));
+vi.mock("@/lib/auth-client", () => ({ authClient: {} }));
+
+import { Route } from "@/routes/_auth/settings/members";
 
 const Members = (Route as unknown as { component: () => ReactNode }).component;
 
-describe("members route", () => {
+describe("members settings route", () => {
   it("lists members with their roles", () => {
     members.length = 0;
     members.push(
@@ -38,12 +55,18 @@ describe("members route", () => {
     expect(screen.getByText("Mitglied")).toBeDefined();
   });
 
-  it("uses the singular for a lone member", () => {
+  it("renders combined static and group roles as separate badges", () => {
     members.length = 0;
-    members.push({ id: "m1", role: "admin", user: { name: "Solo Dev", email: "solo@acme.io" } });
+    members.push({
+      id: "m1",
+      role: "admin,redaktion",
+      user: { name: "Solo Dev", email: "solo@acme.io" },
+    });
     render(<Members />);
 
     expect(screen.getByText("1 Mitglied in Acme.")).toBeDefined();
     expect(screen.getByText("Administrator")).toBeDefined();
+    // A dynamic group name has no static label, so it renders verbatim.
+    expect(screen.getByText("redaktion")).toBeDefined();
   });
 });

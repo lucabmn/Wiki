@@ -15,6 +15,12 @@ vi.mock("@/lib/auth-client", () => ({
     useActiveMember: () => ({ data: undefined }),
   },
 }));
+// The sidebar's permission gates round-trip to better-auth in the real impl;
+// drive them directly here so no organization queries are needed.
+vi.mock("@/lib/permissions", () => ({
+  usePermission: () => ({ allowed: false, isPending: false }),
+  checkStaticRolePermission: () => false,
+}));
 // Alias paths so these resolve to the same module id MainSidebar imports via
 // "./…" — a relative specifier here would resolve against the test file.
 vi.mock("@/components/theme-provider", () => ({

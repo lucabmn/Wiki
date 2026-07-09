@@ -1,6 +1,6 @@
 import { authClient } from "@/lib/auth-client";
 import { initials } from "@/lib/format";
-import { usePermission } from "@/lib/permissions";
+import { checkStaticRolePermission, usePermission } from "@/lib/permissions";
 import { orpc } from "@/utils/orpc";
 import { PageTree } from "./page-tree/page-tree";
 import { CommandPalette } from "./command-palette";
@@ -35,10 +35,10 @@ import {
   Folder,
   Home,
   LayoutGrid,
-  Lock,
   Moon,
   Plus,
   Search,
+  Settings,
   Sun,
 } from "lucide-react";
 import { useState } from "react";
@@ -51,11 +51,16 @@ import {
   useRouteContext,
 } from "@tanstack/react-router";
 
-const nav = linkOptions([
+const baseNav = linkOptions([
   { to: "/", label: "Übersicht", icon: Home },
   { to: "/spaces", label: "Alle Spaces", icon: LayoutGrid },
-  { to: "/members", label: "Mitglieder & Rechte", icon: Lock },
 ]);
+
+const settingsNavItem = {
+  to: "/settings/members",
+  label: "Einstellungen",
+  icon: Settings,
+} as const;
 
 /** The space list for the active organization; each space expands to its pages. */
 function SpacesTree({
@@ -67,7 +72,7 @@ function SpacesTree({
 }) {
   const { data: session } = authClient.useSession();
   const activeOrgId = session?.session.activeOrganizationId ?? null;
-  const canReorder = usePermission({ page: ["move"] });
+  const { allowed: canReorder } = usePermission({ page: ["move"] });
   const [createPageSpaceId, setCreatePageSpaceId] = useState<string | null>(null);
 
   const { data: spaces, isPending } = useQuery(
@@ -166,6 +171,16 @@ export default function MainSidebar() {
   // the layout route renders this sidebar.
   const { auth } = useRouteContext({ from: "/_auth" });
   const { theme, setTheme } = useTheme();
+
+  // Show the settings entry only to members who can manage people or roles. The
+  // static role suffices here (owner/admin hold these grants); the settings
+  // route re-guards and the server enforces every mutation regardless.
+  const myRole =
+    auth.organization.members.find((member) => member.user.id === auth.session.user.id)?.role ?? "";
+  const canManageOrg =
+    checkStaticRolePermission({ member: ["update"] }, myRole) ||
+    checkStaticRolePermission({ ac: ["create"] }, myRole);
+  const nav = canManageOrg ? [...baseNav, settingsNavItem] : baseNav;
 
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
