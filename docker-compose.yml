@@ -6,10 +6,12 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_SERVER_URL: http://localhost:3000
-        # Browser-reachable WebSocket origin of the collab service (baked into
-        # the client bundle at build time).
-        VITE_COLLAB_URL: ws://localhost:1234
+        # Baked into the client bundle at build time. The installer TUI writes
+        # these to the root `.env`; compose interpolates them here so a rebuild
+        # picks up a real domain. Defaults keep plain `docker compose` on
+        # localhost.
+        VITE_SERVER_URL: ${VITE_SERVER_URL:-http://localhost:3000}
+        VITE_COLLAB_URL: ${VITE_COLLAB_URL:-ws://localhost:1234}
     init: true
     ports:
       - "3001:3001"
