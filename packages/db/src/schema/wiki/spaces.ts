@@ -44,13 +44,16 @@ export const spaceMember = wikiSchema.table(
     subject: permissionSubject("subject").notNull(),
     userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
     teamId: text("team_id").references(() => team.id, { onDelete: "cascade" }),
+    // For subject="role": the org role (group) name this grant applies to.
+    roleName: text("role_name"),
     role: wikiRole("role").notNull().default("editor"),
     ...timestamps,
   },
   (t) => [
-    // NULLs are treated as distinct in Postgres, so these two coexist cleanly.
+    // NULLs are treated as distinct in Postgres, so these coexist cleanly.
     uniqueIndex("space_member_user_uq").on(t.spaceId, t.userId),
     uniqueIndex("space_member_team_uq").on(t.spaceId, t.teamId),
+    uniqueIndex("space_member_role_uq").on(t.spaceId, t.roleName),
     index("space_member_space_idx").on(t.spaceId),
   ],
 );

@@ -33,4 +33,5 @@ export const activityAction = wikiSchema.enum("activity_action", [
 
 export const wikiRole = wikiSchema.enum("wiki_role", ["viewer", "commenter", "editor", "admin"]);
 
-export const permissionSubject = wikiSchema.enum("permission_subject", ["user", "team"]);
+// `role` grants a space/page to everyone holding a given org role (a "group").
+export const permissionSubject = wikiSchema.enum("permission_subject", ["user", "team", "role"]);
