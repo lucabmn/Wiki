@@ -1,0 +1,23 @@
+# Reverse proxy with automatic HTTPS (Let's Encrypt) for the self-hosted stack.
+# Domains and ACME email come from the root `.env` (see `.env.prod.example`).
+# Caddy reaches the app containers by their compose service name over the
+# internal network — the apps publish no host ports in production.
+
+{
+	email {$ACME_EMAIL}
+}
+
+# Web app
+{$WEB_DOMAIN} {
+	reverse_proxy web:3001
+}
+
+# API server (Better Auth issues cookies for this origin)
+{$API_DOMAIN} {
+	reverse_proxy server:3000
+}
+
+# Real-time collaboration (WebSocket — Caddy proxies WS transparently)
+{$COLLAB_DOMAIN} {
+	reverse_proxy collab:1234
+}

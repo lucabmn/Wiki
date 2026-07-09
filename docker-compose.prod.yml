@@ -1,0 +1,67 @@
+# Production overlay. Use together with the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# It adds a Caddy TLS reverse proxy, stops publishing the app ports on the host
+# (only Caddy is public on 80/443), binds Postgres to localhost only, and makes
+# every service restart on boot.
+#
+# Public URLs (BETTER_AUTH_URL, CORS_ORIGIN, VITE_SERVER_URL, VITE_COLLAB_URL)
+# must be the https/wss domains — set them via the installer TUI or the `.env`
+# files before building. The VITE_* vars are baked into the web bundle at build
+# time, so a domain change needs a rebuild.
+
+name: nilovon-wiki
+
+services:
+  caddy:
+    image: caddy:2
+    init: true
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      WEB_DOMAIN: ${WEB_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      COLLAB_DOMAIN: ${COLLAB_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - server
+      - collab
+
+  web:
+    restart: always
+    # Not published on the host — reached by Caddy over the compose network.
+    ports: !reset []
+
+  server:
+    restart: always
+    ports: !reset []
+    environment:
+      # Base file hardcodes CORS_ORIGIN to localhost; override to the public
+      # web origin so Better Auth trusts it and CORS passes.
+      CORS_ORIGIN: https://${WEB_DOMAIN}
+
+  collab:
+    restart: always
+    ports: !reset []
+    environment:
+      CORS_ORIGIN: https://${WEB_DOMAIN}
+
+  postgres:
+    restart: always
+    # Localhost-only: not reachable from the network, but the installer TUI can
+    # still push the schema against the published port from the host.
+    ports: !override
+      - "127.0.0.1:5432:5432"
+
+volumes:
+  caddy_data:
+  caddy_config:
