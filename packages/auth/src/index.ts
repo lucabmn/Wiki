@@ -20,6 +20,12 @@ export function createAuth() {
     experimental: {
       joins: true,
     },
+    session: {
+      cookieCache: {
+        enabled: true,
+        maxAge: 5 * 60, // Cache session for 5 minutes
+      },
+    },
     trustedOrigins: [env.CORS_ORIGIN],
     emailAndPassword: {
       enabled: true,
