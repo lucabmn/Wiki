@@ -185,7 +185,7 @@ export default function MainSidebar() {
           type="button"
           className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent"
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
             {auth.organization.name.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
@@ -201,7 +201,7 @@ export default function MainSidebar() {
           <Button
             variant="outline"
             onClick={() => setSearchOpen(true)}
-            className="h-9 w-full justify-start gap-2.5 px-2.5 font-normal text-muted-foreground"
+            className="h-8 w-full justify-start gap-2.5 px-2.5 font-normal text-muted-foreground"
           >
             <Search className="size-4" />
             <span className="flex-1 text-left">Suchen …</span>
