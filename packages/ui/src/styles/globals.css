@@ -40,8 +40,8 @@
   --sidebar-border: oklch(0.9401 0 0);
   --sidebar-ring: oklch(0.7731 0 0);
   --destructive-foreground: oklch(1 0 0);
-  --font-sans: "Public Sans", Inter, system-ui, sans-serif;
-  --font-serif: "Source Serif 4", Georgia, serif;
+  --font-sans: "Public Sans Variable", "Public Sans", Inter, system-ui, sans-serif;
+  --font-serif: "Source Serif 4 Variable", "Source Serif 4", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --shadow-color: #000000;
   --shadow-opacity: 0.1;
@@ -96,8 +96,8 @@
   --sidebar-ring: oklch(0.7731 0 0);
   --destructive-foreground: oklch(1 0 0);
   --radius: 0.625rem;
-  --font-sans: "Public Sans", Inter, system-ui, sans-serif;
-  --font-serif: "Source Serif 4", Georgia, serif;
+  --font-sans: "Public Sans Variable", "Public Sans", Inter, system-ui, sans-serif;
+  --font-serif: "Source Serif 4 Variable", "Source Serif 4", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --shadow-color: #000000;
   --shadow-opacity: 0.3;

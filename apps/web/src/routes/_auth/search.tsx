@@ -116,9 +116,7 @@ function RouteComponent() {
             <p className="text-sm text-muted-foreground">Keine Treffer für „{query}“.</p>
           ) : (
             <>
-              <p className="mb-2 text-xs text-muted-foreground">
-                {hits.length} {hits.length === 1 ? "Treffer" : "Treffer"}
-              </p>
+              <p className="mb-2 text-xs text-muted-foreground">{hits.length} Treffer</p>
               <ul className="space-y-1">
                 {hits.map((hit) => (
                   <li key={hit.pageId}>

@@ -11,8 +11,16 @@ import { localization } from "better-auth-localization";
 export function createAuth() {
   const db = createDb();
 
+  // Browsers only accept `Secure` cookies over HTTPS (localhost is the sole
+  // exception), and `SameSite=None` requires `Secure`. Deriving the attributes
+  // from the deployment's own URL means: HTTPS deployments get cross-site-safe
+  // cookies (web + api on different subdomains), while plain-HTTP setups
+  // (localhost, LAN pilots) fall back to `Lax` cookies that actually stick —
+  // instead of auth silently failing.
+  const isHttps = env.BETTER_AUTH_URL.startsWith("https:");
+
   return betterAuth({
-    appName: "Nilovon Wiki",
+    appName: env.APP_NAME,
     database: drizzleAdapter(db, {
       provider: "pg",
       schema: schema,
@@ -33,14 +41,9 @@ export function createAuth() {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     advanced: {
-      // `SameSite=None; Secure` supports the cross-site web (:3001) <-> server
-      // (:3000) setup, but browsers only accept `Secure` cookies over HTTPS
-      // (localhost is the sole exception). When self-hosting, serve the API
-      // behind TLS and point BETTER_AUTH_URL/CORS_ORIGIN at https:// URLs, or
-      // auth sessions will silently fail.
       defaultCookieAttributes: {
-        sameSite: "none",
-        secure: true,
+        sameSite: isHttps ? "none" : "lax",
+        secure: isHttps,
         httpOnly: true,
       },
     },

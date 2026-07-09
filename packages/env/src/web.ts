@@ -16,7 +16,11 @@ export const env = createEnv({
     VITE_SERVER_URL: z.url(),
     // WebSocket origin of the real-time collaboration service (`apps/collab`),
     // e.g. `ws://localhost:1234` in dev or `wss://collab.example.com` behind TLS.
-    VITE_COLLAB_URL: z.string().min(1),
+    VITE_COLLAB_URL: z
+      .url()
+      .refine((value) => value.startsWith("ws://") || value.startsWith("wss://"), {
+        message: "VITE_COLLAB_URL must be a ws:// or wss:// URL",
+      }),
   },
   runtimeEnv: (import.meta as unknown as ViteImportMeta).env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

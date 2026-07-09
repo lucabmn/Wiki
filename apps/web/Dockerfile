@@ -18,6 +18,9 @@ ENV HOST=0.0.0.0
 ENV PORT=3001
 EXPOSE 3001
 
+# Run unprivileged: a compromised app process must not own the container.
+USER node
+
 # SSR chunks require() externals at runtime; must run from the workspace
 WORKDIR /app/apps/web
 CMD ["node", ".output/server/index.mjs"]

@@ -28,6 +28,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Archive, Bell, Check, FileText, Lock, Pencil, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_auth/pages/$id")({
   component: RouteComponent,
@@ -162,11 +163,25 @@ function ArchiveButton({ pageId, spaceSlug }: { pageId: string; spaceSlug?: stri
 
 function CommentCard({ comment }: { comment: { id: string; body: string; createdAt: Date } }) {
   const invalidate = useInvalidate(orpc.comments.list.key());
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const resolve = useMutation(
-    orpc.comments.resolve.mutationOptions({ onSuccess: invalidate, onError: toastError }),
+    orpc.comments.resolve.mutationOptions({
+      onSuccess: () => {
+        invalidate();
+        toast.success("Kommentar aufgelöst");
+      },
+      onError: toastError,
+    }),
   );
   const remove = useMutation(
-    orpc.comments.delete.mutationOptions({ onSuccess: invalidate, onError: toastError }),
+    orpc.comments.delete.mutationOptions({
+      onSuccess: () => {
+        invalidate();
+        setConfirmDelete(false);
+        toast.success("Kommentar gelöscht");
+      },
+      onError: toastError,
+    }),
   );
 
   return (
@@ -192,7 +207,7 @@ function CommentCard({ comment }: { comment: { id: string; body: string; created
               className="size-7 text-muted-foreground hover:text-destructive"
               disabled={remove.isPending}
               aria-label="Kommentar löschen"
-              onClick={() => remove.mutate({ id: comment.id })}
+              onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="size-3.5" />
             </Button>
@@ -200,6 +215,28 @@ function CommentCard({ comment }: { comment: { id: string; body: string; created
         </div>
         <p className="mt-1 text-sm whitespace-pre-wrap">{comment.body}</p>
       </CardContent>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kommentar löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Der Kommentar wird dauerhaft entfernt. Das kann nicht rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={remove.isPending}>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={remove.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                remove.mutate({ id: comment.id });
+              }}
+            >
+              {remove.isPending ? "Löschen …" : "Löschen"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
@@ -213,6 +250,7 @@ function CommentForm({ pageId }: { pageId: string }) {
       onSuccess: () => {
         invalidate();
         setBody("");
+        toast.success("Kommentar hinzugefügt");
       },
       onError: toastError,
     }),
@@ -296,12 +334,19 @@ function RouteComponent() {
         <p className="text-sm text-muted-foreground">
           Diese Seite existiert nicht oder du hast keinen Zugriff.
         </p>
+        <div className="mt-4">
+          <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/" />}>
+            Zur Übersicht
+          </Button>
+        </div>
       </DashboardLayout>
     );
   }
 
   const openComments = comments?.filter((c) => !c.resolvedAt && !c.deletedAt) ?? [];
 
+  // Neutral fallback while the space list is still loading, so the reader
+  // always has an in-content way back.
   const backLink =
     space != null ? (
       <Link
@@ -311,7 +356,14 @@ function RouteComponent() {
       >
         ← {space.name}
       </Link>
-    ) : null;
+    ) : (
+      <Link
+        to="/"
+        className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        ← Übersicht
+      </Link>
+    );
 
   if (editing) {
     return (

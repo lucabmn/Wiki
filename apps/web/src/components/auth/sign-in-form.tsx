@@ -41,7 +41,11 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
             toast.success("Erfolgreich angemeldet");
           },
           onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
+            toast.error(
+              error.error.status === 401
+                ? "E-Mail oder Passwort ist falsch."
+                : "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+            );
           },
         },
       );
@@ -93,7 +97,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
                     placeholder="name@firma.de"
-                    autoComplete="off"
+                    autoComplete="email"
                     type="email"
                   />
                   {isInvalid && <FieldError errors={field.state.meta.errors} />}
@@ -116,7 +120,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
                     placeholder="••••••••"
-                    autoComplete="off"
+                    autoComplete="current-password"
                     type="password"
                   />
                   {isInvalid && <FieldError errors={field.state.meta.errors} />}

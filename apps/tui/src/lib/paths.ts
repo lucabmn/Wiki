@@ -1,25 +1,40 @@
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 
-/**
- * Walk up from this file until the monorepo root is found (the directory that
- * holds `docker-compose.yml`). The TUI ships inside the repo it installs, so the
- * root is always an ancestor — no cwd guessing.
- */
-export function findRepoRoot(start = import.meta.dir): string {
+/** Walk up from `start` until a directory containing docker-compose.yml is found. */
+function walkUp(start: string): string | null {
   let dir = start;
   // Stop at the filesystem root: dirname("/") === "/".
   for (;;) {
     if (existsSync(join(dir, "docker-compose.yml"))) return dir;
     const parent = dirname(dir);
-    if (parent === dir) {
-      throw new Error(
-        "Could not locate the repo root (no docker-compose.yml found above " +
-          `${start}). Run the TUI from inside the nilovon-wiki checkout.`,
-      );
-    }
+    if (parent === dir) return null;
     dir = parent;
   }
+}
+
+/**
+ * Locate the monorepo root (the directory that holds `docker-compose.yml`).
+ *
+ * Tried in order:
+ * 1. The current working directory and its ancestors — this is the path the
+ *    compiled installer binary relies on (its `import.meta.dir` points into
+ *    Bun's virtual bundle filesystem, not the real disk).
+ * 2. This file's directory and its ancestors — covers `pnpm dev:tui`, where
+ *    the source lives inside the checkout regardless of cwd.
+ */
+export function findRepoRoot(): string {
+  const fromCwd = walkUp(process.cwd());
+  if (fromCwd) return fromCwd;
+
+  const fromSource = walkUp(import.meta.dir);
+  if (fromSource) return fromSource;
+
+  throw new Error(
+    "Repo-Root nicht gefunden (keine docker-compose.yml oberhalb von " +
+      `${process.cwd()}). Führe den Installer aus dem geklonten Wiki-Verzeichnis aus:\n` +
+      "  git clone https://github.com/Nilovon/Wiki.git && cd Wiki && ./nilovon-wiki-installer",
+  );
 }
 
 export const repoRoot = findRepoRoot();

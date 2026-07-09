@@ -1,6 +1,17 @@
 import { spawnStream } from "./proc";
 
 /**
+ * Compose file arguments. Production installs (https URLs) additionally load
+ * the Caddy TLS overlay, which publishes only 80/443 and un-publishes the app
+ * ports.
+ */
+function composeFiles(production: boolean): string[] {
+  return production
+    ? ["-f", "docker-compose.yml", "-f", "docker-compose.prod.yml"]
+    : ["-f", "docker-compose.yml"];
+}
+
+/**
  * Shell out to `docker compose` from the repo root, streaming merged
  * stdout+stderr to `onLine`. Resolves with the process exit code (0 = success).
  * Never throws on a non-zero exit — the caller inspects the code.
@@ -10,16 +21,8 @@ export function runCompose(args: string[], onLine?: (line: string) => void): Pro
 }
 
 /** Bring the whole stack up in the background, rebuilding images. */
-export function composeUp(onLine?: (line: string) => void): Promise<number> {
-  return runCompose(["up", "-d", "--build"], onLine);
-}
-
-/** Bring specific services up in the background (no rebuild). */
-export function composeUpServices(
-  services: string[],
-  onLine?: (line: string) => void,
-): Promise<number> {
-  return runCompose(["up", "-d", ...services], onLine);
+export function composeUp(production: boolean, onLine?: (line: string) => void): Promise<number> {
+  return runCompose([...composeFiles(production), "up", "-d", "--build"], onLine);
 }
 
 /** Tear the stack down (used by a failed/cancelled install). */
@@ -34,6 +37,8 @@ export interface ServiceStatus {
   /** compose service state, e.g. "running", "exited". */
   state: string;
   health: ServiceHealth;
+  /** Exit code for stopped containers (one-shot services like `migrate`). */
+  exitCode: number | null;
 }
 
 function normalizeHealth(raw: string | undefined): ServiceHealth {
@@ -81,19 +86,28 @@ export async function composePs(): Promise<ServiceStatus[]> {
     name: r.Service ?? r.Name ?? "unknown",
     state: (r.State ?? "").toString(),
     health: normalizeHealth(r.Health),
+    exitCode: typeof r.ExitCode === "number" ? r.ExitCode : null,
   }));
 }
 
-/** True when every service is running and no service is unhealthy/starting. */
+/**
+ * A service counts as OK when it is running with a green (or absent)
+ * healthcheck — or when it is a completed one-shot (state "exited" with code
+ * 0), like the `migrate` service that applies database migrations and stops.
+ */
+function serviceOk(s: ServiceStatus): boolean {
+  if (s.state === "exited") return s.exitCode === 0;
+  return s.state === "running" && (s.health === "healthy" || s.health === "none");
+}
+
+/** True when every service is up (or a cleanly finished one-shot). */
 export function allHealthy(statuses: ServiceStatus[]): boolean {
   if (statuses.length === 0) return false;
-  return statuses.every(
-    (s) => s.state === "running" && (s.health === "healthy" || s.health === "none"),
-  );
+  return statuses.every(serviceOk);
 }
 
 /** A single service is up and its healthcheck (if any) is green. */
 export function serviceReady(statuses: ServiceStatus[], name: string): boolean {
   const s = statuses.find((x) => x.name === name);
-  return !!s && s.state === "running" && (s.health === "healthy" || s.health === "none");
+  return !!s && serviceOk(s);
 }

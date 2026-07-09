@@ -73,7 +73,34 @@ The codebase is a pnpm + Turborepo monorepo with a strict boundary between the H
 
 Reads are gated on **space visibility** (`packages/api/src/lib/access.ts`); mutations are gated on **organization role** (`assertOrgPermission`). Every write runs in a transaction and appends an audit row.
 
-## Getting started
+## Self-hosting
+
+The only requirement is Docker (with the Compose plugin). Clone the repo,
+download the guided installer from GitHub Releases, run it:
+
+```bash
+git clone https://github.com/Nilovon/Wiki.git && cd Wiki
+curl -fsSLo installer "https://github.com/Nilovon/Wiki/releases/latest/download/nilovon-wiki-installer-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
+chmod +x installer && ./installer
+```
+
+The installer is a self-contained terminal wizard: it generates strong
+secrets, writes the `.env` files, builds and starts the stack (database
+migrations run automatically inside it), and waits for the health checks.
+Open **http://localhost:3001** and register; onboarding creates the first
+organization.
+
+**Public deployment with automatic HTTPS:** enter `https://` URLs in the
+installer form (e.g. `https://wiki.example.com`, API `https://api.example.com`,
+Collab `wss://collab.example.com`) plus a Let's Encrypt email — the installer
+then brings the stack up behind the bundled Caddy TLS proxy.
+
+The same wizard also handles reconfiguration ("Konfigurieren") and updates
+("Updaten"). From a checkout with the dev toolchain you can run it as
+`pnpm dev:tui` instead of downloading the binary. See [DEPLOY.md](DEPLOY.md)
+for details, manual installation, and backups.
+
+## Development setup
 
 ### Prerequisites
 
@@ -93,8 +120,11 @@ pnpm db:start
 
 # 3. Configure environment
 cp apps/server/.env.example apps/server/.env
+cp apps/collab/.env.example apps/collab/.env
 cp apps/web/.env.example apps/web/.env
-#   → set BETTER_AUTH_SECRET (min 32 chars) and review the rest
+#   → set BETTER_AUTH_SECRET in the server AND collab files (same value).
+#     Generate one with: openssl rand -base64 48
+#     Placeholder values are rejected at startup.
 
 # 4. Apply the schema to your database
 pnpm db:push
@@ -113,7 +143,8 @@ nilovon-wiki/
 ├── apps/
 │   ├── web/          # React + TanStack Start frontend (:3001)
 │   ├── server/       # Hono + oRPC HTTP server (:3000)
-│   └── tui/          # OpenTUI terminal client (preview — mock data)
+│   ├── collab/       # Hocuspocus real-time collaboration server (:1234)
+│   └── tui/          # OpenTUI terminal installer (install/configure/update)
 ├── packages/
 │   ├── api/          # oRPC routers, zod schemas, access control (business logic)
 │   ├── auth/         # Better Auth config, statement & roles (RBAC source of truth)
@@ -125,7 +156,7 @@ nilovon-wiki/
 └── docker-compose.yml
 ```
 
-> **Note:** `apps/tui` is an early preview that currently renders mock data; it is not yet wired to the live server.
+> **Note:** `apps/tui` is the guided terminal installer — shipped as a self-contained binary on GitHub Releases (built via `pnpm --filter tui compile`), or run from the checkout with `pnpm dev:tui`.
 
 ## Available scripts
 
@@ -151,37 +182,56 @@ Run from the repository root.
 
 ## Deployment
 
-> **HTTPS is required.** Auth cookies are issued with `SameSite=None; Secure` to support the cross-site web ↔ server setup, so browsers only accept them over HTTPS (localhost is the sole exception). Put the server behind TLS and set `BETTER_AUTH_URL` and `CORS_ORIGIN` to `https://` URLs.
+The recommended path is the installer (see [Self-hosting](#self-hosting) above and [DEPLOY.md](DEPLOY.md)). The stack is a docker-compose file with four services plus a one-shot `migrate` service that applies the versioned database migrations automatically before the apps start.
 
-### Docker Compose
-
-The bundled stack builds the `web` and `server` images and provisions PostgreSQL:
+> Cookie behavior: over HTTPS auth cookies are issued `SameSite=None; Secure` (supports web and API on different subdomains). Over plain HTTP they fall back to `SameSite=Lax`, so localhost and LAN pilots work without TLS — production deployments should still use the HTTPS overlay.
 
 ```bash
-pnpm docker:up      # build + start (web :3001, server :3000, postgres :5432)
+pnpm docker:up      # build + start (web :3001, server :3000, collab :1234, postgres 127.0.0.1:5432)
 pnpm docker:logs    # tail logs
 pnpm docker:down    # stop
 ```
 
-Per-app environment is read from each app's `.env` file (public web variables are baked in at build time) and overridden in `docker-compose.yml` for container networking.
-
 ### Environment variables
+
+Docker installs are configured entirely through the root **`.env`** (written by the installer; annotated template in [.env.example](.env.example)):
+
+| Variable                                                  | Required   | Description                                                       |
+| --------------------------------------------------------- | ---------- | ----------------------------------------------------------------- |
+| `POSTGRES_PASSWORD`                                       | yes        | Database password (generated by the installer)                    |
+| `BETTER_AUTH_SECRET`                                      | yes        | Auth signing secret, min 32 chars — placeholders are rejected     |
+| `BETTER_AUTH_URL` / `CORS_ORIGIN`                         | production | Public API URL / web origin (derived from domains in the overlay) |
+| `VITE_SERVER_URL` / `VITE_COLLAB_URL`                     | production | URLs baked into the web bundle at build time                      |
+| `WEB_DOMAIN`, `API_DOMAIN`, `COLLAB_DOMAIN`, `ACME_EMAIL` | production | Domains + Let's Encrypt email for the Caddy overlay               |
+
+For local development (`pnpm dev`), each app reads its own `.env` file instead:
 
 **`apps/server/.env`**
 
-| Variable             | Required | Description                                     |
-| -------------------- | -------- | ----------------------------------------------- |
-| `DATABASE_URL`       | yes      | PostgreSQL connection string                    |
-| `BETTER_AUTH_SECRET` | yes      | Auth signing secret (min 32 characters)         |
-| `BETTER_AUTH_URL`    | yes      | Public URL of the server (HTTPS in production)  |
-| `CORS_ORIGIN`        | yes      | Allowed origin of the web app                   |
-| `NODE_ENV`           | no       | `development` (default) / `production` / `test` |
+| Variable                                 | Required | Description                                         |
+| ---------------------------------------- | -------- | --------------------------------------------------- |
+| `DATABASE_URL`                           | yes      | PostgreSQL connection string                        |
+| `BETTER_AUTH_SECRET`                     | yes      | Auth signing secret (min 32 chars, no placeholders) |
+| `BETTER_AUTH_URL`                        | yes      | Public URL of the server                            |
+| `CORS_ORIGIN`                            | yes      | Allowed origin of the web app                       |
+| `NODE_ENV`                               | no       | `development` (default) / `production` / `test`     |
+| `APP_NAME`                               | no       | Display name used by auth flows (white-labeling)    |
+| `RATE_LIMIT_MAX` / `RATE_LIMIT_AUTH_MAX` | no       | Per-IP requests/minute for the API / auth routes    |
+
+**`apps/collab/.env`**
+
+| Variable             | Required | Description                                        |
+| -------------------- | -------- | -------------------------------------------------- |
+| `DATABASE_URL`       | yes      | Same database as the server                        |
+| `BETTER_AUTH_SECRET` | yes      | Same secret as the server (verifies collab tokens) |
+| `COLLAB_PORT`        | no       | WebSocket port (default 1234)                      |
 
 **`apps/web/.env`**
 
-| Variable          | Required | Description                           |
-| ----------------- | -------- | ------------------------------------- |
-| `VITE_SERVER_URL` | yes      | URL the browser uses to reach the API |
+| Variable          | Required | Description                                      |
+| ----------------- | -------- | ------------------------------------------------ |
+| `VITE_SERVER_URL` | yes      | URL the browser uses to reach the API            |
+| `VITE_COLLAB_URL` | yes      | WebSocket URL of the collab service (`ws(s)://`) |
 
 See the `.env.example` files for annotated placeholders.
 

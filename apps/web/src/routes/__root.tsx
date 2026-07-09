@@ -8,6 +8,15 @@ import { evlogErrorHandler } from "evlog/nitro/v3";
 
 import type { orpc } from "@/utils/orpc";
 
+// Fonts are bundled and served from our own origin — loading them from Google
+// Fonts would leak every visitor's IP to a third party (a GDPR problem for
+// self-hosted enterprise installs, and a hard failure in air-gapped networks).
+import "@fontsource-variable/public-sans";
+import "@fontsource-variable/public-sans/wght-italic.css";
+import "@fontsource-variable/source-serif-4";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
+
 import appCss from "../index.css?url";
 import { ThemeProvider } from "@/components/theme-provider";
 export interface RouterAppContext {
@@ -33,12 +42,6 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
       },
     ],
     links: [
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400..700;1,400..700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400..600&family=JetBrains+Mono:wght@400;500&display=swap",
-      },
       {
         rel: "stylesheet",
         href: appCss,
@@ -51,7 +54,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 function RootDocument() {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="de" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
@@ -62,8 +65,12 @@ function RootDocument() {
           </ThemeProvider>
         </div>
         <Toaster richColors />
-        <TanStackRouterDevtools position="bottom-left" />
-        <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+        {import.meta.env.DEV ? (
+          <>
+            <TanStackRouterDevtools position="bottom-left" />
+            <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+          </>
+        ) : null}
         <Scripts />
       </body>
     </html>

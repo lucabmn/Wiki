@@ -2,14 +2,15 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
-# It adds a Caddy TLS reverse proxy, stops publishing the app ports on the host
-# (only Caddy is public on 80/443), binds Postgres to localhost only, and makes
-# every service restart on boot.
+# The installer (GitHub-Releases binary or `pnpm dev:tui`) writes the required
+# .env values; the domain vars below are prod-only and set by hand.
 #
-# Public URLs (BETTER_AUTH_URL, CORS_ORIGIN, VITE_SERVER_URL, VITE_COLLAB_URL)
-# must be the https/wss domains — set them via the installer TUI or the `.env`
-# files before building. The VITE_* vars are baked into the web bundle at build
-# time, so a domain change needs a rebuild.
+# It adds a Caddy TLS reverse proxy, stops publishing the app ports on the host
+# (only Caddy is public on 80/443), and makes every service restart on boot.
+#
+# The public URLs are derived from WEB_DOMAIN / API_DOMAIN / COLLAB_DOMAIN in
+# the root `.env`. The VITE_* vars are baked into the web bundle at build time,
+# so a domain change needs a rebuild (`docker compose ... up -d --build web`).
 
 name: nilovon-wiki
 
@@ -23,10 +24,10 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      WEB_DOMAIN: ${WEB_DOMAIN}
-      API_DOMAIN: ${API_DOMAIN}
-      COLLAB_DOMAIN: ${COLLAB_DOMAIN}
-      ACME_EMAIL: ${ACME_EMAIL}
+      WEB_DOMAIN: ${WEB_DOMAIN:?Set WEB_DOMAIN in .env for the production overlay}
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN in .env for the production overlay}
+      COLLAB_DOMAIN: ${COLLAB_DOMAIN:?Set COLLAB_DOMAIN in .env for the production overlay}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env for the production overlay}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -45,22 +46,17 @@ services:
     restart: always
     ports: !reset []
     environment:
-      # Base file hardcodes CORS_ORIGIN to localhost; override to the public
-      # web origin so Better Auth trusts it and CORS passes.
+      # Derived from the domains so Better Auth, CORS, and Caddy can never
+      # disagree about the public origins.
       CORS_ORIGIN: https://${WEB_DOMAIN}
+      BETTER_AUTH_URL: https://${API_DOMAIN}
 
   collab:
     restart: always
     ports: !reset []
-    environment:
-      CORS_ORIGIN: https://${WEB_DOMAIN}
 
   postgres:
     restart: always
-    # Localhost-only: not reachable from the network, but the installer TUI can
-    # still push the schema against the published port from the host.
-    ports: !override
-      - "127.0.0.1:5432:5432"
 
 volumes:
   caddy_data:

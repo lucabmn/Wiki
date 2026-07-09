@@ -318,7 +318,10 @@ describe("page view route", () => {
       { id: "c1", body: "Q", resolvedAt: null, deletedAt: null, createdAt: new Date() },
     ];
     renderView();
+    // Deleting now requires confirming in an AlertDialog first.
     fireEvent.click(await screen.findByRole("button", { name: "Kommentar löschen" }));
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Löschen" }));
     await waitFor(() => expect(deleteCommentSpy.mock.calls[0]?.[0]).toEqual({ id: "c1" }));
   });
 

@@ -1,0 +1,65 @@
+name: Release installer
+
+# Builds the standalone terminal installer (apps/tui) for every supported
+# platform and attaches the binaries to the GitHub release for the pushed tag.
+#
+# Each target builds on a runner of its own architecture instead of
+# cross-compiling: @opentui/core loads a platform-specific native library via
+# optionalDependencies, and only a native install has the right one on disk.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            suffix: linux-x64
+          - os: ubuntu-24.04-arm
+            suffix: linux-arm64
+          - os: macos-latest
+            suffix: darwin-arm64
+          - os: macos-15-intel
+            suffix: darwin-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      TURBO_TELEMETRY_DISABLED: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        # version is read from the "packageManager" field in package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile installer
+        working-directory: apps/tui
+        run: pnpm run compile
+
+      - name: Rename binary for platform
+        run: mv apps/tui/dist/nilovon-wiki-installer nilovon-wiki-installer-${{ matrix.suffix }}
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: nilovon-wiki-installer-${{ matrix.suffix }}

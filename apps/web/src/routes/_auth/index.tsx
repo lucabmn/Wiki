@@ -1,6 +1,5 @@
 import { CreatePageDialog } from "@/components/create-page-dialog";
 import DashboardLayout from "@/components/layouts/dashboard-layout";
-import { authClient } from "@/lib/auth-client";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { ACTION_LABEL } from "@/lib/labels";
 import { orpc } from "@/utils/orpc";
@@ -36,11 +35,9 @@ function timeAgo(date: Date): string {
   return relativeTime.format(0, "minute");
 }
 
-function RecentActivity({ enabled }: { enabled: boolean }) {
+function RecentActivity() {
   const navigate = useNavigate();
-  const { data, isPending } = useQuery(
-    orpc.activity.list.queryOptions({ input: { limit: 5 }, enabled }),
-  );
+  const { data, isPending } = useQuery(orpc.activity.list.queryOptions({ input: { limit: 5 } }));
 
   return (
     <section>
@@ -53,49 +50,57 @@ function RecentActivity({ enabled }: { enabled: boolean }) {
           Alle Spaces
         </Link>
       </div>
-      {isPending && (
+      {isPending ? (
         <Card className="gap-0 py-0">
           <Skeleton className="h-22 items-center border-b" />
           <Skeleton className="h-22 items-center border-b" />
           <Skeleton className="h-22 items-center border-b" />
           <Skeleton className="h-22 items-center border-b" />
         </Card>
-      )}
-      <Card className="gap-0 py-0">
-        {data?.map((r) => (
-          <button
-            type="button"
-            key={r.id}
-            disabled={!r.pageId}
-            onClick={() => r.pageId && navigate({ to: "/pages/$id", params: { id: r.pageId } })}
-            className="group flex w-full items-center gap-3 border-b border-border px-4 py-3.5 text-left transition-colors last:border-0 hover:bg-muted/50 disabled:cursor-default disabled:hover:bg-transparent"
-          >
-            <span
-              className="flex size-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
-              style={{ backgroundColor: r.space?.color ?? DEFAULT_SPACE_COLOR }}
+      ) : !data?.length ? (
+        <Card className="px-4 py-6">
+          <p className="text-sm text-muted-foreground">
+            Noch keine Aktivität. Sobald dein Team Seiten anlegt oder bearbeitet, erscheint sie
+            hier.
+          </p>
+        </Card>
+      ) : (
+        <Card className="gap-0 py-0">
+          {data.map((r) => (
+            <button
+              type="button"
+              key={r.id}
+              disabled={!r.pageId}
+              onClick={() => r.pageId && navigate({ to: "/pages/$id", params: { id: r.pageId } })}
+              className="group flex w-full items-center gap-3 border-b border-border px-4 py-3.5 text-left transition-colors last:border-0 hover:bg-muted/50 disabled:cursor-default disabled:hover:bg-transparent"
             >
-              <FileText className="size-4.5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[14px] font-medium group-hover:text-primary">
-                {ACTION_LABEL[r.action]}
+              <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
+                style={{ backgroundColor: r.space?.color ?? DEFAULT_SPACE_COLOR }}
+              >
+                <FileText className="size-4.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[14px] font-medium group-hover:text-primary">
+                  {ACTION_LABEL[r.action]}
+                </div>
+                <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {r.actor?.name} - {timeAgo(r.createdAt)}
+                </div>
               </div>
-              <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                {r.actor?.name} - {timeAgo(r.createdAt)}
-              </div>
-            </div>
-            <Badge variant="outline" className="shrink-0">
-              {r.space?.name}
-            </Badge>
-          </button>
-        ))}
-      </Card>
+              <Badge variant="outline" className="shrink-0">
+                {r.space?.name}
+              </Badge>
+            </button>
+          ))}
+        </Card>
+      )}
     </section>
   );
 }
 
-function Favorites({ enabled }: { enabled: boolean }) {
-  const { data, isPending } = useQuery(orpc.me.listFavorites.queryOptions({ input: {}, enabled }));
+function Favorites() {
+  const { data, isPending } = useQuery(orpc.me.listFavorites.queryOptions({ input: {} }));
 
   return (
     <section>
@@ -110,8 +115,8 @@ function Favorites({ enabled }: { enabled: boolean }) {
             <p className="text-sm text-muted-foreground">Noch keine Favoriten.</p>
           ) : (
             data.map((page) => (
-              <Link to="/pages/$id" params={{ id: page.id }}>
-                <div key={page.id} className="flex items-center gap-2 text-sm">
+              <Link key={page.id} to="/pages/$id" params={{ id: page.id }}>
+                <div className="flex items-center gap-2 text-sm">
                   {page.icon ? (
                     <span className="leading-none">{page.icon}</span>
                   ) : (
@@ -172,9 +177,9 @@ function HeroCard() {
           <div className={cn(eyebrow, "mb-2 flex items-center gap-1.5 text-primary")}>
             {dateLine}
           </div>
-          <h1 className="text-[28px] leading-tight font-semibold tracking-tight">
+          <p className="text-[28px] leading-tight font-semibold tracking-tight">
             {greeting}, {auth.session.user.name}.
-          </h1>
+          </p>
           <p className="mt-1 text-sm text-muted-foreground">
             {overview
               ? `Du hast ${overview.openComments} offene Kommentare und ${overview.pagesCreatedThisWeek} neue Seiten diese Woche.`
@@ -203,24 +208,19 @@ function HeroCard() {
   );
 }
 
+// The _auth layout guard guarantees an active organization here, so the
+// queries below can run unconditionally.
 function RouteComponent() {
-  const { data: session } = authClient.useSession();
-  const hasActiveOrg = Boolean(session?.session.activeOrganizationId);
-
   return (
     <DashboardLayout className="p-7">
       <div>
         <h1 className="text-lg font-semibold">Übersicht</h1>
-        <p className="text-sm text-muted-foreground">
-          {hasActiveOrg
-            ? "Zuletzt geändert und deine Favoriten."
-            : "Wähle oder erstelle eine Organisation, um loszulegen."}
-        </p>
+        <p className="text-sm text-muted-foreground">Zuletzt geändert und deine Favoriten.</p>
       </div>
       <HeroCard />
       <div className="grid gap-4 md:grid-cols-2">
-        <RecentActivity enabled={hasActiveOrg} />
-        <Favorites enabled={hasActiveOrg} />
+        <RecentActivity />
+        <Favorites />
       </div>
     </DashboardLayout>
   );

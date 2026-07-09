@@ -2,7 +2,7 @@ import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
 import { getUser } from "@/functions/get-user";
 import MainSidebar from "@/components/main-sidebar";
-import { SidebarInset, SidebarProvider } from "@nilovon-wiki/ui/components/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@nilovon-wiki/ui/components/sidebar";
 
 export const Route = createFileRoute("/_auth")({
   ssr: false,
@@ -31,6 +31,12 @@ function AuthLayout() {
     <SidebarProvider className="h-svh overflow-hidden">
       <MainSidebar />
       <SidebarInset className="h-svh overflow-hidden">
+        {/* On narrow viewports the sidebar is an off-canvas sheet; this slim
+            bar is its only opener, so it must exist on every page. */}
+        <div className="flex items-center gap-2 border-b border-border px-2 py-1.5 md:hidden">
+          <SidebarTrigger />
+          <span className="text-sm font-semibold">Wiki</span>
+        </div>
         <div data-page-scroll className="flex flex-1 flex-col overflow-y-auto">
           <Outlet />
         </div>

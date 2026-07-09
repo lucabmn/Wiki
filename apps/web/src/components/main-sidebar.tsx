@@ -13,6 +13,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@nilovon-wiki/ui/components/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@nilovon-wiki/ui/components/dropdown-menu";
 import { Kbd } from "@nilovon-wiki/ui/components/kbd";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import {
@@ -30,11 +38,13 @@ import {
 } from "@nilovon-wiki/ui/components/sidebar";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Check,
   ChevronRight,
   ChevronsUpDown,
   Folder,
   Home,
   LayoutGrid,
+  LogOut,
   Moon,
   Plus,
   Search,
@@ -193,24 +203,67 @@ export default function MainSidebar() {
   const pageMatch = matchRoute({ to: "/pages/$id" });
   const activePage = pageMatch ? pageMatch.id : null;
 
+  // All content is org-scoped, so a switch does a full reload: every query
+  // cache and route loader starts fresh in the new organization.
+  const { data: organizations } = authClient.useListOrganizations();
+  const switchOrganization = async (organizationId: string) => {
+    if (organizationId === auth.organization.id) return;
+    await authClient.organization.setActive({ organizationId });
+    window.location.assign("/");
+  };
+
+  const signOut = async () => {
+    await authClient.signOut();
+    window.location.assign("/auth/login");
+  };
+
   return (
-    <Sidebar collapsible="none" className="border-r border-border">
+    <Sidebar collapsible="offcanvas" className="border-r border-border">
       <SidebarHeader className="gap-0">
-        <button
-          type="button"
-          className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent"
-        >
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
-            {auth.organization.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm leading-tight font-semibold">
-              {auth.organization.name}
-            </div>
-            <div className="text-[11.5px] leading-tight text-muted-foreground">Wissens-Hub</div>
-          </div>
-          <ChevronsUpDown className="size-4 text-muted-foreground" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent"
+              >
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
+                  {auth.organization.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm leading-tight font-semibold">
+                    {auth.organization.name}
+                  </div>
+                  <div className="text-[11.5px] leading-tight text-muted-foreground">
+                    Wissens-Hub
+                  </div>
+                </div>
+                <ChevronsUpDown className="size-4 text-muted-foreground" />
+              </button>
+            }
+          />
+          <DropdownMenuContent align="start" className="w-60">
+            <DropdownMenuLabel>Organisation wechseln</DropdownMenuLabel>
+            {(organizations ?? [auth.organization]).map((org) => (
+              <DropdownMenuItem key={org.id} onClick={() => switchOrganization(org.id)}>
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+                  {org.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{org.name}</span>
+                {org.id === auth.organization.id ? <Check className="size-4" /> : null}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              render={
+                <Link to="/auth/onboarding">
+                  <Plus className="size-4" />
+                  <span>Neue Organisation</span>
+                </Link>
+              }
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <div className="px-2 pt-2">
           <Button
@@ -257,20 +310,40 @@ export default function MainSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="flex-row items-center gap-2.5 border-t border-border">
-        <Avatar size="sm">
-          <AvatarFallback className="font-semibold">
-            {initials(auth.session.user.name)}
-          </AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] leading-tight font-semibold">
-            {auth.session.user.name}
-          </div>
-          <div className="truncate text-[11px] text-muted-foreground">
-            {auth.session.user.email}
-          </div>
-        </div>
+      <SidebarFooter className="flex-row items-center gap-1 border-t border-border">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                title="Konto"
+                className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-sidebar-accent"
+              >
+                <Avatar size="sm">
+                  <AvatarFallback className="font-semibold">
+                    {initials(auth.session.user.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] leading-tight font-semibold">
+                    {auth.session.user.name}
+                  </div>
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {auth.session.user.email}
+                  </div>
+                </div>
+              </button>
+            }
+          />
+          <DropdownMenuContent align="start" side="top" className="w-56">
+            <DropdownMenuLabel className="truncate">{auth.session.user.email}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onClick={signOut}>
+              <LogOut className="size-4" />
+              <span>Abmelden</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           variant="ghost"
           size="icon-sm"

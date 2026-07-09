@@ -44,7 +44,11 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
             toast.success("Erfolgreich registriert");
           },
           onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
+            toast.error(
+              error.error.status === 422
+                ? "Ein Konto mit dieser E-Mail existiert bereits."
+                : "Registrierung fehlgeschlagen. Bitte versuche es erneut.",
+            );
           },
         },
       );
@@ -96,7 +100,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
                     placeholder="Name"
-                    autoComplete="off"
+                    autoComplete="name"
                   />
                   {isInvalid && <FieldError errors={field.state.meta.errors} />}
                 </Field>
@@ -118,7 +122,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
                     placeholder="name@firma.de"
-                    autoComplete="off"
+                    autoComplete="email"
                     type="email"
                   />
                   {isInvalid && <FieldError errors={field.state.meta.errors} />}
@@ -141,7 +145,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
                     placeholder="••••••••"
-                    autoComplete="off"
+                    autoComplete="new-password"
                     type="password"
                   />
                   {isInvalid && <FieldError errors={field.state.meta.errors} />}

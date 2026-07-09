@@ -19,5 +19,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],
+    // Deterministic client env so tests never depend on a developer's .env.
+    env: {
+      VITE_SERVER_URL: "http://localhost:3000",
+      VITE_COLLAB_URL: "ws://localhost:1234",
+    },
   },
 });

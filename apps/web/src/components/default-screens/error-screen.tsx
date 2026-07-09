@@ -31,7 +31,7 @@ export default function ErrorScreen({ error, reset }: { error?: Error; reset?: (
       >
         <RefreshCw /> Erneut versuchen
       </Button>
-      <Button variant="outline" render={<Link to="/" />}>
+      <Button variant="outline" nativeButton={false} render={<Link to="/" />}>
         <Home /> Zur Startseite
       </Button>
     </StatusScreen>

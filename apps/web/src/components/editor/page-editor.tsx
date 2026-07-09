@@ -11,6 +11,7 @@ import type { Editor } from "@tiptap/core";
 import { useMutation } from "@tanstack/react-query";
 import { Check, History, Loader2, Send, Users, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import * as Y from "yjs";
 
 import { RichTextEditor } from "./rich-text-editor";
@@ -100,7 +101,7 @@ function PageEditorForm({
   // Flush the current title + live document to the DB. Title-only pages (no
   // editor yet) still persist their title.
   const persist = async () => {
-    const trimmed = title.trim() || "Untitled";
+    const trimmed = title.trim() || "Ohne Titel";
     const editor = editorRef.current;
     await update.mutateAsync({
       id: page.id,
@@ -117,12 +118,14 @@ function PageEditorForm({
 
   const handleSave = async () => {
     await persist();
+    toast.success("Seite gespeichert");
     finish();
   };
 
   const handlePublish = async () => {
     await persist();
     await publish.mutateAsync({ id: page.id });
+    toast.success("Seite veröffentlicht");
     finish();
   };
 

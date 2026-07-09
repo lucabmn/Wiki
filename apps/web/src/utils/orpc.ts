@@ -8,13 +8,42 @@ import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BatchLinkPlugin } from "@orpc/client/plugins";
 
+/**
+ * Map transport/oRPC errors to friendly German copy instead of dumping raw
+ * backend messages (often English or technical) into a toast.
+ */
+export function friendlyErrorMessage(error: Error): string {
+  const code = (error as { code?: string }).code;
+  switch (code) {
+    case "UNAUTHORIZED":
+      return "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.";
+    case "FORBIDDEN":
+      return "Dafür fehlt dir die Berechtigung.";
+    case "NOT_FOUND":
+      return "Der Inhalt wurde nicht gefunden — möglicherweise wurde er gelöscht.";
+    case "TOO_MANY_REQUESTS":
+      return "Zu viele Anfragen. Bitte warte einen Moment.";
+    case "CONFLICT":
+      return "Das kollidiert mit einem vorhandenen Eintrag.";
+    case "BAD_REQUEST":
+      return "Die Eingabe ist ungültig. Bitte prüfe deine Angaben.";
+  }
+  if (error.name === "TypeError" || /fetch|network/i.test(error.message)) {
+    return "Der Server ist gerade nicht erreichbar. Prüfe deine Verbindung.";
+  }
+  return "Etwas ist schiefgelaufen. Bitte versuche es erneut.";
+}
+
 export function createQueryClient() {
   return new QueryClient({
     queryCache: new QueryCache({
       onError: (error, query) => {
-        toast.error(`Error: ${error.message}`, {
+        toast.error(friendlyErrorMessage(error), {
+          // One toast per failure cause at a time — a page with five queries
+          // against an unreachable server shouldn't stack five identical toasts.
+          id: `query-error-${(error as { code?: string }).code ?? error.name}`,
           action: {
-            label: "retry",
+            label: "Erneut versuchen",
             onClick: () => {
               query.invalidate();
             },

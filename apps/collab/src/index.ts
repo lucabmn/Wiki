@@ -11,7 +11,7 @@ import { extractPageLinks, syncPageLinks } from "@nilovon-wiki/api/lib/page-link
 import { db } from "@nilovon-wiki/db";
 import { page } from "@nilovon-wiki/db/schema/index";
 import { pageEditorExtensions } from "@nilovon-wiki/editor";
-import { env } from "@nilovon-wiki/env/server";
+import { env } from "@nilovon-wiki/env/collab";
 
 /**
  * Real-time collaboration server for page bodies.
@@ -102,6 +102,13 @@ const server = new Server({
           await storeDocument(pageId, state, document);
         } catch (error) {
           log.error({ source: "collab", op: "store", documentName, ...parseError(error) });
+          // Persisting failed: without this, users keep typing into a document
+          // that will never be saved. Closing the connections surfaces the
+          // problem in the client UI ("connection lost") and triggers its
+          // reconnect loop instead of silent data loss.
+          for (const connection of document.getConnections()) {
+            connection.close();
+          }
         }
       },
     }),
@@ -115,3 +122,20 @@ server
     log.error({ source: "collab", msg: "failed to start", ...parseError(error) });
     process.exit(1);
   });
+
+// Flush open documents before exiting: `destroy()` runs the debounced store
+// for every open doc, so a rolling restart doesn't drop in-flight edits.
+let shuttingDown = false;
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  log.info({ source: "collab", msg: "shutting down", signal });
+  try {
+    await server.destroy();
+  } catch (error) {
+    log.error({ source: "collab", msg: "shutdown error", ...parseError(error) });
+  }
+  process.exit(0);
+}
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

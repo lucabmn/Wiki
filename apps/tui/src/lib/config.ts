@@ -14,6 +14,8 @@ export interface InstallConfig {
   webUrl: string;
   /** WebSocket origin of the collab service, browser-reachable. */
   collabUrl: string;
+  /** Let's-Encrypt contact email — required for https installs (Caddy). */
+  acmeEmail: string;
   /** Postgres superuser password (compose interpolates POSTGRES_PASSWORD). */
   postgresPassword: string;
   /** Better Auth signing secret, shared by server + collab (min 32 chars). */
@@ -25,9 +27,19 @@ export function defaultConfig(): InstallConfig {
     serverUrl: "http://localhost:3000",
     webUrl: "http://localhost:3001",
     collabUrl: "ws://localhost:1234",
+    acmeEmail: "",
     postgresPassword: generatePassword(),
     authSecret: generateSecret(),
   };
+}
+
+/**
+ * An install is "production" when the web app is served over https. In that
+ * mode the stack comes up with the Caddy TLS overlay (docker-compose.prod.yml)
+ * and the domain variables below are written for it.
+ */
+export function isProduction(config: Pick<InstallConfig, "webUrl">): boolean {
+  return config.webUrl.startsWith("https:");
 }
 
 // ── Editable form fields ────────────────────────────────────────────────────
@@ -43,6 +55,11 @@ export const fields: FieldDef[] = [
   { key: "serverUrl", label: "Server-URL", help: "Öffentliche URL der API (apps/server)" },
   { key: "webUrl", label: "Web-URL", help: "Öffentliche URL der Web-App (auch CORS-Origin)" },
   { key: "collabUrl", label: "Collab-URL", help: "WebSocket-Origin des Echtzeit-Dienstes" },
+  {
+    key: "acmeEmail",
+    label: "TLS-E-Mail",
+    help: "Let's-Encrypt-Kontakt — nur bei https-URLs nötig, sonst leer lassen",
+  },
   {
     key: "postgresPassword",
     label: "DB-Passwort",
@@ -86,6 +103,25 @@ export function validate(config: Partial<InstallConfig>): FieldErrors {
   if ((config.postgresPassword ?? "").trim().length < 8)
     errors.postgresPassword = "mindestens 8 Zeichen";
   if ((config.authSecret ?? "").length < 32) errors.authSecret = "mindestens 32 Zeichen";
+
+  // TLS terminates at Caddy for all three services at once — mixed http/https
+  // configs produce broken cookies or blocked WebSockets, so refuse them.
+  const secure = [
+    config.webUrl?.startsWith("https:"),
+    config.serverUrl?.startsWith("https:"),
+    config.collabUrl?.startsWith("wss:"),
+  ];
+  if (secure.some(Boolean) && !secure.every(Boolean)) {
+    if (!errors.webUrl && !config.webUrl?.startsWith("https:"))
+      errors.webUrl = "https nötig, wenn andere URLs https/wss sind";
+    if (!errors.serverUrl && !config.serverUrl?.startsWith("https:"))
+      errors.serverUrl = "https nötig, wenn andere URLs https/wss sind";
+    if (!errors.collabUrl && !config.collabUrl?.startsWith("wss:"))
+      errors.collabUrl = "wss nötig, wenn andere URLs https/wss sind";
+  }
+  if (secure.every(Boolean) && !/.+@.+\..+/.test(config.acmeEmail ?? ""))
+    errors.acmeEmail = "gültige E-Mail nötig (Let's Encrypt)";
+
   return errors;
 }
 
@@ -121,18 +157,32 @@ function kv(pairs: Record<string, string>): string {
 export function renderEnvFiles(config: InstallConfig): EnvFile[] {
   const databaseUrl = `postgresql://postgres:${config.postgresPassword}@postgres:5432/nilovon-wiki`;
   const isLocal = config.serverUrl.startsWith("http://localhost");
+  const production = isProduction(config);
 
   return [
     {
       label: "Root (Compose-Variablen)",
       rel: ".env",
-      // POSTGRES_PASSWORD is interpolated by compose; the VITE_* vars feed the
-      // web image's build args (see docker-compose.yml) so a rebuild targets
-      // the real domain instead of localhost.
+      // The root .env is the canonical config for compose: it interpolates the
+      // secrets and URLs into every container (see docker-compose.yml). The
+      // VITE_* vars feed the web image's build args so a rebuild targets the
+      // real domain instead of localhost. In production mode the domain vars
+      // additionally feed the Caddy TLS overlay (docker-compose.prod.yml).
       content: kv({
         POSTGRES_PASSWORD: config.postgresPassword,
+        BETTER_AUTH_SECRET: config.authSecret,
+        BETTER_AUTH_URL: config.serverUrl,
+        CORS_ORIGIN: config.webUrl,
         VITE_SERVER_URL: config.serverUrl,
         VITE_COLLAB_URL: config.collabUrl,
+        ...(production
+          ? {
+              WEB_DOMAIN: new URL(config.webUrl).hostname,
+              API_DOMAIN: new URL(config.serverUrl).hostname,
+              COLLAB_DOMAIN: new URL(config.collabUrl).hostname,
+              ACME_EMAIL: config.acmeEmail,
+            }
+          : {}),
       }),
     },
     {
@@ -216,10 +266,11 @@ export async function readConfig(): Promise<InstallConfig> {
   ]);
   const d = defaultConfig();
   return {
-    serverUrl: server.BETTER_AUTH_URL ?? d.serverUrl,
-    webUrl: server.CORS_ORIGIN ?? d.webUrl,
+    serverUrl: server.BETTER_AUTH_URL ?? root.BETTER_AUTH_URL ?? d.serverUrl,
+    webUrl: server.CORS_ORIGIN ?? root.CORS_ORIGIN ?? d.webUrl,
     collabUrl: web.VITE_COLLAB_URL ?? root.VITE_COLLAB_URL ?? d.collabUrl,
+    acmeEmail: root.ACME_EMAIL ?? "",
     postgresPassword: root.POSTGRES_PASSWORD ?? "",
-    authSecret: server.BETTER_AUTH_SECRET ?? "",
+    authSecret: server.BETTER_AUTH_SECRET ?? root.BETTER_AUTH_SECRET ?? "",
   };
 }

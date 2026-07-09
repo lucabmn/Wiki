@@ -143,13 +143,19 @@ const SlashCommandList = forwardRef<SlashListRef, ListProps>(({ items, command }
   }
 
   return (
-    <div className="max-h-72 w-64 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-md">
+    <div
+      role="listbox"
+      aria-label="Editor-Befehle"
+      className="max-h-72 w-64 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-md"
+    >
       {items.map((item, index) => {
         const Icon: ComponentType<{ className?: string }> = item.icon;
         return (
           <button
             key={item.title}
             type="button"
+            role="option"
+            aria-selected={index === selected}
             onMouseEnter={() => setSelected(index)}
             onClick={() => command(item)}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm ${

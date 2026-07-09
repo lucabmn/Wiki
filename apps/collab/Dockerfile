@@ -11,6 +11,9 @@ ENV SKIP_ENV_VALIDATION=
 
 EXPOSE 1234
 
+# Run unprivileged: a compromised app process must not own the container.
+USER node
+
 # Hocuspocus is built on `ws`/crossws and refuses to run under Bun, so the
 # collab service runs on Node. It executes its TypeScript entrypoint directly
 # via tsx (a runtime dependency) — no separate bundle step.

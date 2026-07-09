@@ -11,12 +11,24 @@ vi.mock("@/components/layouts/dashboard-layout", () => ({
   default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
+// The create/settings dialogs pull their own mutations — out of scope here.
+vi.mock("@/components/create-space-dialog", () => ({ CreateSpaceDialog: () => null }));
+vi.mock("@/components/create-page-dialog", () => ({ CreatePageDialog: () => null }));
+vi.mock("@/components/spaces/space-settings-sheet", () => ({ SpaceSettingsSheet: () => null }));
+
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (opts: Record<string, unknown>) => ({
     useParams: () => ({ slug: "ops" }),
     ...opts,
   }),
   Link: ({ children, ...props }: { children: ReactNode }) => <a {...props}>{children}</a>,
+  // The browse route reads the auth context off the _auth layout route by id.
+  useRouteContext: () => ({
+    auth: {
+      organization: { id: "o1", members: [] },
+      session: { user: { name: "Luca", email: "luca@acme.io" } },
+    },
+  }),
 }));
 
 vi.mock("@/utils/orpc", () => ({
@@ -24,6 +36,7 @@ vi.mock("@/utils/orpc", () => ({
     spaces: {
       list: {
         queryOptions: () => ({ queryKey: ["spaces"], queryFn: async () => data.spaces }),
+        key: () => ["spaces"],
       },
     },
     pages: {
@@ -33,6 +46,17 @@ vi.mock("@/utils/orpc", () => ({
           queryFn: async () => data.pages,
           enabled,
         }),
+        key: () => ["pages"],
+      },
+    },
+    spaceMembers: {
+      myRole: {
+        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
+          queryKey: ["myRole"],
+          queryFn: async () => ({ role: "viewer" }),
+          enabled,
+        }),
+        key: () => ["myRole"],
       },
     },
   },
@@ -84,7 +108,7 @@ describe("spaces index route", () => {
 
   it("shows an empty state", async () => {
     renderComponent(<SpacesIndex />);
-    expect(await screen.findByText("Noch keine Spaces.")).toBeDefined();
+    expect(await screen.findByText("Noch keine Spaces")).toBeDefined();
   });
 });
 
@@ -99,15 +123,18 @@ describe("space browse route", () => {
         color: null,
         icon: null,
         description: "Runbooks",
+        createdBy: null,
+        createdAt: new Date("2026-01-02T10:00:00Z"),
       },
     ];
     data.pages = [
-      { id: "p1", title: "Deploy", icon: null },
-      { id: "p2", title: "Rollback", icon: "🔙" },
+      { id: "p1", title: "Deploy", icon: null, status: "published" },
+      { id: "p2", title: "Rollback", icon: "🔙", status: "published" },
     ];
     renderComponent(<SpaceBrowse />);
     expect(await screen.findByText("Operations")).toBeDefined();
-    expect(screen.getByText("Eingeschränkt")).toBeDefined();
+    // Visibility shows in both the header badge and the info rail.
+    expect(screen.getAllByText("Eingeschränkt").length).toBeGreaterThan(0);
     // Pages load after the space resolves.
     expect(await screen.findByText("Deploy")).toBeDefined();
     expect(screen.getByText("Rollback")).toBeDefined();
@@ -123,6 +150,8 @@ describe("space browse route", () => {
         color: null,
         icon: null,
         description: null,
+        createdBy: null,
+        createdAt: new Date("2026-01-02T10:00:00Z"),
       },
     ];
     renderComponent(<SpaceBrowse />);
@@ -139,9 +168,11 @@ describe("space browse route", () => {
         color: null,
         icon: null,
         description: null,
+        createdBy: null,
+        createdAt: new Date("2026-01-02T10:00:00Z"),
       },
     ];
     renderComponent(<SpaceBrowse />);
-    expect(await screen.findByText("Noch keine Seiten in diesem Space.")).toBeDefined();
+    expect(await screen.findByText("Noch keine Seiten")).toBeDefined();
   });
 });

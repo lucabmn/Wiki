@@ -1,19 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import SignInForm from "@/components/auth/sign-in-form";
 import SignUpForm from "@/components/auth/sign-up-form";
 
 export const Route = createFileRoute("/auth/register")({
   component: RouteComponent,
 });
 
+// Sign-in and sign-up are separate routes (instead of a local toggle) so the
+// URL always reflects the visible form — refresh, back/forward, and shared
+// links behave as expected.
 function RouteComponent() {
-  const [showSignIn, setShowSignIn] = useState(false);
-
-  return showSignIn ? (
-    <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
-  ) : (
-    <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
-  );
+  const navigate = useNavigate();
+  return <SignUpForm onSwitchToSignIn={() => navigate({ to: "/auth/login" })} />;
 }

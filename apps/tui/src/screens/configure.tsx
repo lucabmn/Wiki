@@ -5,6 +5,7 @@ import { theme } from "../theme";
 import {
   defaultConfig,
   fields,
+  isProduction,
   isValid,
   readConfig,
   writeEnvFiles,
@@ -63,7 +64,7 @@ export function Configure({ onExit }: { onExit: () => void }) {
         const written = await writeEnvFiles(config);
         written.forEach((p) => append(`  ✔ ${p}`));
         append("→ Baue neu und starte Dienste (up -d --build) …");
-        const code = await composeUp((l) => !signal.aborted && append(l));
+        const code = await composeUp(isProduction(config), (l) => !signal.aborted && append(l));
         if (signal.aborted) return;
         if (code !== 0) {
           append(`✘ docker compose beendet mit Code ${code}.`);

@@ -2,17 +2,10 @@ import { TextAttributes } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import { useEffect, useState } from "react";
 import { theme } from "../theme";
-import { readConfig } from "../lib/config";
-import { composeUp, composeUpServices } from "../lib/docker";
-import { pushSchema } from "../lib/db";
+import { isProduction, readConfig } from "../lib/config";
+import { composeUp } from "../lib/docker";
 import { gitInfo, gitPull } from "../lib/git";
-import {
-  LogBox,
-  StatusRow,
-  pollUntilHealthy,
-  pollUntilServiceReady,
-  useRunLog,
-} from "../components/run-log";
+import { LogBox, StatusRow, pollUntilHealthy, useRunLog } from "../components/run-log";
 
 type Stage = "idle" | "running" | "done" | "error";
 
@@ -43,30 +36,12 @@ export function Update({ onExit }: { onExit: () => void }) {
           return setStage("error");
         }
 
-        const config = await readConfig();
-
-        append("→ Stelle sicher, dass die Datenbank läuft …");
-        await composeUpServices(["postgres"], (l) => !signal.aborted && append(l));
-        const dbReady = await pollUntilServiceReady("postgres", setStatuses, signal);
-        if (signal.aborted) return;
-        if (!dbReady) {
-          append("✘ Datenbank nicht bereit.");
-          return setStage("error");
-        }
-
-        append("→ Wende Schema-Änderungen an (drizzle-kit push) …");
-        const pushCode = await pushSchema(
-          config.postgresPassword,
-          (l) => !signal.aborted && append(l),
-        );
-        if (signal.aborted) return;
-        if (pushCode !== 0) {
-          append(`✘ Schema-Push fehlgeschlagen (Code ${pushCode}).`);
-          return setStage("error");
-        }
-
-        append("→ Baue Images neu und starte Dienste …");
-        const upCode = await composeUp((l) => !signal.aborted && append(l));
+        // Migrations run inside the stack via the one-shot `migrate` service
+        // before server/collab restart — no host-side tooling needed. Reuse
+        // the install's mode: https configs restart with the TLS overlay.
+        const production = isProduction(await readConfig());
+        append("→ Baue Images neu und starte Dienste (inkl. DB-Migrationen) …");
+        const upCode = await composeUp(production, (l) => !signal.aborted && append(l));
         if (signal.aborted) return;
         if (upCode !== 0) {
           append(`✘ docker compose beendet mit Code ${upCode}.`);
@@ -111,7 +86,7 @@ export function Update({ onExit }: { onExit: () => void }) {
         <text fg={theme.accent} attributes={TextAttributes.BOLD}>
           Update
         </text>
-        <text fg={theme.dim}>git pull · Schema · Images neu bauen · Dienste neu starten.</text>
+        <text fg={theme.dim}>git pull · Images neu bauen · Migrationen · Dienste neu starten.</text>
       </box>
 
       {stage === "idle" && (

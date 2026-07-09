@@ -2,48 +2,69 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { data, saveDraftSpy, deleteDraftSpy, updateSpy, publishSpy, onDoneSpy } = vi.hoisted(() => ({
+// The old local-draft autosave/restore tests were removed: PageEditor was
+// rewritten around real-time collaboration (Hocuspocus/Yjs) and the
+// getDraft/saveDraft/deleteDraft flow no longer exists.
+
+const { data, updateSpy, publishSpy, onDoneSpy, toastSuccessSpy } = vi.hoisted(() => ({
   data: {
-    draft: null as unknown,
     canPublish: false,
   },
-  saveDraftSpy: vi.fn((_v?: unknown) => Promise.resolve({})),
-  deleteDraftSpy: vi.fn((_v?: unknown) => Promise.resolve({})),
   updateSpy: vi.fn((_v?: unknown) => Promise.resolve({})),
   publishSpy: vi.fn((_v?: unknown) => Promise.resolve({})),
   onDoneSpy: vi.fn(),
+  toastSuccessSpy: vi.fn(),
 }));
 
 vi.mock("@/components/editor/revision-history", () => ({ RevisionHistory: () => null }));
 
-// Stub the TipTap surface: exposes a button that reports an edit upward, and a
-// marker of whether it received initial content.
-vi.mock("@/components/editor/rich-text-editor", () => ({
-  RichTextEditor: ({
-    initialContent,
-    onChange,
-  }: {
-    initialContent: unknown;
-    onChange: (v: { json: unknown; text: string }) => void;
-  }) => (
-    <div>
-      <span>RTE:{initialContent ? "has-content" : "empty"}</span>
-      <button
-        type="button"
-        onClick={() =>
-          onChange({
-            json: {
-              type: "doc",
-              content: [{ type: "paragraph", content: [{ type: "text", text: "new body" }] }],
-            },
-            text: "new body",
-          })
-        }
-      >
-        edit-body
-      </button>
-    </div>
-  ),
+vi.mock("@/lib/auth-client", () => ({
+  authClient: {
+    useSession: () => ({ data: { user: { id: "u1", name: "Luca", email: "luca@acme.io" } } }),
+  },
+}));
+
+// No real WebSocket in jsdom: replace the Hocuspocus provider with an inert
+// stub. The unit test stubs the TipTap surface too, so no awareness is needed.
+vi.mock("@hocuspocus/provider", () => ({
+  HocuspocusProvider: class {
+    configuration: unknown;
+    constructor(configuration: unknown) {
+      this.configuration = configuration;
+    }
+    destroy() {}
+  },
+  WebSocketStatus: {
+    Connecting: "connecting",
+    Connected: "connected",
+    Disconnected: "disconnected",
+  },
+}));
+
+// Stub the TipTap surface: the collab editor exposes the live instance via
+// `onEditor`, which the parent reads at save/publish time (getJSON/getText).
+vi.mock("@/components/editor/rich-text-editor", async () => {
+  const { useEffect } = await import("react");
+  return {
+    RichTextEditor: ({ onEditor }: { onEditor?: (editor: unknown) => void }) => {
+      useEffect(() => {
+        onEditor?.({
+          getJSON: () => ({
+            type: "doc",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "new body" }] }],
+          }),
+          getText: () => "new body",
+          commands: { setContent: vi.fn() },
+        });
+        return () => onEditor?.(null);
+      }, [onEditor]);
+      return <div>RTE</div>;
+    },
+  };
+});
+
+vi.mock("sonner", () => ({
+  toast: { success: toastSuccessSpy, error: vi.fn() },
 }));
 
 vi.mock("@/utils/orpc", () => ({
@@ -51,18 +72,6 @@ vi.mock("@/utils/orpc", () => ({
     pages: {
       get: { key: () => ["page"] },
       list: { key: () => ["pages"] },
-      getDraft: {
-        queryOptions: ({ input }: { input: { id: string } }) => ({
-          queryKey: ["draft", input.id],
-          queryFn: async () => data.draft,
-        }),
-      },
-      saveDraft: {
-        mutationOptions: (o: Record<string, unknown>) => ({ mutationFn: saveDraftSpy, ...o }),
-      },
-      deleteDraft: {
-        mutationOptions: (o: Record<string, unknown>) => ({ mutationFn: deleteDraftSpy, ...o }),
-      },
       update: {
         mutationOptions: (o: Record<string, unknown>) => ({ mutationFn: updateSpy, ...o }),
       },
@@ -70,6 +79,9 @@ vi.mock("@/utils/orpc", () => ({
         mutationOptions: (o: Record<string, unknown>) => ({ mutationFn: publishSpy, ...o }),
       },
     },
+  },
+  client: {
+    pages: { collabToken: vi.fn(async () => ({ token: "t" })) },
   },
 }));
 
@@ -93,19 +105,16 @@ function renderEditor() {
 
 describe("PageEditor", () => {
   beforeEach(() => {
-    data.draft = null;
     data.canPublish = false;
-    saveDraftSpy.mockClear();
-    deleteDraftSpy.mockClear();
     updateSpy.mockClear();
     publishSpy.mockClear();
     onDoneSpy.mockClear();
+    toastSuccessSpy.mockClear();
   });
 
-  it("saves the page: update with content + textContent, discards draft, exits", async () => {
+  it("saves the page: update with content + textContent, toasts, exits", async () => {
     renderEditor();
-    fireEvent.click(await screen.findByText("edit-body"));
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
       expect(updateSpy.mock.calls[0]?.[0]).toEqual({
@@ -118,57 +127,46 @@ describe("PageEditor", () => {
         textContent: "new body",
       }),
     );
-    await waitFor(() => expect(deleteDraftSpy.mock.calls[0]?.[0]).toEqual({ id: "p1" }));
+    await waitFor(() => expect(toastSuccessSpy).toHaveBeenCalledWith("Seite gespeichert"));
     await waitFor(() => expect(onDoneSpy).toHaveBeenCalled());
+    expect(publishSpy).not.toHaveBeenCalled();
   });
 
-  it("autosaves the draft after editing", async () => {
+  it("falls back to 'Ohne Titel' when the title is emptied", async () => {
     renderEditor();
-    fireEvent.click(await screen.findByText("edit-body"));
-    await waitFor(
-      () =>
-        expect(saveDraftSpy.mock.calls[0]?.[0]).toEqual({
-          pageId: "p1",
-          title: "Runbook",
-          content: {
-            type: "doc",
-            content: [{ type: "paragraph", content: [{ type: "text", text: "new body" }] }],
-          },
-        }),
-      { timeout: 2000 },
-    );
+    fireEvent.change(await screen.findByPlaceholderText("Seitentitel"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => {
+      const firstCall = updateSpy.mock.calls[0]?.[0] as { title: string } | undefined;
+      expect(firstCall?.title).toBe("Ohne Titel");
+    });
   });
 
-  it("publishes: persists then snapshots a revision", async () => {
+  it("publishes: persists, then calls pages.publish, toasts, exits", async () => {
     data.canPublish = true;
     renderEditor();
-    fireEvent.click(await screen.findByText("edit-body"));
-    fireEvent.click(screen.getByRole("button", { name: "Veröffentlichen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Veröffentlichen" }));
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalled());
     await waitFor(() => expect(publishSpy.mock.calls[0]?.[0]).toEqual({ id: "p1" }));
+    await waitFor(() => expect(toastSuccessSpy).toHaveBeenCalledWith("Seite veröffentlicht"));
     await waitFor(() => expect(onDoneSpy).toHaveBeenCalled());
   });
 
   it("hides publish without permission", async () => {
     data.canPublish = false;
     renderEditor();
-    await screen.findByText("edit-body");
+    await screen.findByRole("button", { name: "Speichern" });
     expect(screen.queryByRole("button", { name: "Veröffentlichen" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Speichern" })).toBeDefined();
   });
 
-  it("restores an existing draft and shows the banner until edited", async () => {
-    data.draft = {
-      content: { type: "doc", content: [{ type: "paragraph" }] },
-      title: "Draft title",
-    };
+  it("cancels without persisting", async () => {
     renderEditor();
-    // The editor mounts with the draft content, and the banner is shown.
-    expect(await screen.findByText("RTE:has-content")).toBeDefined();
-    expect(screen.getByText(/Entwurf wiederhergestellt/)).toBeDefined();
-
-    fireEvent.click(screen.getByText("edit-body"));
-    await waitFor(() => expect(screen.queryByText(/Entwurf wiederhergestellt/)).toBeNull());
+    fireEvent.click(await screen.findByRole("button", { name: "Abbrechen" }));
+    expect(onDoneSpy).toHaveBeenCalled();
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 });

@@ -13,6 +13,9 @@ vi.mock("@/lib/auth-client", () => ({
   authClient: {
     useSession: () => ({ data: { session: { activeOrganizationId: "o1" } } }),
     useActiveMember: () => ({ data: undefined }),
+    useListOrganizations: () => ({ data: [{ id: "o1", name: "Org Eins" }] }),
+    organization: { setActive: async () => ({}) },
+    signOut: async () => ({}),
   },
 }));
 // The sidebar's permission gates round-trip to better-auth in the real impl;

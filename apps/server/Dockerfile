@@ -13,5 +13,8 @@ ENV SKIP_ENV_VALIDATION=
 
 EXPOSE 3000
 
+# Run unprivileged: a compromised app process must not own the container.
+USER node
+
 WORKDIR /app/apps/server
 CMD ["bun", "dist/index.mjs"]

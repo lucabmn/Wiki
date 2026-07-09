@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     "./server": "./src/server.ts",
+    "./collab": "./src/collab.ts",
+    "./db": "./src/db.ts",
     "./web": "./src/web.ts"
   },
   "dependencies": {

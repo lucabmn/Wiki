@@ -18,7 +18,7 @@ export default function NotFoundScreen() {
       <Button variant="outline" onClick={() => window.history.back()}>
         <ArrowLeft /> Zurück
       </Button>
-      <Button render={<Link to="/" />}>
+      <Button nativeButton={false} render={<Link to="/" />}>
         <Home /> Zur Startseite
       </Button>
     </StatusScreen>

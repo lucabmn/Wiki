@@ -5,21 +5,15 @@ import { theme } from "../theme";
 import {
   defaultConfig,
   fields,
+  isProduction,
   isValid,
   renderEnvFiles,
   writeEnvFiles,
   type InstallConfig,
 } from "../lib/config";
-import { composeUp, composeUpServices } from "../lib/docker";
-import { pushSchema } from "../lib/db";
+import { composeUp } from "../lib/docker";
 import { ConfigFormView, useConfigForm } from "../components/config-form";
-import {
-  LogBox,
-  StatusRow,
-  pollUntilHealthy,
-  pollUntilServiceReady,
-  useRunLog,
-} from "../components/run-log";
+import { LogBox, StatusRow, pollUntilHealthy, useRunLog } from "../components/run-log";
 
 type Stage = "form" | "review" | "installing" | "done" | "error";
 
@@ -48,28 +42,14 @@ export function InstallWizard({ onExit }: { onExit: () => void }) {
         const written = await writeEnvFiles(config);
         written.forEach((p) => append(`  ✔ ${p}`));
 
-        append("→ Starte Datenbank …");
-        await composeUpServices(["postgres"], (l) => !signal.aborted && append(l));
-        const dbReady = await pollUntilServiceReady("postgres", setStatuses, signal);
-        if (signal.aborted) return;
-        if (!dbReady) {
-          append("✘ Datenbank wurde nicht rechtzeitig bereit.");
-          return setStage("error");
-        }
-
-        append("→ Wende Datenbank-Schema an (drizzle-kit push) …");
-        const pushCode = await pushSchema(
-          config.postgresPassword,
-          (l) => !signal.aborted && append(l),
-        );
-        if (signal.aborted) return;
-        if (pushCode !== 0) {
-          append(`✘ Schema-Push fehlgeschlagen (Code ${pushCode}).`);
-          return setStage("error");
-        }
-
-        append("→ Baue Images und starte alle Dienste …");
-        const upCode = await composeUp((l) => !signal.aborted && append(l));
+        // Migrations run inside the stack: the one-shot `migrate` service
+        // applies them before server/collab start (see docker-compose.yml),
+        // so the host needs nothing beyond Docker. https configs additionally
+        // bring up the Caddy TLS overlay.
+        const production = isProduction(config);
+        if (production) append("→ Produktionsmodus: Caddy-TLS-Overlay wird mitgestartet.");
+        append("→ Baue Images und starte alle Dienste (inkl. DB-Migrationen) …");
+        const upCode = await composeUp(production, (l) => !signal.aborted && append(l));
         if (signal.aborted) return;
         if (upCode !== 0) {
           append(`✘ docker compose beendet mit Code ${upCode}.`);
@@ -148,7 +128,7 @@ function stageHint(stage: Stage): string {
     case "review":
       return "Diese .env Dateien werden geschrieben.";
     case "installing":
-      return "DB · Schema · Images · Dienste …";
+      return "Images bauen · Migrationen · Dienste starten …";
     case "done":
       return "Fertig.";
     case "error":

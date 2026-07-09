@@ -17,7 +17,7 @@ import {
   Rocket,
   Sparkles,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -136,6 +136,9 @@ function OnboardingPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  // Survives a partial failure: if the org was created but activation/seeding
+  // failed, a retry resumes with this org instead of creating a duplicate.
+  const createdOrgId = useRef<string | null>(null);
 
   const orgResult = orgSchema.safeParse({ name, slug });
   const fieldError = (field: "name" | "slug") =>
@@ -154,11 +157,14 @@ function OnboardingPage() {
   async function handleFinish() {
     setSubmitting(true);
     try {
-      setStatus("Organisation wird erstellt …");
-      const org = await createOrganization(name.trim(), slug);
+      if (!createdOrgId.current) {
+        setStatus("Organisation wird erstellt …");
+        const org = await createOrganization(name.trim(), slug);
+        createdOrgId.current = org.id;
+      }
 
       setStatus("Organisation wird aktiviert …");
-      await authClient.organization.setActive({ organizationId: org.id });
+      await authClient.organization.setActive({ organizationId: createdOrgId.current });
 
       if (useSampleData) {
         setStatus("Beispielinhalte werden angelegt …");

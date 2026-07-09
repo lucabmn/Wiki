@@ -6,7 +6,7 @@ import { STATUS_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
 import { orpc } from "@/utils/orpc";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Button } from "@nilovon-wiki/ui/components/button";
-import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
+import { Card } from "@nilovon-wiki/ui/components/card";
 import {
   Empty,
   EmptyContent,
@@ -237,11 +237,17 @@ function RouteComponent() {
                 </EmptyContent>
               </Empty>
             ) : filtered.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                  Keine Seite passt zu „{query.trim()}“.
-                </CardContent>
-              </Card>
+              <Empty className="rounded-xl border border-dashed">
+                <EmptyHeader>
+                  <EmptyTitle>Keine Treffer</EmptyTitle>
+                  <EmptyDescription>Keine Seite passt zu „{query.trim()}“.</EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button variant="outline" onClick={() => setQuery("")}>
+                    Suche zurücksetzen
+                  </Button>
+                </EmptyContent>
+              </Empty>
             ) : (
               <Card className="gap-0 py-0">
                 {filtered.map((page) => (
