@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@nilovon-wiki/ui/components/dialog";
+import type { JSONContent } from "@tiptap/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Eye, History } from "lucide-react";
 import { useState } from "react";
@@ -19,19 +20,28 @@ const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeS
 /**
  * Version history for a page. Lists the immutable revisions snapshotted at each
  * publish. A revision can be *viewed* read-only (no side effects) or, for a
- * permitted user, restored via `pages.restoreRevision` (same authorization the
- * server enforces).
+ * permitted user, restored.
+ *
+ * Restore has two paths. Inside the collaborative editor, `onRestore` is
+ * provided: the revision is applied into the live shared document, so it syncs
+ * to every connected editor and persists through the normal collab store —
+ * writing `content` server-side there would be clobbered by the in-memory Yjs
+ * doc. Elsewhere (read-only page view), it falls back to
+ * `pages.restoreRevision` (same authorization the server enforces), which also
+ * clears the page's Yjs snapshot so the next session re-seeds from the restore.
  */
 export function RevisionHistory({
   pageId,
   open,
   onOpenChange,
   canRestore,
+  onRestore,
 }: {
   pageId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   canRestore: boolean;
+  onRestore?: (revision: { title: string; content: JSONContent | null }) => void;
 }) {
   const [previewVersion, setPreviewVersion] = useState<number | null>(null);
 
@@ -53,6 +63,20 @@ export function RevisionHistory({
   );
 
   const preview = revisions?.find((r) => r.version === previewVersion) ?? null;
+
+  const handleRestore = (revision: {
+    version: number;
+    title: string;
+    content: JSONContent | null;
+  }) => {
+    if (onRestore) {
+      // Editor is live: apply into the shared doc, don't write content on the server.
+      onRestore({ title: revision.title, content: revision.content });
+      onOpenChange(false);
+      return;
+    }
+    restore.mutate({ id: pageId, version: revision.version });
+  };
 
   const close = (next: boolean) => {
     if (!next) setPreviewVersion(null);
@@ -90,7 +114,13 @@ export function RevisionHistory({
               <div className="flex justify-end">
                 <Button
                   disabled={restore.isPending}
-                  onClick={() => restore.mutate({ id: pageId, version: preview.version })}
+                  onClick={() =>
+                    handleRestore({
+                      version: preview.version,
+                      title: preview.title,
+                      content: preview.content as JSONContent | null,
+                    })
+                  }
                 >
                   Diese Version wiederherstellen
                 </Button>
@@ -143,7 +173,13 @@ export function RevisionHistory({
                           variant="outline"
                           size="sm"
                           disabled={restore.isPending}
-                          onClick={() => restore.mutate({ id: pageId, version: revision.version })}
+                          onClick={() =>
+                            handleRestore({
+                              version: revision.version,
+                              title: revision.title,
+                              content: revision.content as JSONContent | null,
+                            })
+                          }
                         >
                           Wiederherstellen
                         </Button>

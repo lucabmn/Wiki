@@ -7,6 +7,9 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_SERVER_URL: http://localhost:3000
+        # Browser-reachable WebSocket origin of the collab service (baked into
+        # the client bundle at build time).
+        VITE_COLLAB_URL: ws://localhost:1234
     init: true
     ports:
       - "3001:3001"
@@ -16,6 +19,8 @@ services:
     depends_on:
       server:
         condition: service_healthy
+      collab:
+        condition: service_started
     healthcheck:
       test:
         [
@@ -55,6 +60,26 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  collab:
+    build:
+      context: .
+      dockerfile: apps/collab/Dockerfile
+    init: true
+    ports:
+      - "1234:1234"
+    env_file:
+      - path: apps/server/.env
+        required: false
+    environment:
+      # Shares the API server's secret to verify collaboration tokens, and the
+      # same database to persist the Yjs document snapshots.
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/nilovon-wiki
+      COLLAB_PORT: "1234"
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,0 +1,1 @@
+ALTER TABLE "wiki"."page" ADD COLUMN "yjs_state" "bytea";

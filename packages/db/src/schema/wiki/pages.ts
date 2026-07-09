@@ -11,7 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { wikiSchema } from "./_schema";
-import { id, timestamps, tsvector } from "../_helpers";
+import { bytea, id, timestamps, tsvector } from "../_helpers";
 import { pageStatus, permissionSubject, spaceVisibility, wikiRole } from "./enums";
 import { space } from "./spaces";
 import { team, user } from "../auth";
@@ -38,6 +38,12 @@ export const page = wikiSchema.table(
     // Plaintext projection of `content`, kept in sync in app code. Powers search
     // and previews without parsing the JSON doc.
     textContent: text("text_content").notNull().default(""),
+    // Yjs CRDT snapshot for real-time collaboration (`apps/collab`). The live
+    // shared document is the source of truth while a page is being edited; the
+    // collab server projects it back into `content`/`textContent` on save. NULL
+    // for pages that have never been opened in the collaborative editor — the
+    // server seeds the doc from `content` on first connect.
+    yjsState: bytea("yjs_state"),
     status: pageStatus("status").notNull().default("draft"),
     // Per-page access override. NULL = inherit the space's access. A set value
     // *restricts* within the space (page ACLs never grant beyond space access).

@@ -36,6 +36,13 @@
       "when": 1783591207669,
       "tag": "0004_famous_lizard",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783598124916,
+      "tag": "0005_bright_silver_fox",
+      "breakpoints": true
     }
   ]
 }
