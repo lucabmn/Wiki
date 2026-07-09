@@ -7,10 +7,11 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@nilovon-wiki/ui/components/command";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { FileText } from "lucide-react";
+import { FileText, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 /**
@@ -60,6 +61,13 @@ export function CommandPalette({
     navigate({ to: "/pages/$id", params: { id: pageId } });
   };
 
+  const seeAll = () => {
+    const trimmed = query.trim();
+    onOpenChange(false);
+    setQuery("");
+    navigate({ to: "/search", search: { q: trimmed, space: "" } });
+  };
+
   return (
     <CommandDialog
       open={open}
@@ -99,6 +107,17 @@ export function CommandPalette({
               ))}
             </CommandGroup>
           )}
+          {hits?.length ? (
+            <>
+              <CommandSeparator />
+              <CommandGroup>
+                <CommandItem value="__see_all__" onSelect={seeAll}>
+                  <Search className="size-4 text-muted-foreground" />
+                  <span>Alle Ergebnisse für „{debounced}“ ansehen</span>
+                </CommandItem>
+              </CommandGroup>
+            </>
+          ) : null}
         </CommandList>
       </Command>
     </CommandDialog>
