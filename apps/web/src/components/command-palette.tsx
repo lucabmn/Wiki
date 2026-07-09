@@ -15,6 +15,24 @@ import { FileText, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 /**
+ * Renders a Postgres `ts_headline` snippet: matched terms come wrapped in
+ * `<b>…</b>`. We split on those delimiters instead of setting innerHTML so the
+ * (unescaped) page content can't inject markup — React escapes each text part.
+ */
+function renderSnippet(snippet: string) {
+  return snippet.split(/<\/?b>/).map((part, i) =>
+    // Odd indices are the highlighted (previously <b>-wrapped) segments.
+    i % 2 === 1 ? (
+      <strong key={i} className="font-medium text-foreground">
+        {part}
+      </strong>
+    ) : (
+      part
+    ),
+  );
+}
+
+/**
  * ⌘K search palette. Runs the server-side full-text search (already scoped to
  * readable spaces by the API) and navigates to the chosen page. cmdk's own
  * client-side filtering is disabled — the ranking comes from the backend.
@@ -100,7 +118,9 @@ export function CommandPalette({
                   <div className="min-w-0 flex-1">
                     <div className="truncate">{hit.title}</div>
                     {hit.snippet ? (
-                      <div className="truncate text-xs text-muted-foreground">{hit.snippet}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {renderSnippet(hit.snippet)}
+                      </div>
                     ) : null}
                   </div>
                 </CommandItem>
