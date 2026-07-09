@@ -19,6 +19,7 @@ const {
     spaces: [] as unknown[],
     favorites: [] as Array<{ id: string }>,
     subscriptions: [] as Array<{ id: string }>,
+    canEdit: false,
     error: false,
   },
   createCommentSpy: vi.fn((_vars?: { pageId: string; body: string }) => Promise.resolve({})),
@@ -33,6 +34,22 @@ const {
 // Passthrough the layout so the sidebar (and its many deps) stays out of scope.
 vi.mock("@/components/layouts/dashboard-layout", () => ({
   default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
+// Drive the client-side permission gate directly; its real impl reads better-auth.
+vi.mock("@/lib/permissions", () => ({ usePermission: () => data.canEdit }));
+
+// Stub the editor — its TipTap internals are covered in page-editor.test.tsx;
+// here we only assert the route toggles into/out of edit mode.
+vi.mock("@/components/editor/page-editor", () => ({
+  PageEditor: ({ onDone }: { onDone: () => void }) => (
+    <div>
+      <span>EDITOR AKTIV</span>
+      <button type="button" onClick={onDone}>
+        Editor schließen
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -139,6 +156,7 @@ describe("page view route", () => {
     data.spaces = [];
     data.favorites = [];
     data.subscriptions = [];
+    data.canEdit = false;
     data.error = false;
   });
 
@@ -302,5 +320,28 @@ describe("page view route", () => {
     await waitFor(() =>
       expect(navigateSpy).toHaveBeenCalledWith({ to: "/spaces/$slug", params: { slug: "ops" } }),
     );
+  });
+
+  it("hides the edit affordance without update permission", async () => {
+    data.page = somePage;
+    data.canEdit = false;
+    renderView();
+    await screen.findByText("body");
+    expect(screen.queryByRole("button", { name: "Bearbeiten" })).toBeNull();
+  });
+
+  it("opens and closes the editor when permitted", async () => {
+    data.page = somePage;
+    data.canEdit = true;
+    renderView();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Bearbeiten" }));
+    expect(await screen.findByText("EDITOR AKTIV")).toBeDefined();
+    // View chrome (comment box) is replaced by the editor surface.
+    expect(screen.queryByPlaceholderText("Kommentar schreiben …")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Editor schließen" }));
+    expect(await screen.findByText("body")).toBeDefined();
+    expect(screen.queryByText("EDITOR AKTIV")).toBeNull();
   });
 });

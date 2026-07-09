@@ -1,5 +1,8 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { PageContent } from "@/components/editor/page-content";
+import { PageEditor } from "@/components/editor/page-editor";
 import { STATUS_LABEL } from "@/lib/labels";
+import { usePermission } from "@/lib/permissions";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
 import {
@@ -20,7 +23,7 @@ import { Textarea } from "@nilovon-wiki/ui/components/textarea";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Archive, Bell, Check, FileText, Star, Trash2 } from "lucide-react";
+import { Archive, Bell, Check, FileText, Pencil, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/_auth/pages/$id")({
@@ -243,6 +246,8 @@ function CommentForm({ pageId }: { pageId: string }) {
 
 function RouteComponent() {
   const { id } = Route.useParams();
+  const [editing, setEditing] = useState(false);
+  const canEdit = usePermission({ page: ["update"] });
 
   const {
     data: page,
@@ -278,18 +283,34 @@ function RouteComponent() {
 
   const openComments = comments?.filter((c) => !c.resolvedAt && !c.deletedAt) ?? [];
 
+  const backLink =
+    space != null ? (
+      <Link
+        to="/spaces/$slug"
+        params={{ slug: space.slug }}
+        className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        ← {space.name}
+      </Link>
+    ) : null;
+
+  if (editing) {
+    return (
+      <DashboardLayout className="p-7">
+        <div className="mx-auto w-full max-w-3xl">
+          {backLink}
+          <div className="mt-3">
+            <PageEditor page={page} onDone={() => setEditing(false)} />
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout className="p-7">
       <div className="mx-auto w-full max-w-3xl">
-        {space ? (
-          <Link
-            to="/spaces/$slug"
-            params={{ slug: space.slug }}
-            className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            ← {space.name}
-          </Link>
-        ) : null}
+        {backLink}
 
         <div className="mt-3 flex items-start gap-3">
           <span className="mt-1 text-2xl leading-none">
@@ -303,19 +324,20 @@ function RouteComponent() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {canEdit ? (
+              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                <Pencil className="size-4" /> Bearbeiten
+              </Button>
+            ) : null}
             <SubscribeButton pageId={page.id} />
             <FavoriteButton pageId={page.id} />
             <ArchiveButton pageId={page.id} spaceSlug={space?.slug} />
           </div>
         </div>
 
-        <article className="mt-6 text-[15px] leading-7 whitespace-pre-wrap text-foreground/90">
-          {page.textContent.trim() ? (
-            page.textContent
-          ) : (
-            <span className="text-muted-foreground">Diese Seite hat noch keinen Inhalt.</span>
-          )}
-        </article>
+        <div className="mt-6">
+          <PageContent content={page.content} fallbackText={page.textContent} />
+        </div>
 
         <section className="mt-10">
           <h2 className="mb-3 text-[15px] font-semibold">
