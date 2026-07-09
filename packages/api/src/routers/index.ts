@@ -8,8 +8,10 @@ import { dashboardRouter } from "./dashboard";
 import { linkRouter } from "./link";
 import { onboardingRouter } from "./onboarding";
 import { pageRouter } from "./page";
+import { pageAccessRouter } from "./page-access";
 import { searchRouter } from "./search";
 import { spaceRouter } from "./space";
+import { spaceMemberRouter } from "./space-member";
 import { tagRouter } from "./tag";
 import { userStateRouter } from "./user-state";
 
@@ -25,7 +27,9 @@ export const appRouter = {
       .handler(() => "OK"),
   },
   spaces: spaceRouter,
+  spaceMembers: spaceMemberRouter,
   pages: pageRouter,
+  pageAccess: pageAccessRouter,
   comments: commentRouter,
   tags: tagRouter,
   attachments: attachmentRouter,

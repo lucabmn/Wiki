@@ -3,10 +3,15 @@ import { z } from "zod";
 
 import { attachment } from "@nilovon-wiki/db/schema/index";
 
-import { assertOrgPermission, assertOwnerOrPermission, protectedProcedure } from "../index";
+import { protectedProcedure } from "../index";
 import { assertSpaceRead } from "../lib/access";
+import {
+  requireOwnerOrSpaceCapability,
+  requirePageCapability,
+  requireSpaceCapabilityById,
+} from "../lib/authz";
 import { recordActivity } from "../lib/activity";
-import { loadAttachment, loadPage, loadSpace, orgOfSpace } from "../lib/loaders";
+import { loadAttachment, loadPage, loadSpace } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import {
   AttachmentSchema,
@@ -28,8 +33,15 @@ export const attachmentRouter = {
     .input(ListAttachmentsInputSchema)
     .output(z.array(AttachmentSchema))
     .handler(async ({ input, context }) => {
-      const spaceId = input.spaceId ?? (await loadPage(context.db, input.pageId!)).spaceId;
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, spaceId));
+      let spaceId: string;
+      if (input.pageId) {
+        const target = await loadPage(context.db, input.pageId);
+        await requirePageCapability(context.db, context, context.headers, target, "read");
+        spaceId = target.spaceId;
+      } else {
+        spaceId = input.spaceId!;
+        await assertSpaceRead(context.db, context, await loadSpace(context.db, spaceId));
+      }
       return context.db.query.attachment.findMany({
         where: and(
           eq(attachment.spaceId, spaceId),
@@ -49,8 +61,23 @@ export const attachmentRouter = {
     .input(CreateAttachmentInputSchema)
     .output(AttachmentSchema)
     .handler(async ({ input, context }) => {
-      const organizationId = await orgOfSpace(context.db, input.spaceId);
-      await assertOrgPermission(context.headers, { attachment: ["create"] }, organizationId);
+      // Attaching to a page requires write on that page; a bare space upload
+      // requires write on the space.
+      const { organizationId } = input.pageId
+        ? await requirePageCapability(
+            context.db,
+            context,
+            context.headers,
+            await loadPage(context.db, input.pageId),
+            "write",
+          )
+        : await requireSpaceCapabilityById(
+            context.db,
+            context,
+            context.headers,
+            input.spaceId,
+            "write",
+          );
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .insert(attachment)
@@ -89,16 +116,13 @@ export const attachmentRouter = {
     .output(z.object({ id: IdSchema }))
     .handler(async ({ input, context }) => {
       const existing = await loadAttachment(context.db, input.id);
-      const organizationId = await orgOfSpace(context.db, existing.spaceId);
-      // Uploaders may remove their own (their `create` grant suffices);
-      // otherwise `attachment:delete` is needed.
-      await assertOwnerOrPermission({
-        headers: context.headers,
-        organizationId,
+      const space = await loadSpace(context.db, existing.spaceId);
+      // Uploaders may remove their own; otherwise space editor+ is required.
+      await requireOwnerOrSpaceCapability(context.db, context, context.headers, space, {
         isOwner: existing.uploadedBy === context.session.user.id,
-        ownerPermissions: [{ attachment: ["delete"] }, { attachment: ["create"] }],
-        otherPermissions: { attachment: ["delete"] },
+        capability: "write",
       });
+      const organizationId = space.organizationId;
       await context.db.transaction(async (tx) => {
         await tx.delete(attachment).where(eq(attachment.id, input.id));
         // The attachment row is hard-deleted, so keep identifying info in

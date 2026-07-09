@@ -1,13 +1,12 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import type { Database } from "@nilovon-wiki/db";
 import { comment } from "@nilovon-wiki/db/schema/index";
 
-import { assertOrgPermission, assertOwnerOrPermission, protectedProcedure } from "../index";
-import { assertSpaceRead } from "../lib/access";
+import { protectedProcedure } from "../index";
+import { requireOwnerOrPageCapability, requirePageCapability } from "../lib/authz";
 import { recordActivity } from "../lib/activity";
-import { loadComment, loadPage, loadSpace, orgOfSpace } from "../lib/loaders";
+import { loadComment, loadPage } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import {
   CommentSchema,
@@ -19,12 +18,6 @@ import { IdSchema } from "../schemas/shared";
 
 const TAGS = ["Comments"];
 
-/** Resolves the org that owns the space a comment's page lives in. */
-async function orgOfComment(db: Database, pageId: string) {
-  const page = await loadPage(db, pageId);
-  return orgOfSpace(db, page.spaceId);
-}
-
 export const commentRouter = {
   list: protectedProcedure
     .route({ method: "GET", path: "/comments", tags: TAGS, summary: "List comments on a page" })
@@ -32,7 +25,7 @@ export const commentRouter = {
     .output(z.array(CommentSchema))
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.pageId);
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
+      await requirePageCapability(context.db, context, context.headers, target, "read");
       return context.db.query.comment.findMany({
         where: and(
           eq(comment.pageId, input.pageId),
@@ -49,8 +42,14 @@ export const commentRouter = {
     .output(CommentSchema)
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.pageId);
-      const organizationId = await orgOfSpace(context.db, target.spaceId);
-      await assertOrgPermission(context.headers, { comment: ["create"] }, organizationId);
+      // Commenting needs the `commenter` capability in the space.
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        target,
+        "comment",
+      );
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .insert(comment)
@@ -81,15 +80,11 @@ export const commentRouter = {
     .output(CommentSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadComment(context.db, input.id);
-      // Authors may edit their own comment; otherwise `comment:moderate` is
-      // required (comments have no separate edit-others permission).
-      const organizationId = await orgOfComment(context.db, existing.pageId);
-      await assertOwnerOrPermission({
-        headers: context.headers,
-        organizationId,
+      const target = await loadPage(context.db, existing.pageId);
+      // Authors edit their own; otherwise moderating (page editor+) is required.
+      await requireOwnerOrPageCapability(context.db, context, context.headers, target, {
         isOwner: existing.authorId === context.session.user.id,
-        ownerPermissions: [{ comment: ["update"] }],
-        otherPermissions: { comment: ["moderate"] },
+        capability: "write",
       });
       const rows = await context.db
         .update(comment)
@@ -111,8 +106,14 @@ export const commentRouter = {
     .handler(async ({ input, context }) => {
       const existing = await loadComment(context.db, input.id);
       const target = await loadPage(context.db, existing.pageId);
-      const organizationId = await orgOfSpace(context.db, target.spaceId);
-      await assertOrgPermission(context.headers, { comment: ["update"] }, organizationId);
+      // Any participant (commenter+) may resolve or reopen a thread.
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        target,
+        "comment",
+      );
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .update(comment)
@@ -151,15 +152,14 @@ export const commentRouter = {
     .handler(async ({ input, context }) => {
       const existing = await loadComment(context.db, input.id);
       const target = await loadPage(context.db, existing.pageId);
-      const organizationId = await orgOfSpace(context.db, target.spaceId);
-      // Authors delete their own; moderators delete anyone's.
-      await assertOwnerOrPermission({
-        headers: context.headers,
-        organizationId,
-        isOwner: existing.authorId === context.session.user.id,
-        ownerPermissions: [{ comment: ["delete"] }],
-        otherPermissions: { comment: ["moderate"] },
-      });
+      // Authors delete their own; moderators (page editor+) delete anyone's.
+      const { organizationId } = await requireOwnerOrPageCapability(
+        context.db,
+        context,
+        context.headers,
+        target,
+        { isOwner: existing.authorId === context.session.user.id, capability: "write" },
+      );
       return context.db.transaction(async (tx) => {
         await tx.update(comment).set({ deletedAt: new Date() }).where(eq(comment.id, existing.id));
         await recordActivity(tx, {

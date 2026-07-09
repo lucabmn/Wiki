@@ -2,13 +2,13 @@ import { ORPCError } from "@orpc/server";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 import type { Database } from "@nilovon-wiki/db";
 import { pageTag, tag } from "@nilovon-wiki/db/schema/index";
 
-import { assertOrgPermission, protectedProcedure } from "../index";
+import { protectedProcedure } from "../index";
 import { assertSpaceRead } from "../lib/access";
-import { loadPage, loadSpace, loadTag, orgOfSpace } from "../lib/loaders";
+import { requirePageCapability, requireSpaceCapabilityById } from "../lib/authz";
+import { loadPage, loadSpace, loadTag } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import { IdSchema } from "../schemas/shared";
 import {
@@ -20,10 +20,6 @@ import {
 } from "../schemas/tag";
 
 const TAGS = ["Tags"];
-
-// Tags are space content with no dedicated permission in the statement; managing
-// them is gated behind `page:update` (content-editor rights).
-const MANAGE: PermissionRequest = { page: ["update"] };
 
 export const tagRouter = {
   list: protectedProcedure
@@ -43,10 +39,12 @@ export const tagRouter = {
     .input(CreateTagInputSchema)
     .output(TagSchema)
     .handler(async ({ input, context }) => {
-      await assertOrgPermission(
+      await requireSpaceCapabilityById(
+        context.db,
+        context,
         context.headers,
-        MANAGE,
-        await orgOfSpace(context.db, input.spaceId),
+        input.spaceId,
+        "write",
       );
       const rows = await context.db
         .insert(tag)
@@ -61,10 +59,12 @@ export const tagRouter = {
     .output(TagSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadTag(context.db, input.id);
-      await assertOrgPermission(
+      await requireSpaceCapabilityById(
+        context.db,
+        context,
         context.headers,
-        MANAGE,
-        await orgOfSpace(context.db, existing.spaceId),
+        existing.spaceId,
+        "write",
       );
       const { id, ...patch } = input;
       const rows = await context.db.update(tag).set(patch).where(eq(tag.id, id)).returning();
@@ -77,10 +77,12 @@ export const tagRouter = {
     .output(z.object({ id: IdSchema }))
     .handler(async ({ input, context }) => {
       const existing = await loadTag(context.db, input.id);
-      await assertOrgPermission(
+      await requireSpaceCapabilityById(
+        context.db,
+        context,
         context.headers,
-        MANAGE,
-        await orgOfSpace(context.db, existing.spaceId),
+        existing.spaceId,
+        "write",
       );
       await context.db.delete(tag).where(eq(tag.id, input.id));
       return { id: input.id };
@@ -99,11 +101,7 @@ export const tagRouter = {
     .output(z.array(TagSchema))
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.pageId);
-      await assertOrgPermission(
-        context.headers,
-        MANAGE,
-        await orgOfSpace(context.db, target.spaceId),
-      );
+      await requirePageCapability(context.db, context, context.headers, target, "write");
       // The tag must live in the same space as the page — the FK only checks
       // existence, so without this a cross-space (or cross-org) tag could attach.
       const tagRow = await context.db.query.tag.findFirst({
@@ -133,11 +131,7 @@ export const tagRouter = {
     .output(z.array(TagSchema))
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.pageId);
-      await assertOrgPermission(
-        context.headers,
-        MANAGE,
-        await orgOfSpace(context.db, target.spaceId),
-      );
+      await requirePageCapability(context.db, context, context.headers, target, "write");
       await context.db
         .delete(pageTag)
         .where(and(eq(pageTag.pageId, input.pageId), eq(pageTag.tagId, input.tagId)));
@@ -155,7 +149,7 @@ export const tagRouter = {
     .output(z.array(TagSchema))
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.pageId);
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
+      await requirePageCapability(context.db, context, context.headers, target, "read");
       return listPageTags(context.db, input.pageId);
     }),
 };

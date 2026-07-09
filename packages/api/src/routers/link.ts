@@ -3,8 +3,9 @@ import { z } from "zod";
 
 import { page, pageLink } from "@nilovon-wiki/db/schema/index";
 
-import { protectedProcedure } from "../index";
-import { assertSpaceRead } from "../lib/access";
+import { isOrgManager, protectedProcedure } from "../index";
+import { filterReadablePages, loadSpaceRole } from "../lib/access";
+import { requirePageCapability } from "../lib/authz";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { PageSchema } from "../schemas/page";
 import { IdSchema } from "../schemas/shared";
@@ -23,14 +24,23 @@ export const linkRouter = {
     .output(z.array(PageSchema))
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.id);
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
+      await requirePageCapability(context.db, context, context.headers, target, "read");
+      const spaceRow = await loadSpace(context.db, target.spaceId);
+      const manager = await isOrgManager(context.headers, spaceRow.organizationId);
+      const spaceRole = await loadSpaceRole(context.db, context, spaceRow, manager);
       const rows = await context.db
         .select({ page })
         .from(pageLink)
         .innerJoin(page, eq(pageLink.sourcePageId, page.id))
         .where(eq(pageLink.targetPageId, input.id))
         .orderBy(asc(page.title));
-      return rows.map((r) => r.page);
+      // Linked pages live in the same space; hide any the caller can't read.
+      return filterReadablePages(
+        context.db,
+        context,
+        rows.map((r) => r.page),
+        spaceRole,
+      );
     }),
 
   outgoing: protectedProcedure
@@ -44,13 +54,21 @@ export const linkRouter = {
     .output(z.array(PageSchema))
     .handler(async ({ input, context }) => {
       const source = await loadPage(context.db, input.id);
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, source.spaceId));
+      await requirePageCapability(context.db, context, context.headers, source, "read");
+      const spaceRow = await loadSpace(context.db, source.spaceId);
+      const manager = await isOrgManager(context.headers, spaceRow.organizationId);
+      const spaceRole = await loadSpaceRole(context.db, context, spaceRow, manager);
       const rows = await context.db
         .select({ page })
         .from(pageLink)
         .innerJoin(page, eq(pageLink.targetPageId, page.id))
         .where(eq(pageLink.sourcePageId, input.id))
         .orderBy(asc(page.title));
-      return rows.map((r) => r.page);
+      return filterReadablePages(
+        context.db,
+        context,
+        rows.map((r) => r.page),
+        spaceRole,
+      );
     }),
 };
