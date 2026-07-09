@@ -37,7 +37,9 @@ vi.mock("@/components/layouts/dashboard-layout", () => ({
 }));
 
 // Drive the client-side permission gate directly; its real impl reads better-auth.
-vi.mock("@/lib/permissions", () => ({ usePermission: () => data.canEdit }));
+vi.mock("@/lib/permissions", () => ({
+  usePermission: () => ({ allowed: data.canEdit, isPending: false }),
+}));
 
 // Stub the editor — its TipTap internals are covered in page-editor.test.tsx;
 // here we only assert the route toggles into/out of edit mode.
@@ -150,6 +152,14 @@ vi.mock("@/utils/orpc", () => ({
     spaces: {
       list: {
         queryOptions: () => ({ queryKey: ["spaces"], queryFn: async () => data.spaces }),
+      },
+    },
+    pageAccess: {
+      myRole: {
+        queryOptions: () => ({
+          queryKey: ["myRole"],
+          queryFn: async () => ({ role: "editor", canWrite: data.canEdit, canManage: false }),
+        }),
       },
     },
   },

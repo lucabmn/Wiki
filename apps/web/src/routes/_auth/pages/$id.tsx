@@ -2,10 +2,10 @@ import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { PageAside } from "@/components/editor/page-aside";
 import { PageContent } from "@/components/editor/page-content";
 import { PageEditor } from "@/components/editor/page-editor";
+import { PageAccessSheet } from "@/components/pages/page-access-sheet";
 import { RevisionHistory } from "@/components/editor/revision-history";
 import { extractHeadings } from "@/components/editor/headings";
 import { STATUS_LABEL } from "@/lib/labels";
-import { usePermission } from "@/lib/permissions";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
 import {
@@ -26,7 +26,7 @@ import { Textarea } from "@nilovon-wiki/ui/components/textarea";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
-import { Archive, Bell, Check, FileText, Pencil, Star, Trash2 } from "lucide-react";
+import { Archive, Bell, Check, FileText, Lock, Pencil, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/_auth/pages/$id")({
@@ -251,7 +251,12 @@ function RouteComponent() {
   const { id } = Route.useParams();
   const [editing, setEditing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const canEdit = usePermission({ page: ["update"] });
+  // Effective page-level access (respects space + per-page ACL), replacing the
+  // old org-level permission check so the UI matches server enforcement.
+  const { data: access } = useQuery(orpc.pageAccess.myRole.queryOptions({ input: { pageId: id } }));
+  const canEdit = access?.canWrite ?? false;
+  const canManageAccess = access?.canManage ?? false;
+  const [accessOpen, setAccessOpen] = useState(false);
 
   // Resolve author/editor ids to names via the org's member list.
   const { auth } = useRouteContext({ from: "/_auth" });
@@ -314,7 +319,7 @@ function RouteComponent() {
         <div className="mx-auto w-full max-w-4xl">
           {backLink}
           <div className="mt-3">
-            <PageEditor page={page} onDone={() => setEditing(false)} />
+            <PageEditor page={page} canPublish={canEdit} onDone={() => setEditing(false)} />
           </div>
         </div>
       </DashboardLayout>
@@ -343,9 +348,26 @@ function RouteComponent() {
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {canManageAccess ? (
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Zugriff"
+                  title="Zugriff"
+                  onClick={() => setAccessOpen(true)}
+                >
+                  <Lock className="size-4" />
+                </Button>
+              ) : null}
               {canEdit ? (
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                  <Pencil className="size-4" /> Bearbeiten
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Bearbeiten"
+                  title="Bearbeiten"
+                  onClick={() => setEditing(true)}
+                >
+                  <Pencil className="size-4" />
                 </Button>
               ) : null}
               <SubscribeButton pageId={page.id} />
@@ -399,6 +421,15 @@ function RouteComponent() {
         onOpenChange={setHistoryOpen}
         canRestore={canEdit}
       />
+      {canManageAccess ? (
+        <PageAccessSheet
+          open={accessOpen}
+          onOpenChange={setAccessOpen}
+          pageId={page.id}
+          pageTitle={page.title}
+          organizationId={auth.organization.id}
+        />
+      ) : null}
     </DashboardLayout>
   );
 }

@@ -10,7 +10,9 @@ const { data, updateSpy } = vi.hoisted(() => ({
   updateSpy: vi.fn((_v?: unknown) => Promise.resolve({})),
 }));
 
-vi.mock("@/lib/permissions", () => ({ usePermission: () => false }));
+vi.mock("@/lib/permissions", () => ({
+  usePermission: () => ({ allowed: false, isPending: false }),
+}));
 vi.mock("@/components/editor/revision-history", () => ({ RevisionHistory: () => null }));
 // The link picker inside the real editor uses search; stub the endpoint only.
 vi.mock("@/utils/orpc", () => ({
@@ -54,7 +56,7 @@ function renderEditor() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <PageEditor page={page} onDone={vi.fn()} />
+      <PageEditor page={page} canPublish={false} onDone={vi.fn()} />
     </QueryClientProvider>,
   );
 }
