@@ -1,5 +1,6 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { CreateSpaceDialog } from "@/components/create-space-dialog";
+import { QueryError } from "@/components/query-error";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { VISIBILITY_LABEL } from "@/lib/labels";
 import { orpc } from "@/utils/orpc";
@@ -38,7 +39,13 @@ const VISIBILITY_FILTERS: { value: "all" | Visibility; label: string }[] = [
 ];
 
 function RouteComponent() {
-  const { data: spaces, isPending } = useQuery(orpc.spaces.list.queryOptions({ input: {} }));
+  const {
+    data: spaces,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useQuery(orpc.spaces.list.queryOptions({ input: {} }));
 
   const [createOpen, setCreateOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -130,6 +137,8 @@ function RouteComponent() {
             <Skeleton key={i} className="h-28" />
           ))}
         </div>
+      ) : isError ? (
+        <QueryError error={error} onRetry={() => refetch()} />
       ) : total === 0 ? (
         <Empty className="rounded-xl border border-dashed">
           <EmptyHeader>

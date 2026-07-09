@@ -83,6 +83,9 @@ function MembersSettings() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [roleTarget, setRoleTarget] = useState<MemberRolesTarget | null>(null);
   const [removeTarget, setRemoveTarget] = useState<{ memberId: string; name: string } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ invitationId: string; email: string } | null>(
+    null,
+  );
 
   const membersQuery = useQuery(membersQueryOptions(organizationId));
   const invitationsQuery = useQuery(invitationsQueryOptions(organizationId));
@@ -122,6 +125,7 @@ function MembersSettings() {
     onSuccess: async () => {
       await refresh();
       toast.success("Einladung zurückgezogen");
+      setCancelTarget(null);
     },
     onError: toastError,
   });
@@ -259,7 +263,9 @@ function MembersSettings() {
                         variant="ghost"
                         size="sm"
                         disabled={cancelInvite.isPending}
-                        onClick={() => cancelInvite.mutate(invitation.id)}
+                        onClick={() =>
+                          setCancelTarget({ invitationId: invitation.id, email: invitation.email })
+                        }
                       >
                         Zurückziehen
                       </Button>
@@ -314,6 +320,35 @@ function MembersSettings() {
               }}
             >
               {remove.isPending ? "Entfernen …" : "Entfernen"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={cancelTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Einladung zurückziehen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelTarget
+                ? `Die Einladung an ${cancelTarget.email} wird zurückgezogen und kann nicht mehr angenommen werden.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelInvite.isPending}>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={cancelInvite.isPending}
+              onClick={() => {
+                if (cancelTarget) cancelInvite.mutate(cancelTarget.invitationId);
+              }}
+            >
+              {cancelInvite.isPending ? "Zurückziehen …" : "Zurückziehen"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

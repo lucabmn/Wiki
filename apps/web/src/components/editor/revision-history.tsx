@@ -1,5 +1,15 @@
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@nilovon-wiki/ui/components/alert-dialog";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import {
   Dialog,
@@ -44,6 +54,11 @@ export function RevisionHistory({
   onRestore?: (revision: { title: string; content: JSONContent | null }) => void;
 }) {
   const [previewVersion, setPreviewVersion] = useState<number | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<{
+    version: number;
+    title: string;
+    content: JSONContent | null;
+  } | null>(null);
 
   const { data: revisions, isPending } = useQuery(
     orpc.pages.listRevisions.queryOptions({ input: { id: pageId }, enabled: open }),
@@ -69,6 +84,7 @@ export function RevisionHistory({
     title: string;
     content: JSONContent | null;
   }) => {
+    setRestoreTarget(null);
     if (onRestore) {
       // Editor is live: apply into the shared doc, don't write content on the server.
       onRestore({ title: revision.title, content: revision.content });
@@ -79,7 +95,10 @@ export function RevisionHistory({
   };
 
   const close = (next: boolean) => {
-    if (!next) setPreviewVersion(null);
+    if (!next) {
+      setPreviewVersion(null);
+      setRestoreTarget(null);
+    }
     onOpenChange(next);
   };
 
@@ -115,7 +134,7 @@ export function RevisionHistory({
                 <Button
                   disabled={restore.isPending}
                   onClick={() =>
-                    handleRestore({
+                    setRestoreTarget({
                       version: preview.version,
                       title: preview.title,
                       content: preview.content as JSONContent | null,
@@ -174,7 +193,7 @@ export function RevisionHistory({
                           size="sm"
                           disabled={restore.isPending}
                           onClick={() =>
-                            handleRestore({
+                            setRestoreTarget({
                               version: revision.version,
                               title: revision.title,
                               content: revision.content as JSONContent | null,
@@ -191,6 +210,35 @@ export function RevisionHistory({
             )}
           </>
         )}
+
+        <AlertDialog
+          open={restoreTarget !== null}
+          onOpenChange={(next) => {
+            if (!next) setRestoreTarget(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {restoreTarget ? `Version ${restoreTarget.version} wiederherstellen?` : null}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Die heutigen Inhalte der Seite werden durch die gewählte Version ersetzt.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={restore.isPending}>Abbrechen</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={restore.isPending}
+                onClick={() => {
+                  if (restoreTarget) handleRestore(restoreTarget);
+                }}
+              >
+                Wiederherstellen
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

@@ -13,6 +13,7 @@ import { hasOrgPermission, isOrgManager } from "../index";
 import {
   assertOwnerOrSpaceCapability,
   assertSpaceCapability,
+  filterReadablePages,
   loadPageRole,
   loadSpaceRole,
   roleAllows,
@@ -153,6 +154,34 @@ export async function requireOwnerOrPageCapability(
     pageRow,
     opts.isOwner ? "read" : opts.capability,
   );
+}
+
+/**
+ * Cross-space variant of `filterReadablePages`: filters pages that may span
+ * several spaces (favorites, search hits, activity), respecting per-page
+ * `visibility` overrides. Space-level read access must already be established
+ * by the caller — pages without an override pass through unfiltered, so only
+ * overridden pages cost extra queries, grouped per space.
+ */
+export async function filterReadablePagesAcrossSpaces<
+  T extends PageAccessInput & { spaceId: string },
+>(db: Database, context: AuthedContext, headers: Headers, pages: T[]): Promise<T[]> {
+  const overridden = pages.filter((p) => p.visibility !== null);
+  if (overridden.length === 0) return pages;
+  const readable = new Set<string>();
+  for (const spaceId of new Set(overridden.map((p) => p.spaceId))) {
+    const spaceRow = await loadSpace(db, spaceId);
+    const manager = await isOrgManager(headers, spaceRow.organizationId);
+    const spaceRole = await loadSpaceRole(db, context, spaceRow, manager);
+    const pass = await filterReadablePages(
+      db,
+      context,
+      overridden.filter((p) => p.spaceId === spaceId),
+      spaceRole,
+    );
+    for (const p of pass) readable.add(p.id);
+  }
+  return pages.filter((p) => p.visibility === null || readable.has(p.id));
 }
 
 /** Owner-aware capability gate for user-authored resources (comments, files). */

@@ -1,5 +1,6 @@
 import { CreatePageDialog } from "@/components/create-page-dialog";
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { QueryError } from "@/components/query-error";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { ACTION_LABEL } from "@/lib/labels";
 import { orpc } from "@/utils/orpc";
@@ -37,7 +38,9 @@ function timeAgo(date: Date): string {
 
 function RecentActivity() {
   const navigate = useNavigate();
-  const { data, isPending } = useQuery(orpc.activity.list.queryOptions({ input: { limit: 5 } }));
+  const { data, isPending, isError, error, refetch } = useQuery(
+    orpc.activity.list.queryOptions({ input: { limit: 5 } }),
+  );
 
   return (
     <section>
@@ -57,6 +60,8 @@ function RecentActivity() {
           <Skeleton className="h-22 items-center border-b" />
           <Skeleton className="h-22 items-center border-b" />
         </Card>
+      ) : isError ? (
+        <QueryError error={error} onRetry={() => refetch()} />
       ) : !data?.length ? (
         <Card className="px-4 py-6">
           <p className="text-sm text-muted-foreground">
@@ -85,12 +90,16 @@ function RecentActivity() {
                   {ACTION_LABEL[r.action]}
                 </div>
                 <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {r.actor?.name} - {timeAgo(r.createdAt)}
+                  {r.actor?.name
+                    ? `${r.actor.name} - ${timeAgo(r.createdAt)}`
+                    : timeAgo(r.createdAt)}
                 </div>
               </div>
-              <Badge variant="outline" className="shrink-0">
-                {r.space?.name}
-              </Badge>
+              {r.space?.name ? (
+                <Badge variant="outline" className="shrink-0">
+                  {r.space.name}
+                </Badge>
+              ) : null}
             </button>
           ))}
         </Card>
@@ -100,7 +109,9 @@ function RecentActivity() {
 }
 
 function Favorites() {
-  const { data, isPending } = useQuery(orpc.me.listFavorites.queryOptions({ input: {} }));
+  const { data, isPending, isError, error, refetch } = useQuery(
+    orpc.me.listFavorites.queryOptions({ input: {} }),
+  );
 
   return (
     <section>
@@ -111,6 +122,8 @@ function Favorites() {
         <CardContent className="space-y-1.5">
           {isPending ? (
             [0, 1, 2].map((i) => <Skeleton key={i} className="h-5 w-3/4" />)
+          ) : isError ? (
+            <QueryError error={error} onRetry={() => refetch()} />
           ) : !data?.length ? (
             <p className="text-sm text-muted-foreground">Noch keine Favoriten.</p>
           ) : (
@@ -191,7 +204,7 @@ function HeroCard() {
         </Button>
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-3">
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {stats.map(([label, value, delta]) => (
           <Card key={label} className="px-4 py-3">
             <div className="text-[13px] text-muted-foreground">{label}</div>

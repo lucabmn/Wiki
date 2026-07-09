@@ -1,3 +1,4 @@
+import { QueryError } from "@/components/query-error";
 import { orpc } from "@/utils/orpc";
 import {
   Command,
@@ -66,7 +67,13 @@ export function CommandPalette({
     return () => clearTimeout(t);
   }, [query]);
 
-  const { data: hits, isFetching } = useQuery(
+  const {
+    data: hits,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useQuery(
     orpc.search.pages.queryOptions({
       input: { query: debounced },
       enabled: open && debounced.length >= 2,
@@ -100,6 +107,13 @@ export function CommandPalette({
             <CommandEmpty>Tippe, um zu suchen.</CommandEmpty>
           ) : isFetching && !hits?.length ? (
             <CommandEmpty>Suche …</CommandEmpty>
+          ) : isError ? (
+            <QueryError
+              compact
+              error={error}
+              onRetry={() => refetch()}
+              className="justify-center py-4"
+            />
           ) : !hits?.length ? (
             <CommandEmpty>Keine Treffer.</CommandEmpty>
           ) : (

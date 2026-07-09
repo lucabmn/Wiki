@@ -12,6 +12,7 @@ import {
 import { Input } from "@nilovon-wiki/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 /**
@@ -76,18 +77,32 @@ export function CreatePageDialog({
           className="space-y-3"
         >
           {needsPicker && (
-            <NativeSelect
-              className="w-full"
-              value={effectiveSpaceId}
-              onChange={(e) => setPickedSpaceId(e.target.value)}
-              disabled={!spaces?.length}
-            >
-              {spaces?.map((space) => (
-                <NativeSelectOption key={space.id} value={space.id}>
-                  {space.name}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <>
+              <NativeSelect
+                className="w-full"
+                value={effectiveSpaceId}
+                onChange={(e) => setPickedSpaceId(e.target.value)}
+                disabled={!spaces?.length}
+              >
+                {spaces?.map((space) => (
+                  <NativeSelectOption key={space.id} value={space.id}>
+                    {space.name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              {spaces && spaces.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Du hast noch keinen Space. Lege zuerst einen Space an:{" "}
+                  <Link
+                    to="/spaces"
+                    className="font-medium text-foreground underline underline-offset-2"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Zu den Spaces
+                  </Link>
+                </p>
+              ) : null}
+            </>
           )}
           <Input
             autoFocus

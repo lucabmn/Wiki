@@ -1,3 +1,4 @@
+import { ORPCError } from "@orpc/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
@@ -50,6 +51,16 @@ export const commentRouter = {
         target,
         "comment",
       );
+      // A reply must thread under a comment on the same page — the FK alone
+      // would accept a parent on any (possibly inaccessible) page.
+      if (input.parentId) {
+        const parent = await loadComment(context.db, input.parentId);
+        if (parent.pageId !== input.pageId) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Parent comment belongs to a different page",
+          });
+        }
+      }
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .insert(comment)

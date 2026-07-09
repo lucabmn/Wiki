@@ -62,27 +62,36 @@ export const attachmentRouter = {
     .output(AttachmentSchema)
     .handler(async ({ input, context }) => {
       // Attaching to a page requires write on that page; a bare space upload
-      // requires write on the space.
-      const { organizationId } = input.pageId
-        ? await requirePageCapability(
-            context.db,
-            context,
-            context.headers,
-            await loadPage(context.db, input.pageId),
-            "write",
-          )
-        : await requireSpaceCapabilityById(
-            context.db,
-            context,
-            context.headers,
-            input.spaceId,
-            "write",
-          );
+      // requires write on the space. The row's spaceId is derived from the
+      // checked resource — never taken from the client alongside a pageId, or
+      // write access to one page would allow planting rows in foreign spaces.
+      let organizationId: string;
+      let spaceId: string;
+      if (input.pageId) {
+        const target = await loadPage(context.db, input.pageId);
+        ({ organizationId } = await requirePageCapability(
+          context.db,
+          context,
+          context.headers,
+          target,
+          "write",
+        ));
+        spaceId = target.spaceId;
+      } else {
+        ({ organizationId } = await requireSpaceCapabilityById(
+          context.db,
+          context,
+          context.headers,
+          input.spaceId,
+          "write",
+        ));
+        spaceId = input.spaceId;
+      }
       return context.db.transaction(async (tx) => {
         const rows = await tx
           .insert(attachment)
           .values({
-            spaceId: input.spaceId,
+            spaceId,
             pageId: input.pageId ?? null,
             fileName: input.fileName,
             mimeType: input.mimeType,

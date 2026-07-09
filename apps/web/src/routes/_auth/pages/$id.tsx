@@ -19,6 +19,15 @@ import {
   AlertDialogTitle,
 } from "@nilovon-wiki/ui/components/alert-dialog";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
+import {
+  Breadcrumb,
+  BreadcrumbEllipsis,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@nilovon-wiki/ui/components/breadcrumb";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
@@ -27,7 +36,7 @@ import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Archive, Bell, Check, FileText, Lock, Pencil, Star, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_auth/pages/$id")({
@@ -158,6 +167,80 @@ function ArchiveButton({ pageId, spaceSlug }: { pageId: string; spaceSlug?: stri
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+/**
+ * Space › Ancestors › Title trail for nested pages. Resolves ancestors from
+ * the space's flat page list — the same query key the sidebar tree uses — so
+ * the chain comes from cache instead of one request per level.
+ */
+function PageBreadcrumb({
+  page,
+  space,
+}: {
+  page: { id: string; title: string; parentId: string | null; spaceId: string };
+  space?: { slug: string; name: string };
+}) {
+  const { data: allPages } = useQuery(
+    orpc.pages.list.queryOptions({ input: { spaceId: page.spaceId } }),
+  );
+
+  const byId = new Map((allPages ?? []).map((p) => [p.id, p]));
+  const ancestors: { id: string; title: string }[] = [];
+  const seen = new Set<string>([page.id]);
+  let cursor = page.parentId;
+  while (cursor && !seen.has(cursor)) {
+    const node = byId.get(cursor);
+    if (!node) break;
+    seen.add(node.id);
+    ancestors.unshift({ id: node.id, title: node.title });
+    cursor = node.parentId;
+  }
+
+  // Deep trails collapse to first › … › last so the header stays one line.
+  const first = ancestors[0];
+  const last = ancestors[ancestors.length - 1];
+  const trail: ({ id: string; title: string } | "ellipsis")[] =
+    ancestors.length > 3 && first && last ? [first, "ellipsis", last] : ancestors;
+
+  return (
+    <Breadcrumb>
+      <BreadcrumbList className="text-[13px] font-medium">
+        <BreadcrumbItem>
+          {space ? (
+            <BreadcrumbLink render={<Link to="/spaces/$slug" params={{ slug: space.slug }} />}>
+              {space.name}
+            </BreadcrumbLink>
+          ) : (
+            <BreadcrumbLink render={<Link to="/" />}>Übersicht</BreadcrumbLink>
+          )}
+        </BreadcrumbItem>
+        {trail.map((item, index) => (
+          <Fragment key={item === "ellipsis" ? `ellipsis-${index}` : item.id}>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              {item === "ellipsis" ? (
+                <BreadcrumbEllipsis />
+              ) : (
+                <BreadcrumbLink
+                  className="inline-block max-w-40 truncate"
+                  render={<Link to="/pages/$id" params={{ id: item.id }} />}
+                >
+                  {item.title || "Ohne Titel"}
+                </BreadcrumbLink>
+              )}
+            </BreadcrumbItem>
+          </Fragment>
+        ))}
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <BreadcrumbPage className="max-w-52 truncate">
+            {page.title || "Ohne Titel"}
+          </BreadcrumbPage>
+        </BreadcrumbItem>
+      </BreadcrumbList>
+    </Breadcrumb>
   );
 }
 
@@ -345,31 +428,15 @@ function RouteComponent() {
 
   const openComments = comments?.filter((c) => !c.resolvedAt && !c.deletedAt) ?? [];
 
-  // Neutral fallback while the space list is still loading, so the reader
-  // always has an in-content way back.
-  const backLink =
-    space != null ? (
-      <Link
-        to="/spaces/$slug"
-        params={{ slug: space.slug }}
-        className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-      >
-        ← {space.name}
-      </Link>
-    ) : (
-      <Link
-        to="/"
-        className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-      >
-        ← Übersicht
-      </Link>
-    );
+  // Space › Elternseiten › Titel; falls die Space-Liste noch lädt, führt der
+  // erste Eintrag neutral zur Übersicht.
+  const breadcrumb = <PageBreadcrumb page={page} space={space} />;
 
   if (editing) {
     return (
       <DashboardLayout className="p-7">
         <div className="mx-auto w-full max-w-4xl">
-          {backLink}
+          {breadcrumb}
           <div className="mt-3">
             <PageEditor page={page} canPublish={canEdit} onDone={() => setEditing(false)} />
           </div>
@@ -384,7 +451,7 @@ function RouteComponent() {
     <DashboardLayout className="p-7">
       <div className="mx-auto flex w-full max-w-6xl gap-10">
         <div className="min-w-0 flex-1">
-          {backLink}
+          {breadcrumb}
 
           <div className="mt-3 flex items-start gap-3">
             <span className="mt-1 text-2xl leading-none">

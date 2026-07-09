@@ -5,6 +5,7 @@ import { page } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg } from "../index";
 import { assertSpaceRead, readableSpaceIds } from "../lib/access";
+import { filterReadablePagesAcrossSpaces } from "../lib/authz";
 import { loadSpace } from "../lib/loaders";
 import { SearchHitSchema, SearchInputSchema } from "../schemas/misc";
 
@@ -35,7 +36,7 @@ export const searchRouter = {
       }
 
       const tsquery = sql`websearch_to_tsquery('english', ${input.query})`;
-      return context.db
+      const hits = await context.db
         .select({
           pageId: page.id,
           spaceId: page.spaceId,
@@ -44,6 +45,11 @@ export const searchRouter = {
           icon: page.icon,
           snippet: sql<string>`ts_headline('english', ${page.textContent}, ${tsquery}, 'MaxFragments=1, MaxWords=30, MinWords=10')`,
           rank: sql<number>`ts_rank(${page.searchVector}, ${tsquery})`,
+          // Only needed to evaluate per-page ACLs below; stripped by the output
+          // schema before the response leaves the server.
+          id: page.id,
+          visibility: page.visibility,
+          createdBy: page.createdBy,
         })
         .from(page)
         .where(
@@ -55,5 +61,9 @@ export const searchRouter = {
         )
         .orderBy(sql`ts_rank(${page.searchVector}, ${tsquery}) DESC`)
         .limit(input.limit);
+      // Space read is necessary but not sufficient: a page may carry a
+      // restrictive per-page `visibility` override, and a hit leaks its title
+      // and a content snippet.
+      return filterReadablePagesAcrossSpaces(context.db, context, context.headers, hits);
     }),
 };

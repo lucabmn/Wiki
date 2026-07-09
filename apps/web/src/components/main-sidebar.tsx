@@ -4,6 +4,7 @@ import { checkStaticRolePermission, usePermission } from "@/lib/permissions";
 import { orpc } from "@/utils/orpc";
 import { PageTree } from "./page-tree/page-tree";
 import { CommandPalette } from "./command-palette";
+import { QueryError } from "./query-error";
 import { CreateSpaceDialog } from "./create-space-dialog";
 import { CreatePageDialog } from "./create-page-dialog";
 import { Avatar, AvatarFallback } from "@nilovon-wiki/ui/components/avatar";
@@ -85,7 +86,13 @@ function SpacesTree({
   const { allowed: canReorder } = usePermission({ page: ["move"] });
   const [createPageSpaceId, setCreatePageSpaceId] = useState<string | null>(null);
 
-  const { data: spaces, isPending } = useQuery(
+  const {
+    data: spaces,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useQuery(
     orpc.spaces.list.queryOptions({
       input: { includeArchived: false },
       enabled: Boolean(activeOrgId),
@@ -108,6 +115,10 @@ function SpacesTree({
         ))}
       </SidebarMenu>
     );
+  }
+
+  if (isError) {
+    return <QueryError compact error={error} onRetry={() => refetch()} />;
   }
 
   if (!spaces?.length) {

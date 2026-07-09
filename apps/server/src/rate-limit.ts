@@ -31,10 +31,13 @@ export function rateLimit(options: { max: number; keyPrefix: string }): Middlewa
 
   return async (c, next) => {
     // Behind the bundled Caddy proxy the client address arrives via
-    // X-Forwarded-For; when exposed directly there is no trustworthy header,
-    // so all unattributed traffic shares one generous bucket.
+    // X-Forwarded-For. The proxy APPENDS the peer address, so only the LAST
+    // entry is trustworthy — earlier entries are client-supplied and taking
+    // the first would let an attacker rotate spoofed IPs to dodge the limit.
+    // When exposed directly there is no trustworthy header at all, so
+    // unattributed traffic shares one generous bucket.
     const forwarded = c.req.header("x-forwarded-for");
-    const ip = forwarded?.split(",")[0]?.trim() || "unknown";
+    const ip = forwarded?.split(",").at(-1)?.trim() || "unknown";
     const key = `${options.keyPrefix}:${ip}`;
 
     const now = Date.now();

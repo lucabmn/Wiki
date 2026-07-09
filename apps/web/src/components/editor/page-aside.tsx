@@ -10,7 +10,8 @@ import {
 import { Separator } from "@nilovon-wiki/ui/components/separator";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { History, Link2, MessageSquare, Printer, Share2 } from "lucide-react";
-import { type ComponentType, type ReactNode, useEffect, useState } from "react";
+import { type ComponentType, type ReactNode, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import type { Heading } from "./headings";
 
@@ -128,12 +129,35 @@ function ActionRow({
 
 function ShareMenu() {
   const [copied, setCopied] = useState(false);
-  const copyLink = () => {
-    void navigator.clipboard?.writeText(window.location.href);
-    setCopied(true);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearResetTimer = () => {
+    if (resetTimer.current !== null) {
+      clearTimeout(resetTimer.current);
+      resetTimer.current = null;
+    }
+  };
+  useEffect(() => clearResetTimer, []);
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      clearResetTimer();
+      resetTimer.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Kopieren fehlgeschlagen");
+    }
   };
   return (
-    <DropdownMenu onOpenChange={(open) => !open && setCopied(false)}>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (!open) {
+          clearResetTimer();
+          setCopied(false);
+        }
+      }}
+    >
       <DropdownMenuTrigger
         render={
           <button

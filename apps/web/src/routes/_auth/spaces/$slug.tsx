@@ -295,7 +295,12 @@ function RouteComponent() {
         <SpaceSettingsSheet
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
-          space={{ id: space.id, name: space.name, visibility: space.visibility }}
+          space={{
+            id: space.id,
+            name: space.name,
+            visibility: space.visibility,
+            color: space.color,
+          }}
           organizationId={auth.organization.id}
         />
       ) : null}

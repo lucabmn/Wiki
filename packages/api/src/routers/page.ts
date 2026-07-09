@@ -56,6 +56,26 @@ async function positionAtEnd(
 }
 
 /**
+ * Ensures a requested parent page exists in `spaceId`. Without this, a
+ * client-supplied `parentId` could point into another space (or another org's
+ * space), corrupting the tree and doubling as a page-existence oracle.
+ */
+async function assertParentInSpace(
+  db: Database,
+  parentId: string | null,
+  spaceId: string,
+): Promise<void> {
+  if (!parentId) return;
+  const parent = await db.query.page.findFirst({
+    where: eq(page.id, parentId),
+    columns: { spaceId: true },
+  });
+  if (!parent || parent.spaceId !== spaceId) {
+    throw new ORPCError("BAD_REQUEST", { message: "Parent page is not in this space" });
+  }
+}
+
+/**
  * Walks the ancestor chain of `parentId` to ensure `movedId` is not among its
  * ancestors — otherwise the move would create a cycle in the page tree.
  */
@@ -161,6 +181,7 @@ export const pageRouter = {
       );
 
       const parentId = input.parentId ?? null;
+      await assertParentInSpace(context.db, parentId, input.spaceId);
       const slug = await uniqueSlug(
         input.slug ?? slugify(input.title),
         async (candidate) =>
@@ -326,6 +347,7 @@ export const pageRouter = {
         "write",
       );
       const parentId = input.parentId === undefined ? existing.parentId : input.parentId;
+      await assertParentInSpace(context.db, parentId, existing.spaceId);
       await assertNoCycle(context.db, existing.id, parentId);
       const position = await positionForMove(
         context.db,

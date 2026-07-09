@@ -33,10 +33,15 @@ type ProseMirrorNode = {
  * ids are handled downstream by {@link syncPageLinks}. Any non-document input
  * (null, a string, a malformed shape) yields no links rather than throwing.
  */
+// Legitimate documents nest a few dozen levels at most; malicious JSON inside
+// the 10 MB body limit can nest tens of thousands, which would overflow the
+// stack of the recursive walk below. Anything past the cap is ignored.
+const MAX_DEPTH = 200;
+
 export function extractPageLinks(content: unknown): string[] {
   const ids: string[] = [];
-  const visit = (node: ProseMirrorNode | null | undefined): void => {
-    if (!node || typeof node !== "object") return;
+  const visit = (node: ProseMirrorNode | null | undefined, depth: number): void => {
+    if (!node || typeof node !== "object" || depth > MAX_DEPTH) return;
     if (Array.isArray(node.marks)) {
       for (const mark of node.marks) {
         if (mark?.type === "link") {
@@ -46,10 +51,10 @@ export function extractPageLinks(content: unknown): string[] {
       }
     }
     if (Array.isArray(node.content)) {
-      for (const child of node.content) visit(child);
+      for (const child of node.content) visit(child, depth + 1);
     }
   };
-  visit(content as ProseMirrorNode);
+  visit(content as ProseMirrorNode, 0);
   return ids;
 }
 

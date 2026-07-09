@@ -8,6 +8,16 @@ import { VISIBILITY_LABEL, WIKI_ROLE_LABEL } from "@/lib/labels";
 import { membersQueryOptions, rolesQueryOptions } from "@/lib/org-queries";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@nilovon-wiki/ui/components/alert-dialog";
 import { Avatar, AvatarFallback } from "@nilovon-wiki/ui/components/avatar";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
@@ -60,6 +70,7 @@ export function PageAccessSheet({
   const [addSubject, setAddSubject] = useState<"user" | "role">("user");
   const [addUserId, setAddUserId] = useState("");
   const [addRole, setAddRole] = useState<string>("viewer");
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; label: string } | null>(null);
 
   const refresh = () => {
     invalidateAccess();
@@ -94,6 +105,7 @@ export function PageAccessSheet({
       onSuccess: () => {
         refresh();
         toast.success("Zugriff entzogen");
+        setRemoveTarget(null);
       },
       onError: toastError,
     }),
@@ -278,7 +290,7 @@ export function PageAccessSheet({
                           size="icon-sm"
                           title="Entfernen"
                           disabled={removeMember.isPending}
-                          onClick={() => removeMember.mutate({ id: member.id })}
+                          onClick={() => setRemoveTarget({ id: member.id, label })}
                         >
                           <Trash2 className="size-4" />
                           <span className="sr-only">Entfernen</span>
@@ -291,6 +303,35 @@ export function PageAccessSheet({
             </section>
           ) : null}
         </div>
+
+        <AlertDialog
+          open={removeTarget !== null}
+          onOpenChange={(next) => {
+            if (!next) setRemoveTarget(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Zugriff entfernen?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {removeTarget
+                  ? `${removeTarget.label} verliert den expliziten Zugriff auf diese Seite.`
+                  : null}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={removeMember.isPending}>Abbrechen</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={removeMember.isPending}
+                onClick={() => {
+                  if (removeTarget) removeMember.mutate({ id: removeTarget.id });
+                }}
+              >
+                {removeMember.isPending ? "Entfernen …" : "Entfernen"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

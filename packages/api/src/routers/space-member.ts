@@ -48,12 +48,18 @@ function selectMembers(db: Database, where: SQL) {
     .where(where);
 }
 
-/** Number of admin members in a space — used to block orphaning management. */
-async function adminCount(db: Database, spaceId: string): Promise<number> {
-  const rows = await db.query.spaceMember.findMany({
-    where: and(eq(spaceMember.spaceId, spaceId), eq(spaceMember.role, "admin")),
-    columns: { id: true },
-  });
+/**
+ * Number of admin members in a space — used to block orphaning management.
+ * Locks the admin rows (`FOR UPDATE`), so it must run inside the transaction
+ * that performs the demotion/removal: two concurrent calls would otherwise
+ * both count 2 admins and each remove one, leaving the space with none.
+ */
+async function lockedAdminCount(tx: Pick<Database, "select">, spaceId: string): Promise<number> {
+  const rows = await tx
+    .select({ id: spaceMember.id })
+    .from(spaceMember)
+    .where(and(eq(spaceMember.spaceId, spaceId), eq(spaceMember.role, "admin")))
+    .for("update");
   return rows.length;
 }
 
@@ -140,17 +146,16 @@ export const spaceMemberRouter = {
         space: ["update"],
       });
       // Don't let the last admin demote themselves and orphan space management.
-      if (existing.role === "admin" && input.role !== "admin") {
-        if ((await adminCount(context.db, existing.spaceId)) <= 1) {
-          throw new ORPCError("BAD_REQUEST", {
-            message: "A space must keep at least one admin",
-          });
+      await context.db.transaction(async (tx) => {
+        if (existing.role === "admin" && input.role !== "admin") {
+          if ((await lockedAdminCount(tx, existing.spaceId)) <= 1) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "A space must keep at least one admin",
+            });
+          }
         }
-      }
-      await context.db
-        .update(spaceMember)
-        .set({ role: input.role })
-        .where(eq(spaceMember.id, input.id));
+        await tx.update(spaceMember).set({ role: input.role }).where(eq(spaceMember.id, input.id));
+      });
       return loadSpaceMember(context.db, input.id);
     }),
 
@@ -169,10 +174,12 @@ export const spaceMemberRouter = {
       await requireSpaceManage(context.db, context, context.headers, spaceRow, {
         space: ["update"],
       });
-      if (existing.role === "admin" && (await adminCount(context.db, existing.spaceId)) <= 1) {
-        throw new ORPCError("BAD_REQUEST", { message: "A space must keep at least one admin" });
-      }
-      await context.db.delete(spaceMember).where(eq(spaceMember.id, input.id));
+      await context.db.transaction(async (tx) => {
+        if (existing.role === "admin" && (await lockedAdminCount(tx, existing.spaceId)) <= 1) {
+          throw new ORPCError("BAD_REQUEST", { message: "A space must keep at least one admin" });
+        }
+        await tx.delete(spaceMember).where(eq(spaceMember.id, input.id));
+      });
       return { id: input.id };
     }),
 };

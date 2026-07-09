@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { QueryError } from "@/components/query-error";
 import { orpc } from "@/utils/orpc";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
@@ -64,7 +65,13 @@ function RouteComponent() {
 
   const query = q.trim();
   const enabled = query.length >= 2;
-  const { data: hits, isFetching } = useQuery(
+  const {
+    data: hits,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useQuery(
     orpc.search.pages.queryOptions({
       input: { query, spaceId: space || undefined, limit: 50 },
       enabled,
@@ -112,6 +119,8 @@ function RouteComponent() {
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
+          ) : isError ? (
+            <QueryError error={error} onRetry={() => refetch()} />
           ) : !hits?.length ? (
             <p className="text-sm text-muted-foreground">Keine Treffer für „{query}“.</p>
           ) : (

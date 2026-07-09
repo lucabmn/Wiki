@@ -86,7 +86,14 @@ vi.mock("@/utils/orpc", () => ({
       archive: {
         mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: archiveSpy, ...opts }),
       },
-      list: { key: () => ["pages"] },
+      list: {
+        key: () => ["pages"],
+        // The breadcrumb resolves ancestors from the space's page list.
+        queryOptions: ({ input }: { input: { spaceId: string } }) => ({
+          queryKey: ["pages", input.spaceId],
+          queryFn: async () => [],
+        }),
+      },
       listRevisions: {
         queryOptions: ({ enabled }: { enabled?: boolean }) => ({
           queryKey: ["revisions"],
@@ -230,11 +237,13 @@ describe("page view route", () => {
     ];
     renderView();
 
-    expect(await screen.findByText("Runbook")).toBeDefined();
+    // The title renders as the page heading and in the breadcrumb trail.
+    expect(await screen.findByRole("heading", { name: "Runbook" })).toBeDefined();
     expect(screen.getByText("Restart the pods.")).toBeDefined();
     // Status shows in both the header badge and the metadata rail.
     expect(screen.getAllByText("Veröffentlicht").length).toBeGreaterThan(0);
-    expect(screen.getByText("← Operations")).toBeDefined();
+    // The space appears as a breadcrumb link back to its overview.
+    expect(screen.getByText("Operations")).toBeDefined();
     // Only the unresolved comment counts (comments load after the page).
     expect(await screen.findByRole("heading", { name: "Kommentare (1)" })).toBeDefined();
     expect(screen.getByText("Works")).toBeDefined();

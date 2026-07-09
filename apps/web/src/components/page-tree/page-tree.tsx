@@ -1,3 +1,4 @@
+import { QueryError } from "@/components/query-error";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
 import type { Page } from "@nilovon-wiki/api/schemas/page";
@@ -51,7 +52,13 @@ export function PageTree({
   canReorder: boolean;
   onSelectPage: (id: string) => void;
 }) {
-  const { data: pages, isPending } = useQuery(orpc.pages.list.queryOptions({ input: { spaceId } }));
+  const {
+    data: pages,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useQuery(orpc.pages.list.queryOptions({ input: { spaceId } }));
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -122,6 +129,10 @@ export function PageTree({
         ))}
       </div>
     );
+  }
+
+  if (isError) {
+    return <QueryError compact error={error} onRetry={() => refetch()} />;
   }
 
   if (!items.length) {

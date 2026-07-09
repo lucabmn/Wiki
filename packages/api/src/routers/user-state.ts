@@ -4,8 +4,9 @@ import { z } from "zod";
 import { favorite, page, pageSubscription, space } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure } from "../index";
-import { assertSpaceRead, buildSpaceReadFilter } from "../lib/access";
-import { loadPage, loadSpace } from "../lib/loaders";
+import { buildSpaceReadFilter } from "../lib/access";
+import { filterReadablePagesAcrossSpaces, requirePageCapability } from "../lib/authz";
+import { loadPage } from "../lib/loaders";
 import { PageSchema } from "../schemas/page";
 import { PageRefInputSchema, ToggleResultSchema } from "../schemas/user-state";
 
@@ -44,7 +45,14 @@ export const userStateRouter = {
           .orderBy(desc(favorite.createdAt)),
         buildSpaceReadFilter(context.db, context),
       ]);
-      return rows.filter((r) => canRead(r.space)).map((r) => r.page);
+      // Space read alone is not enough: a page may carry a restrictive per-page
+      // override, and this endpoint returns full content.
+      return filterReadablePagesAcrossSpaces(
+        context.db,
+        context,
+        context.headers,
+        rows.filter((r) => canRead(r.space)).map((r) => r.page),
+      );
     }),
 
   addFavorite: protectedProcedure
@@ -58,7 +66,9 @@ export const userStateRouter = {
     .output(ToggleResultSchema)
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.pageId);
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
+      // Page-level check: favoriting must not grant a view into a page the
+      // caller can't read under a per-page override.
+      await requirePageCapability(context.db, context, context.headers, target, "read");
       await context.db
         .insert(favorite)
         .values({ userId: context.session.user.id, pageId: input.pageId })
@@ -106,7 +116,12 @@ export const userStateRouter = {
           .orderBy(desc(pageSubscription.createdAt)),
         buildSpaceReadFilter(context.db, context),
       ]);
-      return rows.filter((r) => canRead(r.space)).map((r) => r.page);
+      return filterReadablePagesAcrossSpaces(
+        context.db,
+        context,
+        context.headers,
+        rows.filter((r) => canRead(r.space)).map((r) => r.page),
+      );
     }),
 
   subscribe: protectedProcedure
@@ -120,7 +135,7 @@ export const userStateRouter = {
     .output(ToggleResultSchema)
     .handler(async ({ input, context }) => {
       const target = await loadPage(context.db, input.pageId);
-      await assertSpaceRead(context.db, context, await loadSpace(context.db, target.spaceId));
+      await requirePageCapability(context.db, context, context.headers, target, "read");
       await context.db
         .insert(pageSubscription)
         .values({ userId: context.session.user.id, pageId: input.pageId })
