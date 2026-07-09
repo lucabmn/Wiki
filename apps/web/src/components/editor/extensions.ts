@@ -1,7 +1,13 @@
 import type { Extensions } from "@tiptap/core";
+import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
+import Subscript from "@tiptap/extension-subscript";
+import Superscript from "@tiptap/extension-superscript";
+import { TableKit } from "@tiptap/extension-table";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
+import TextAlign from "@tiptap/extension-text-align";
+import { Color, TextStyle } from "@tiptap/extension-text-style";
 import StarterKit from "@tiptap/starter-kit";
 
 /**
@@ -26,6 +32,13 @@ export function pageEditorExtensions(placeholder?: string): Extensions {
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
+    TableKit.configure({ table: { resizable: true } }),
+    TextStyle,
+    Color,
+    Highlight.configure({ multicolor: true }),
+    Superscript,
+    Subscript,
+    TextAlign.configure({ types: ["heading", "paragraph"] }),
     Placeholder.configure({
       placeholder: placeholder ?? 'Schreibe etwas, oder tippe "/" für Befehle …',
       emptyEditorClass:

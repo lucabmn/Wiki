@@ -111,6 +111,64 @@
   margin: 1.5em 0;
 }
 
+.tiptap mark {
+  border-radius: 0.2em;
+  padding: 0 0.1em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.tiptap sub,
+.tiptap sup {
+  font-size: 0.75em;
+  line-height: 0;
+}
+
+/* Tables */
+.tiptap .tableWrapper {
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+.tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+.tiptap th,
+.tiptap td {
+  position: relative;
+  min-width: 3em;
+  border: 1px solid var(--border);
+  padding: 0.4em 0.6em;
+  vertical-align: top;
+}
+.tiptap th {
+  background: var(--muted);
+  font-weight: 600;
+  text-align: left;
+}
+.tiptap td > *,
+.tiptap th > * {
+  margin: 0;
+}
+.tiptap .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--primary);
+  opacity: 0.12;
+  pointer-events: none;
+}
+.tiptap .column-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: -2px;
+  right: -2px;
+  width: 4px;
+  background: var(--primary);
+  cursor: col-resize;
+}
+
 .tiptap a {
   cursor: pointer;
 }

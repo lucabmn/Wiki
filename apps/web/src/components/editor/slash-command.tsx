@@ -12,6 +12,7 @@ import {
   ListOrdered,
   Minus,
   Quote,
+  Table as TableIcon,
   Type,
 } from "lucide-react";
 import { type ComponentType, forwardRef, useEffect, useImperativeHandle, useState } from "react";
@@ -81,6 +82,18 @@ const COMMANDS: SlashCommand[] = [
     icon: Code,
     keywords: ["code", "codeblock", "pre"],
     run: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
+  },
+  {
+    title: "Tabelle",
+    icon: TableIcon,
+    keywords: ["tabelle", "table", "grid"],
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run(),
   },
   {
     title: "Trenner",
