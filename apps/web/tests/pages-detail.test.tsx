@@ -79,11 +79,23 @@ vi.mock("@/utils/orpc", () => ({
             return data.page;
           },
         }),
+        key: () => ["page"],
       },
       archive: {
         mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: archiveSpy, ...opts }),
       },
       list: { key: () => ["pages"] },
+      listRevisions: {
+        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
+          queryKey: ["revisions"],
+          queryFn: async () => [],
+          enabled,
+        }),
+        key: () => ["revisions"],
+      },
+      restoreRevision: {
+        mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: vi.fn(), ...opts }),
+      },
     },
     comments: {
       list: {

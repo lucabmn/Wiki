@@ -2,6 +2,7 @@ import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { PageAside } from "@/components/editor/page-aside";
 import { PageContent } from "@/components/editor/page-content";
 import { PageEditor } from "@/components/editor/page-editor";
+import { RevisionHistory } from "@/components/editor/revision-history";
 import { extractHeadings } from "@/components/editor/headings";
 import { STATUS_LABEL } from "@/lib/labels";
 import { usePermission } from "@/lib/permissions";
@@ -249,6 +250,7 @@ function CommentForm({ pageId }: { pageId: string }) {
 function RouteComponent() {
   const { id } = Route.useParams();
   const [editing, setEditing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const canEdit = usePermission({ page: ["update"] });
 
   // Resolve author/editor ids to names via the org's member list.
@@ -356,7 +358,7 @@ function RouteComponent() {
             <PageContent content={page.content} fallbackText={page.textContent} />
           </div>
 
-          <section className="mt-10">
+          <section id="page-comments" className="mt-10 scroll-mt-6">
             <h2 className="mb-3 text-[15px] font-semibold">
               Kommentare{openComments.length ? ` (${openComments.length})` : ""}
             </h2>
@@ -375,10 +377,28 @@ function RouteComponent() {
 
         <aside className="hidden w-60 shrink-0 xl:block">
           <div className="sticky top-6">
-            <PageAside page={page} headings={headings} nameOf={nameOf} />
+            <PageAside
+              page={page}
+              headings={headings}
+              nameOf={nameOf}
+              commentCount={openComments.length}
+              onOpenHistory={() => setHistoryOpen(true)}
+              onJumpToComments={() =>
+                document
+                  .getElementById("page-comments")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+            />
           </div>
         </aside>
       </div>
+
+      <RevisionHistory
+        pageId={page.id}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        canRestore={canEdit}
+      />
     </DashboardLayout>
   );
 }

@@ -26,10 +26,14 @@ export const Route = createFileRoute("/_auth")({
 
 function AuthLayout() {
   return (
-    <SidebarProvider>
+    // Pin the shell to the viewport so the sidebar stays fixed and only the
+    // content column scrolls — on every _auth page.
+    <SidebarProvider className="h-svh overflow-hidden">
       <MainSidebar />
-      <SidebarInset>
-        <Outlet />
+      <SidebarInset className="h-svh overflow-hidden">
+        <div data-page-scroll className="flex flex-1 flex-col overflow-y-auto">
+          <Outlet />
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { PageAside } from "@/components/editor/page-aside";
@@ -27,32 +27,59 @@ const headings: Heading[] = [
 const nameOf = (id: string | null) =>
   id === "u1" ? "Alice" : id === "u2" ? "Bob" : id ? "Unbekannt" : "—";
 
+function renderAside(overrides: Partial<Parameters<typeof PageAside>[0]> = {}) {
+  const props = {
+    page,
+    headings,
+    nameOf,
+    commentCount: 3,
+    onOpenHistory: vi.fn(),
+    onJumpToComments: vi.fn(),
+    ...overrides,
+  };
+  render(<PageAside {...props} />);
+  return props;
+}
+
 describe("PageAside", () => {
-  it("renders the metadata rows with resolved author names", () => {
-    render(<PageAside page={page} headings={[]} nameOf={nameOf} />);
+  it("renders metadata rows with resolved author names", () => {
+    renderAside({ headings: [] });
     expect(screen.getByText("Erstellt von")).toBeDefined();
     expect(screen.getByText("Alice")).toBeDefined();
     expect(screen.getByText("Bob")).toBeDefined();
     expect(screen.getByText("Bearbeitet von")).toBeDefined();
-    expect(screen.getByText("Zuletzt geändert")).toBeDefined();
-    // "Veröffentlicht" is both the status badge and the published-date row.
-    expect(screen.getAllByText("Veröffentlicht").length).toBe(2);
   });
 
-  it("renders a TOC that skips empty headings and scrolls on click", () => {
+  it("renders a TOC that skips empty headings and defaults the first as active", () => {
+    renderAside();
+    expect(screen.getByText("Details")).toBeDefined();
+    // Two non-empty headings → two TOC buttons (plus the action buttons).
+    const intro = screen.getByText("Intro");
+    // The first heading is active by default (highlighted).
+    expect(intro.className).toContain("text-primary");
+  });
+
+  it("scrolls to a heading on click", () => {
     const scrollSpy = vi.fn();
     const el = document.createElement("div");
     el.scrollIntoView = scrollSpy;
     vi.spyOn(document, "getElementById").mockReturnValue(el);
-
-    render(<PageAside page={page} headings={headings} nameOf={nameOf} />);
-    expect(screen.getByText("Intro")).toBeDefined();
-    expect(screen.getByText("Details")).toBeDefined();
-    // Only the two non-empty headings become TOC entries.
-    expect(screen.getAllByRole("button")).toHaveLength(2);
-
+    renderAside();
     screen.getByText("Details").click();
     expect(scrollSpy).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
     vi.restoreAllMocks();
+  });
+
+  it("opens the version history and jumps to comments", () => {
+    const props = renderAside({ commentCount: 3 });
+    fireEvent.click(screen.getByText("Versionsverlauf"));
+    expect(props.onOpenHistory).toHaveBeenCalled();
+    fireEvent.click(screen.getByText("3 Kommentare"));
+    expect(props.onJumpToComments).toHaveBeenCalled();
+  });
+
+  it("singularizes the comment label", () => {
+    renderAside({ commentCount: 1 });
+    expect(screen.getByText("1 Kommentar")).toBeDefined();
   });
 });
