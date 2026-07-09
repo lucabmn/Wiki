@@ -6,16 +6,18 @@ import { Button } from "@nilovon-wiki/ui/components/button";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { generateText } from "@tiptap/core";
 import type { JSONContent } from "@tiptap/react";
 import { Check, History, Loader2, Send, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { pageEditorExtensions } from "./extensions";
 import { RichTextEditor } from "./rich-text-editor";
 import { RevisionHistory } from "./revision-history";
 
 const AUTOSAVE_MS = 900;
 
-type Draft = { json: JSONContent; text: string; title: string };
+type Draft = { json: JSONContent; title: string };
 type SaveState = "idle" | "saving" | "saved";
 
 /**
@@ -83,10 +85,11 @@ function PageEditorForm({
   const [draftBanner, setDraftBanner] = useState(restoredFromDraft);
 
   // Latest editor value, kept in a ref so autosave/save read it without
-  // re-rendering the editor on every keystroke.
+  // re-rendering the editor on every keystroke. `textContent` is derived from
+  // the JSON at save time (not tracked separately), so a title-only edit can't
+  // blank the search field.
   const latest = useRef<Draft>({
     json: initialContent ?? { type: "doc", content: [] },
-    text: "",
     title: initialTitle,
   });
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,8 +121,8 @@ function PageEditorForm({
   }, []);
 
   const onEditorChange = useCallback(
-    (value: { json: JSONContent; text: string }) => {
-      latest.current = { ...latest.current, json: value.json, text: value.text };
+    (value: { json: JSONContent }) => {
+      latest.current = { ...latest.current, json: value.json };
       setDraftBanner(false);
       scheduleAutosave();
     },
@@ -136,11 +139,14 @@ function PageEditorForm({
   const persist = async () => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     const trimmed = latest.current.title.trim() || "Untitled";
+    // Derive plain text from the document so the search field always matches the
+    // saved body — independent of whether the body was the thing that changed.
+    const textContent = generateText(latest.current.json, pageEditorExtensions());
     await update.mutateAsync({
       id: page.id,
       title: trimmed,
       content: latest.current.json,
-      textContent: latest.current.text,
+      textContent,
     });
   };
 

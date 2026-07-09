@@ -33,7 +33,10 @@ vi.mock("@/components/editor/rich-text-editor", () => ({
         type="button"
         onClick={() =>
           onChange({
-            json: { type: "doc", content: [{ type: "paragraph" }] },
+            json: {
+              type: "doc",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "new body" }] }],
+            },
             text: "new body",
           })
         }
@@ -109,7 +112,10 @@ describe("PageEditor", () => {
       expect(updateSpy.mock.calls[0]?.[0]).toEqual({
         id: "p1",
         title: "Runbook",
-        content: { type: "doc", content: [{ type: "paragraph" }] },
+        content: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "new body" }] }],
+        },
         textContent: "new body",
       }),
     );
@@ -125,7 +131,10 @@ describe("PageEditor", () => {
         expect(saveDraftSpy.mock.calls[0]?.[0]).toEqual({
           pageId: "p1",
           title: "Runbook",
-          content: { type: "doc", content: [{ type: "paragraph" }] },
+          content: {
+            type: "doc",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "new body" }] }],
+          },
         }),
       { timeout: 2000 },
     );
