@@ -6,6 +6,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { useEffect } from "react";
 import type * as Y from "yjs";
 
+import { cleverEditorExtensions } from "./clever";
 import { EditorToolbar } from "./editor-toolbar";
 import { pageEditorExtensions } from "./extensions";
 import { SlashCommand } from "./slash-command";
@@ -40,6 +41,7 @@ export function RichTextEditor({
     immediatelyRender: false,
     extensions: [
       ...pageEditorExtensions({ collaborative: true }),
+      ...cleverEditorExtensions(),
       SlashCommand,
       Collaboration.configure({ document: doc }),
       CollaborationCaret.configure({ provider, user }),

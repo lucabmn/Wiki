@@ -180,3 +180,21 @@
   height: 0;
   pointer-events: none;
 }
+
+/* Clever-editor color swatch: the ColorHighlighter decoration tags a hex color
+   with `.color` and a `--color` custom property; render a small dot before it. */
+.tiptap .color {
+  white-space: nowrap;
+}
+
+.tiptap .color::before {
+  content: " ";
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  margin-right: 0.25em;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background-color: var(--color);
+  vertical-align: middle;
+}
