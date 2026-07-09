@@ -19,6 +19,7 @@ const {
     spaces: [] as unknown[],
     favorites: [] as Array<{ id: string }>,
     subscriptions: [] as Array<{ id: string }>,
+    canEdit: false,
     error: false,
   },
   createCommentSpy: vi.fn((_vars?: { pageId: string; body: string }) => Promise.resolve({})),
@@ -35,6 +36,22 @@ vi.mock("@/components/layouts/dashboard-layout", () => ({
   default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
+// Drive the client-side permission gate directly; its real impl reads better-auth.
+vi.mock("@/lib/permissions", () => ({ usePermission: () => data.canEdit }));
+
+// Stub the editor — its TipTap internals are covered in page-editor.test.tsx;
+// here we only assert the route toggles into/out of edit mode.
+vi.mock("@/components/editor/page-editor", () => ({
+  PageEditor: ({ onDone }: { onDone: () => void }) => (
+    <div>
+      <span>EDITOR AKTIV</span>
+      <button type="button" onClick={onDone}>
+        Editor schließen
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (opts: Record<string, unknown>) => ({
     useParams: () => ({ id: "p1" }),
@@ -42,6 +59,13 @@ vi.mock("@tanstack/react-router", () => ({
   }),
   Link: ({ children, ...props }: { children: ReactNode }) => <a {...props}>{children}</a>,
   useNavigate: () => navigateSpy,
+  useRouteContext: () => ({
+    auth: {
+      organization: {
+        members: [{ user: { id: "u1", name: "Luca" } }],
+      },
+    },
+  }),
 }));
 
 vi.mock("@/utils/orpc", () => ({
@@ -55,11 +79,23 @@ vi.mock("@/utils/orpc", () => ({
             return data.page;
           },
         }),
+        key: () => ["page"],
       },
       archive: {
         mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: archiveSpy, ...opts }),
       },
       list: { key: () => ["pages"] },
+      listRevisions: {
+        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
+          queryKey: ["revisions"],
+          queryFn: async () => [],
+          enabled,
+        }),
+        key: () => ["revisions"],
+      },
+      restoreRevision: {
+        mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: vi.fn(), ...opts }),
+      },
     },
     comments: {
       list: {
@@ -139,6 +175,7 @@ describe("page view route", () => {
     data.spaces = [];
     data.favorites = [];
     data.subscriptions = [];
+    data.canEdit = false;
     data.error = false;
   });
 
@@ -185,7 +222,8 @@ describe("page view route", () => {
 
     expect(await screen.findByText("Runbook")).toBeDefined();
     expect(screen.getByText("Restart the pods.")).toBeDefined();
-    expect(screen.getByText("Veröffentlicht")).toBeDefined();
+    // Status shows in both the header badge and the metadata rail.
+    expect(screen.getAllByText("Veröffentlicht").length).toBeGreaterThan(0);
     expect(screen.getByText("← Operations")).toBeDefined();
     // Only the unresolved comment counts (comments load after the page).
     expect(await screen.findByRole("heading", { name: "Kommentare (1)" })).toBeDefined();
@@ -302,5 +340,28 @@ describe("page view route", () => {
     await waitFor(() =>
       expect(navigateSpy).toHaveBeenCalledWith({ to: "/spaces/$slug", params: { slug: "ops" } }),
     );
+  });
+
+  it("hides the edit affordance without update permission", async () => {
+    data.page = somePage;
+    data.canEdit = false;
+    renderView();
+    await screen.findByText("body");
+    expect(screen.queryByRole("button", { name: "Bearbeiten" })).toBeNull();
+  });
+
+  it("opens and closes the editor when permitted", async () => {
+    data.page = somePage;
+    data.canEdit = true;
+    renderView();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Bearbeiten" }));
+    expect(await screen.findByText("EDITOR AKTIV")).toBeDefined();
+    // View chrome (comment box) is replaced by the editor surface.
+    expect(screen.queryByPlaceholderText("Kommentar schreiben …")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Editor schließen" }));
+    expect(await screen.findByText("body")).toBeDefined();
+    expect(screen.queryByText("EDITOR AKTIV")).toBeNull();
   });
 });

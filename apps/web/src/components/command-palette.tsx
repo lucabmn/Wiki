@@ -7,11 +7,30 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@nilovon-wiki/ui/components/command";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { FileText } from "lucide-react";
+import { FileText, Search } from "lucide-react";
 import { useEffect, useState } from "react";
+
+/**
+ * Renders a Postgres `ts_headline` snippet: matched terms come wrapped in
+ * `<b>…</b>`. We split on those delimiters instead of setting innerHTML so the
+ * (unescaped) page content can't inject markup — React escapes each text part.
+ */
+function renderSnippet(snippet: string) {
+  return snippet.split(/<\/?b>/).map((part, i) =>
+    // Odd indices are the highlighted (previously <b>-wrapped) segments.
+    i % 2 === 1 ? (
+      <strong key={i} className="font-medium text-foreground">
+        {part}
+      </strong>
+    ) : (
+      part
+    ),
+  );
+}
 
 /**
  * ⌘K search palette. Runs the server-side full-text search (already scoped to
@@ -60,6 +79,13 @@ export function CommandPalette({
     navigate({ to: "/pages/$id", params: { id: pageId } });
   };
 
+  const seeAll = () => {
+    const trimmed = query.trim();
+    onOpenChange(false);
+    setQuery("");
+    navigate({ to: "/search", search: { q: trimmed, space: "" } });
+  };
+
   return (
     <CommandDialog
       open={open}
@@ -92,13 +118,26 @@ export function CommandPalette({
                   <div className="min-w-0 flex-1">
                     <div className="truncate">{hit.title}</div>
                     {hit.snippet ? (
-                      <div className="truncate text-xs text-muted-foreground">{hit.snippet}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {renderSnippet(hit.snippet)}
+                      </div>
                     ) : null}
                   </div>
                 </CommandItem>
               ))}
             </CommandGroup>
           )}
+          {hits?.length ? (
+            <>
+              <CommandSeparator />
+              <CommandGroup>
+                <CommandItem value="__see_all__" onSelect={seeAll}>
+                  <Search className="size-4 text-muted-foreground" />
+                  <span>Alle Ergebnisse für „{debounced}“ ansehen</span>
+                </CommandItem>
+              </CommandGroup>
+            </>
+          ) : null}
         </CommandList>
       </Command>
     </CommandDialog>

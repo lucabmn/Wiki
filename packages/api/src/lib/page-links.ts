@@ -3,6 +3,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { Database } from "@nilovon-wiki/db";
 import { page, pageLink } from "@nilovon-wiki/db/schema/index";
 
+import { pageIdFromHref } from "./page-href";
+
 // syncPageLinks needs read + write; both the db handle and a transaction satisfy
 // this, so link maintenance runs inside the page mutation's tx.
 type LinkExecutor = Pick<Database, "select" | "insert" | "delete">;
@@ -16,18 +18,39 @@ export function normalizeLinkTargets(sourcePageId: string, targetIds: string[]):
   return [...new Set(targetIds)].filter((id) => id !== sourcePageId);
 }
 
+/** A single ProseMirror/TipTap node: may carry text marks and child content. */
+type ProseMirrorNode = {
+  marks?: Array<{ type?: string; attrs?: { href?: string | null } }>;
+  content?: ProseMirrorNode[];
+};
+
 /**
  * Extracts referenced page ids from a page's rich-text content.
  *
- * INTENTIONAL STUB: the editor and its internal-link representation don't exist
- * yet (the content column is opaque JSON, format undecided). Parsing an invented
- * shape now can't be verified — its tests would be circular — so this returns no
- * links until the editor lands. Implement the doc walk here then (collect the
- * nodes/marks that carry a target page id) and the write-path below activates
- * with no other change.
+ * The editor represents an internal link as a `link` mark whose href is
+ * `/pages/<id>` (see {@link pageIdFromHref}); this walks the TipTap document
+ * tree and collects the target id of every such mark. Duplicates and dangling
+ * ids are handled downstream by {@link syncPageLinks}. Any non-document input
+ * (null, a string, a malformed shape) yields no links rather than throwing.
  */
-export function extractPageLinks(_content: unknown): string[] {
-  return [];
+export function extractPageLinks(content: unknown): string[] {
+  const ids: string[] = [];
+  const visit = (node: ProseMirrorNode | null | undefined): void => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node.marks)) {
+      for (const mark of node.marks) {
+        if (mark?.type === "link") {
+          const id = pageIdFromHref(mark.attrs?.href);
+          if (id) ids.push(id);
+        }
+      }
+    }
+    if (Array.isArray(node.content)) {
+      for (const child of node.content) visit(child);
+    }
+  };
+  visit(content as ProseMirrorNode);
+  return ids;
 }
 
 /**

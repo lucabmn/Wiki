@@ -1,5 +1,11 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { PageAside } from "@/components/editor/page-aside";
+import { PageContent } from "@/components/editor/page-content";
+import { PageEditor } from "@/components/editor/page-editor";
+import { RevisionHistory } from "@/components/editor/revision-history";
+import { extractHeadings } from "@/components/editor/headings";
 import { STATUS_LABEL } from "@/lib/labels";
+import { usePermission } from "@/lib/permissions";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
 import {
@@ -19,8 +25,8 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { Textarea } from "@nilovon-wiki/ui/components/textarea";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Archive, Bell, Check, FileText, Star, Trash2 } from "lucide-react";
+import { Link, createFileRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
+import { Archive, Bell, Check, FileText, Pencil, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/_auth/pages/$id")({
@@ -243,6 +249,19 @@ function CommentForm({ pageId }: { pageId: string }) {
 
 function RouteComponent() {
   const { id } = Route.useParams();
+  const [editing, setEditing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const canEdit = usePermission({ page: ["update"] });
+
+  // Resolve author/editor ids to names via the org's member list.
+  const { auth } = useRouteContext({ from: "/_auth" });
+  const nameOf = (userId: string | null) => {
+    if (!userId) return "—";
+    return (
+      auth.organization.members.find((member) => member.user.id === userId)?.user.name ??
+      "Unbekannt"
+    );
+  };
 
   const {
     data: page,
@@ -278,61 +297,108 @@ function RouteComponent() {
 
   const openComments = comments?.filter((c) => !c.resolvedAt && !c.deletedAt) ?? [];
 
-  return (
-    <DashboardLayout className="p-7">
-      <div className="mx-auto w-full max-w-3xl">
-        {space ? (
-          <Link
-            to="/spaces/$slug"
-            params={{ slug: space.slug }}
-            className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            ← {space.name}
-          </Link>
-        ) : null}
+  const backLink =
+    space != null ? (
+      <Link
+        to="/spaces/$slug"
+        params={{ slug: space.slug }}
+        className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        ← {space.name}
+      </Link>
+    ) : null;
 
-        <div className="mt-3 flex items-start gap-3">
-          <span className="mt-1 text-2xl leading-none">
-            {page.icon ?? <FileText className="size-6 text-muted-foreground" />}
-          </span>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-[30px] leading-tight font-semibold tracking-tight">{page.title}</h1>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
-              <span>Zuletzt geändert {dateFormat.format(page.updatedAt)}</span>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <SubscribeButton pageId={page.id} />
-            <FavoriteButton pageId={page.id} />
-            <ArchiveButton pageId={page.id} spaceSlug={space?.slug} />
+  if (editing) {
+    return (
+      <DashboardLayout className="p-7">
+        <div className="mx-auto w-full max-w-4xl">
+          {backLink}
+          <div className="mt-3">
+            <PageEditor page={page} onDone={() => setEditing(false)} />
           </div>
         </div>
+      </DashboardLayout>
+    );
+  }
 
-        <article className="mt-6 text-[15px] leading-7 whitespace-pre-wrap text-foreground/90">
-          {page.textContent.trim() ? (
-            page.textContent
-          ) : (
-            <span className="text-muted-foreground">Diese Seite hat noch keinen Inhalt.</span>
-          )}
-        </article>
+  const headings = extractHeadings(page.content);
 
-        <section className="mt-10">
-          <h2 className="mb-3 text-[15px] font-semibold">
-            Kommentare{openComments.length ? ` (${openComments.length})` : ""}
-          </h2>
-          {!openComments.length ? (
-            <p className="text-sm text-muted-foreground">Noch keine Kommentare.</p>
-          ) : (
-            <div className="space-y-2">
-              {openComments.map((comment) => (
-                <CommentCard key={comment.id} comment={comment} />
-              ))}
+  return (
+    <DashboardLayout className="p-7">
+      <div className="mx-auto flex w-full max-w-6xl gap-10">
+        <div className="min-w-0 flex-1">
+          {backLink}
+
+          <div className="mt-3 flex items-start gap-3">
+            <span className="mt-1 text-2xl leading-none">
+              {page.icon ?? <FileText className="size-6 text-muted-foreground" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[30px] leading-tight font-semibold tracking-tight">
+                {page.title}
+              </h1>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
+                <span>Zuletzt geändert {dateFormat.format(page.updatedAt)}</span>
+              </div>
             </div>
-          )}
-          <CommentForm pageId={page.id} />
-        </section>
+            <div className="flex shrink-0 items-center gap-2">
+              {canEdit ? (
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                  <Pencil className="size-4" /> Bearbeiten
+                </Button>
+              ) : null}
+              <SubscribeButton pageId={page.id} />
+              <FavoriteButton pageId={page.id} />
+              <ArchiveButton pageId={page.id} spaceSlug={space?.slug} />
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <PageContent content={page.content} fallbackText={page.textContent} />
+          </div>
+
+          <section id="page-comments" className="mt-10 scroll-mt-6">
+            <h2 className="mb-3 text-[15px] font-semibold">
+              Kommentare{openComments.length ? ` (${openComments.length})` : ""}
+            </h2>
+            {!openComments.length ? (
+              <p className="text-sm text-muted-foreground">Noch keine Kommentare.</p>
+            ) : (
+              <div className="space-y-2">
+                {openComments.map((comment) => (
+                  <CommentCard key={comment.id} comment={comment} />
+                ))}
+              </div>
+            )}
+            <CommentForm pageId={page.id} />
+          </section>
+        </div>
+
+        <aside className="hidden w-60 shrink-0 xl:block">
+          <div className="sticky top-6">
+            <PageAside
+              page={page}
+              headings={headings}
+              nameOf={nameOf}
+              commentCount={openComments.length}
+              onOpenHistory={() => setHistoryOpen(true)}
+              onJumpToComments={() =>
+                document
+                  .getElementById("page-comments")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+            />
+          </div>
+        </aside>
       </div>
+
+      <RevisionHistory
+        pageId={page.id}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        canRestore={canEdit}
+      />
     </DashboardLayout>
   );
 }

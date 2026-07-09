@@ -1,6 +1,8 @@
 import { authClient } from "@/lib/auth-client";
 import { initials } from "@/lib/format";
+import { usePermission } from "@/lib/permissions";
 import { orpc } from "@/utils/orpc";
+import { PageTree } from "./page-tree/page-tree";
 import { CommandPalette } from "./command-palette";
 import { CreateSpaceDialog } from "./create-space-dialog";
 import { CreatePageDialog } from "./create-page-dialog";
@@ -25,15 +27,11 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from "@nilovon-wiki/ui/components/sidebar";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronRight,
   ChevronsUpDown,
-  FileText,
   Folder,
   Home,
   LayoutGrid,
@@ -59,60 +57,6 @@ const nav = linkOptions([
   { to: "/members", label: "Mitglieder & Rechte", icon: Lock },
 ]);
 
-/** Top-level pages of one space, loaded lazily when the space is expanded. */
-function SpacePages({
-  spaceId,
-  activePage,
-  onSelectPage,
-}: {
-  spaceId: string;
-  activePage: string | null;
-  onSelectPage: (id: string) => void;
-}) {
-  const { data: pages, isPending } = useQuery(
-    orpc.pages.list.queryOptions({ input: { spaceId, parentId: null } }),
-  );
-
-  if (isPending) {
-    return (
-      <SidebarMenuSub className="mr-0 pr-0">
-        {[0, 1, 2].map((i) => (
-          <SidebarMenuSubItem key={i}>
-            <Skeleton className="mx-2 my-1 h-5 w-32" />
-          </SidebarMenuSubItem>
-        ))}
-      </SidebarMenuSub>
-    );
-  }
-
-  if (!pages?.length) {
-    return (
-      <SidebarMenuSub className="mr-0 pr-0">
-        <SidebarMenuSubItem>
-          <span className="px-2 py-1 text-[12px] text-muted-foreground">Keine Seiten</span>
-        </SidebarMenuSubItem>
-      </SidebarMenuSub>
-    );
-  }
-
-  return (
-    <SidebarMenuSub className="mr-0 pr-0">
-      {pages.map((page) => (
-        <SidebarMenuSubItem key={page.id}>
-          <SidebarMenuSubButton
-            isActive={activePage === page.id}
-            onClick={() => onSelectPage(page.id)}
-            className="cursor-pointer data-active:bg-primary/10 data-active:text-primary"
-          >
-            {page.icon ? <span className="text-sm leading-none">{page.icon}</span> : <FileText />}
-            <span>{page.title}</span>
-          </SidebarMenuSubButton>
-        </SidebarMenuSubItem>
-      ))}
-    </SidebarMenuSub>
-  );
-}
-
 /** The space list for the active organization; each space expands to its pages. */
 function SpacesTree({
   activePage,
@@ -123,6 +67,7 @@ function SpacesTree({
 }) {
   const { data: session } = authClient.useSession();
   const activeOrgId = session?.session.activeOrganizationId ?? null;
+  const canReorder = usePermission({ page: ["move"] });
   const [createPageSpaceId, setCreatePageSpaceId] = useState<string | null>(null);
 
   const { data: spaces, isPending } = useQuery(
@@ -194,7 +139,12 @@ function SpacesTree({
               <Plus /> <span className="sr-only">Neue Seite</span>
             </SidebarMenuAction>
             <CollapsibleContent>
-              <SpacePages spaceId={space.id} activePage={activePage} onSelectPage={onSelectPage} />
+              <PageTree
+                spaceId={space.id}
+                activePage={activePage}
+                canReorder={canReorder}
+                onSelectPage={onSelectPage}
+              />
             </CollapsibleContent>
           </SidebarMenuItem>
         </Collapsible>
@@ -235,7 +185,7 @@ export default function MainSidebar() {
           type="button"
           className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent"
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-foreground shadow-sm">
             {auth.organization.name.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
@@ -251,7 +201,7 @@ export default function MainSidebar() {
           <Button
             variant="outline"
             onClick={() => setSearchOpen(true)}
-            className="h-9 w-full justify-start gap-2.5 px-2.5 font-normal text-muted-foreground"
+            className="h-8 w-full justify-start gap-2.5 px-2.5 font-normal text-muted-foreground"
           >
             <Search className="size-4" />
             <span className="flex-1 text-left">Suchen …</span>

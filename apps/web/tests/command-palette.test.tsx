@@ -79,4 +79,30 @@ describe("CommandPalette", () => {
 
     expect(await screen.findByText("Keine Treffer.")).toBeDefined();
   });
+
+  it("jumps to the full search page for all results", async () => {
+    searchHits.mockReturnValue([
+      {
+        pageId: "p1",
+        spaceId: "s1",
+        title: "Runbook",
+        slug: "runbook",
+        icon: null,
+        snippet: "restart",
+        rank: 1,
+      },
+    ]);
+    render(<CommandPalette open onOpenChange={vi.fn()} />, { wrapper });
+
+    fireEvent.change(screen.getByPlaceholderText("Seiten suchen …"), {
+      target: { value: "runbook" },
+    });
+
+    const seeAll = await screen.findByText(/Alle Ergebnisse für/);
+    fireEvent.click(seeAll);
+    expect(navigateSpy).toHaveBeenCalledWith({
+      to: "/search",
+      search: { q: "runbook", space: "" },
+    });
+  });
 });

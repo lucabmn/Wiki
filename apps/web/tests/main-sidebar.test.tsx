@@ -10,7 +10,10 @@ const { navigateSpy, data } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth-client", () => ({
-  authClient: { useSession: () => ({ data: { session: { activeOrganizationId: "o1" } } }) },
+  authClient: {
+    useSession: () => ({ data: { session: { activeOrganizationId: "o1" } } }),
+    useActiveMember: () => ({ data: undefined }),
+  },
 }));
 // Alias paths so these resolve to the same module id MainSidebar imports via
 // "./…" — a relative specifier here would resolve against the test file.
@@ -55,7 +58,11 @@ vi.mock("@/utils/orpc", () => ({
       list: { queryOptions: () => ({ queryKey: ["spaces"], queryFn: async () => data.spaces }) },
     },
     pages: {
-      list: { queryOptions: () => ({ queryKey: ["pages"], queryFn: async () => data.pages }) },
+      list: {
+        queryOptions: () => ({ queryKey: ["pages"], queryFn: async () => data.pages }),
+        key: () => ["pages"],
+      },
+      move: { mutationOptions: (o: Record<string, unknown>) => ({ mutationFn: vi.fn(), ...o }) },
     },
   },
 }));
@@ -78,7 +85,7 @@ beforeEach(() => {
     { id: "s1", slug: "ops", name: "Operations", color: null, icon: null },
     { id: "s2", slug: "hr", name: "People", color: null, icon: null },
   ];
-  data.pages = [{ id: "p1", title: "Deploy", icon: null }];
+  data.pages = [{ id: "p1", parentId: null, title: "Deploy", icon: null }];
 });
 
 describe("MainSidebar", () => {
