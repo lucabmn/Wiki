@@ -61,7 +61,7 @@ export function RevisionHistory({
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className={preview ? "max-w-3xl" : undefined}>
+      <DialogContent className={preview ? "sm:max-w-3xl" : undefined}>
         {preview ? (
           <>
             <DialogHeader>
