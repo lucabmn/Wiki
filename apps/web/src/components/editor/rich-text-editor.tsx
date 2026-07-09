@@ -3,12 +3,13 @@ import type { Editor } from "@tiptap/core";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type * as Y from "yjs";
 
 import { cleverEditorExtensions } from "./clever";
 import { EditorToolbar } from "./editor-toolbar";
 import { pageEditorExtensions } from "./extensions";
+import { createMentionSuggestion } from "./mention";
 import { SlashCommand } from "./slash-command";
 import "./editor.css";
 
@@ -37,10 +38,11 @@ export function RichTextEditor({
   // in the Yjs doc, not in React state.
   onEditor?: (editor: Editor | null) => void;
 }) {
+  const mention = useMemo(() => createMentionSuggestion(spaceId), [spaceId]);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      ...pageEditorExtensions({ collaborative: true }),
+      ...pageEditorExtensions({ collaborative: true, mention }),
       ...cleverEditorExtensions(),
       SlashCommand,
       Collaboration.configure({ document: doc }),

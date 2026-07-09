@@ -1,5 +1,6 @@
 import type { Extensions } from "@tiptap/core";
 import Highlight from "@tiptap/extension-highlight";
+import Mention, { type MentionOptions } from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
@@ -36,6 +37,14 @@ export function pageEditorExtensions(options?: {
    * collab server can keep the default.
    */
   collaborative?: boolean;
+  /**
+   * Browser-only `@mention` autocomplete config (items + render popup). The
+   * `mention` NODE itself is always in the schema — it must be identical across
+   * the editor, the read-only renderer, and the collab server, or Yjs sync and
+   * serialization break. The suggestion behaviour (async user lookup, popup) is
+   * inert on the server/renderer, which never pass it.
+   */
+  mention?: Partial<MentionOptions["suggestion"]>;
 }): Extensions {
   return [
     StarterKit.configure({
@@ -58,6 +67,14 @@ export function pageEditorExtensions(options?: {
     Superscript,
     Subscript,
     TextAlign.configure({ types: ["heading", "paragraph"] }),
+    // `@mention` node. `renderText` feeds the plaintext search projection and the
+    // collab server's `textContent`, so a mention reads as "@Name" everywhere.
+    Mention.configure({
+      HTMLAttributes: { class: "mention" },
+      deleteTriggerWithBackspace: true,
+      renderText: ({ node }) => `@${node.attrs.label ?? node.attrs.id}`,
+      ...(options?.mention ? { suggestion: options.mention as MentionOptions["suggestion"] } : {}),
+    }),
     Placeholder.configure({
       placeholder: options?.placeholder ?? 'Schreibe etwas, oder tippe "/" für Befehle …',
       emptyEditorClass:

@@ -181,6 +181,17 @@
   pointer-events: none;
 }
 
+/* @mention pill — the shared `mention` node renders `@Name` with this class. */
+.tiptap .mention {
+  border-radius: 0.375rem;
+  padding: 0.05em 0.3em;
+  background-color: color-mix(in oklch, var(--primary) 14%, transparent);
+  color: var(--primary);
+  font-weight: 500;
+  white-space: nowrap;
+  box-decoration-break: clone;
+}
+
 /* Clever-editor color swatch: the ColorHighlighter decoration tags a hex color
    with `.color` and a `--color` custom property; render a small dot before it. */
 .tiptap .color {

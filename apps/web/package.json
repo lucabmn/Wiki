@@ -33,6 +33,7 @@
     "@tiptap/extension-collaboration": "^3.0.7",
     "@tiptap/extension-collaboration-caret": "^3.0.7",
     "@tiptap/extension-highlight": "^3.0.7",
+    "@tiptap/extension-mention": "^3.0.7",
     "@tiptap/extension-placeholder": "^3.0.7",
     "@tiptap/extension-subscript": "^3.0.7",
     "@tiptap/extension-superscript": "^3.0.7",
