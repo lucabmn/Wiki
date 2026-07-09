@@ -19,7 +19,15 @@ export function PageContent({ content, fallbackText }: { content: unknown; fallb
   const html = useMemo(() => {
     if (!content || typeof content !== "object") return null;
     try {
-      return generateHTML(content as Record<string, unknown>, pageEditorExtensions());
+      const raw = generateHTML(content as Record<string, unknown>, pageEditorExtensions());
+      // Tag headings with positional ids (heading-0, heading-1, …) so the TOC
+      // can scroll to them. Order matches extractHeadings().
+      const template = document.createElement("template");
+      template.innerHTML = raw;
+      template.content.querySelectorAll("h1, h2, h3").forEach((heading, index) => {
+        heading.id = `heading-${index}`;
+      });
+      return template.innerHTML;
     } catch {
       return null;
     }

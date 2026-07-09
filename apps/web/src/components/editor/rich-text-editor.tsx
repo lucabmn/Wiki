@@ -13,6 +13,7 @@ import {
   Italic,
   Link2,
   List,
+  ListChecks,
   ListOrdered,
   Quote,
   Redo2,
@@ -23,6 +24,7 @@ import { type ComponentType, useState } from "react";
 
 import { pageEditorExtensions } from "./extensions";
 import { LinkPageDialog } from "./link-page-dialog";
+import { SlashCommand } from "./slash-command";
 import "./editor.css";
 
 /** One toolbar control: reflects and toggles a mark/node on the editor. */
@@ -133,6 +135,12 @@ function Toolbar({ editor, spaceId }: { editor: Editor; spaceId: string }) {
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
       />
       <ToolButton
+        icon={ListChecks}
+        label="Aufgabenliste"
+        active={editor.isActive("taskList")}
+        onClick={() => editor.chain().focus().toggleTaskList().run()}
+      />
+      <ToolButton
         icon={Quote}
         label="Zitat"
         active={editor.isActive("blockquote")}
@@ -190,7 +198,7 @@ export function RichTextEditor({
     // `_auth` renders client-only (ssr: false), but keep this off to avoid any
     // hydration mismatch and to match TipTap's SSR-safe guidance.
     immediatelyRender: false,
-    extensions: pageEditorExtensions(),
+    extensions: [...pageEditorExtensions(), SlashCommand],
     content: initialContent ?? "",
     editorProps: {
       attributes: {

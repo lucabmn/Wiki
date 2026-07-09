@@ -59,6 +59,13 @@ vi.mock("@tanstack/react-router", () => ({
   }),
   Link: ({ children, ...props }: { children: ReactNode }) => <a {...props}>{children}</a>,
   useNavigate: () => navigateSpy,
+  useRouteContext: () => ({
+    auth: {
+      organization: {
+        members: [{ user: { id: "u1", name: "Luca" } }],
+      },
+    },
+  }),
 }));
 
 vi.mock("@/utils/orpc", () => ({
@@ -203,7 +210,8 @@ describe("page view route", () => {
 
     expect(await screen.findByText("Runbook")).toBeDefined();
     expect(screen.getByText("Restart the pods.")).toBeDefined();
-    expect(screen.getByText("Veröffentlicht")).toBeDefined();
+    // Status shows in both the header badge and the metadata rail.
+    expect(screen.getAllByText("Veröffentlicht").length).toBeGreaterThan(0);
     expect(screen.getByText("← Operations")).toBeDefined();
     // Only the unresolved comment counts (comments load after the page).
     expect(await screen.findByRole("heading", { name: "Kommentare (1)" })).toBeDefined();

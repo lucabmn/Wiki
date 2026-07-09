@@ -38,6 +38,7 @@ describe("RichTextEditor (real TipTap mount)", () => {
     // (bad StarterKit option, SSR crash) surfaces here.
     expect(await screen.findByRole("button", { name: "Fett" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Seite verknüpfen" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Aufgabenliste" })).toBeDefined();
     await waitFor(() => expect(screen.getByText("hello")).toBeDefined());
   });
 });

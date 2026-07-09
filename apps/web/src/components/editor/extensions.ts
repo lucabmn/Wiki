@@ -1,5 +1,7 @@
 import type { Extensions } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
+import TaskItem from "@tiptap/extension-task-item";
+import TaskList from "@tiptap/extension-task-list";
 import StarterKit from "@tiptap/starter-kit";
 
 /**
@@ -22,8 +24,10 @@ export function pageEditorExtensions(placeholder?: string): Extensions {
         },
       },
     }),
+    TaskList,
+    TaskItem.configure({ nested: true }),
     Placeholder.configure({
-      placeholder: placeholder ?? "Schreibe etwas, oder füge eine Verknüpfung ein …",
+      placeholder: placeholder ?? 'Schreibe etwas, oder tippe "/" für Befehle …',
       emptyEditorClass:
         "before:pointer-events-none before:float-left before:h-0 before:text-muted-foreground before:content-[attr(data-placeholder)]",
     }),

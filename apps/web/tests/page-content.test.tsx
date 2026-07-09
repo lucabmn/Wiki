@@ -45,4 +45,17 @@ describe("PageContent", () => {
     render(<PageContent content={null} fallbackText="   " />);
     expect(screen.getByText("Diese Seite hat noch keinen Inhalt.")).toBeDefined();
   });
+
+  it("injects positional ids into headings so the TOC can target them", () => {
+    const withHeadings = {
+      type: "doc",
+      content: [
+        { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "First" }] },
+        { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Second" }] },
+      ],
+    };
+    render(<PageContent content={withHeadings} fallbackText="" />);
+    expect(screen.getByText("First").id).toBe("heading-0");
+    expect(screen.getByText("Second").id).toBe("heading-1");
+  });
 });
