@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { MemberAccessManager } from "@/components/access/member-access-manager";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
-import { initials } from "@/lib/format";
-import { VISIBILITY_LABEL, WIKI_ROLE_LABEL } from "@/lib/labels";
+import { VISIBILITY_LABEL } from "@/lib/labels";
 import { membersQueryOptions, rolesQueryOptions } from "@/lib/org-queries";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
@@ -20,7 +19,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@nilovon-wiki/ui/components/alert-dialog";
-import { Avatar, AvatarFallback } from "@nilovon-wiki/ui/components/avatar";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
@@ -31,11 +29,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@nilovon-wiki/ui/components/sheet";
-import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 
 const VISIBILITIES = ["public", "private", "restricted"] as const;
-const WIKI_ROLES = ["viewer", "commenter", "editor", "admin"] as const;
 
 const VISIBILITY_HINT: Record<string, string> = {
   public: "Jedes Organisationsmitglied kann lesen. Schreiben braucht eine Rolle.",
@@ -85,10 +81,6 @@ export function SpaceSettingsSheet({
   const addableUsers = orgMembers.filter((m) => !memberUserIds.has(m.user.id));
   const addableGroups = groups.filter((g) => !grantedRoleNames.has(g.role));
 
-  const [addSubject, setAddSubject] = useState<"user" | "role">("user");
-  const [addUserId, setAddUserId] = useState("");
-  const [addRole, setAddRole] = useState<string>("editor");
-  const [removeTarget, setRemoveTarget] = useState<{ id: string; label: string } | null>(null);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -161,7 +153,6 @@ export function SpaceSettingsSheet({
     orpc.spaceMembers.add.mutationOptions({
       onSuccess: () => {
         refresh();
-        setAddUserId("");
         toast.success("Zugriff gewährt");
       },
       onError: toastError,
@@ -176,7 +167,6 @@ export function SpaceSettingsSheet({
     orpc.spaceMembers.remove.mutationOptions({
       onSuccess: () => {
         refresh();
-        setRemoveTarget(null);
         toast.success("Mitglied entfernt");
       },
       onError: toastError,
@@ -261,143 +251,34 @@ export function SpaceSettingsSheet({
 
           <section className="space-y-3">
             <h3 className="text-sm font-semibold">Mitglieder & Gruppen</h3>
-
-            <div className="space-y-2 rounded-lg border border-dashed border-border p-2.5">
-              <div className="flex gap-1">
-                {(["user", "role"] as const).map((s) => (
-                  <Button
-                    key={s}
-                    type="button"
-                    size="sm"
-                    variant={addSubject === s ? "default" : "outline"}
-                    onClick={() => {
-                      setAddSubject(s);
-                      setAddUserId("");
-                    }}
-                  >
-                    {s === "user" ? "Person" : "Gruppe"}
-                  </Button>
-                ))}
-              </div>
-              <div className="flex items-end gap-2">
-                <div className="min-w-0 flex-1">
-                  <NativeSelect
-                    className="w-full"
-                    value={addUserId}
-                    onChange={(event) => setAddUserId(event.target.value)}
-                  >
-                    {addSubject === "user" ? (
-                      <>
-                        <NativeSelectOption value="">Person wählen …</NativeSelectOption>
-                        {addableUsers.map((m) => (
-                          <NativeSelectOption key={m.user.id} value={m.user.id}>
-                            {m.user.name}
-                          </NativeSelectOption>
-                        ))}
-                      </>
-                    ) : (
-                      <>
-                        <NativeSelectOption value="">Gruppe wählen …</NativeSelectOption>
-                        {addableGroups.map((g) => (
-                          <NativeSelectOption key={g.id} value={g.role}>
-                            {g.role}
-                          </NativeSelectOption>
-                        ))}
-                      </>
-                    )}
-                  </NativeSelect>
-                </div>
-                <NativeSelect value={addRole} onChange={(event) => setAddRole(event.target.value)}>
-                  {WIKI_ROLES.map((r) => (
-                    <NativeSelectOption key={r} value={r}>
-                      {WIKI_ROLE_LABEL[r]}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-                <Button
-                  size="sm"
-                  disabled={!addUserId || addMember.isPending}
-                  onClick={() =>
-                    addMember.mutate(
-                      addSubject === "user"
-                        ? {
-                            spaceId: space.id,
-                            subject: "user",
-                            userId: addUserId,
-                            role: addRole as "editor",
-                          }
-                        : {
-                            spaceId: space.id,
-                            subject: "role",
-                            roleName: addUserId,
-                            role: addRole as "editor",
-                          },
-                    )
-                  }
-                >
-                  Hinzufügen
-                </Button>
-              </div>
-              {addSubject === "user" && addableUsers.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Alle Organisationsmitglieder sind bereits im Space.
-                </p>
-              ) : null}
-              {addSubject === "role" && addableGroups.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Keine weiteren Gruppen verfügbar. Lege welche unter Einstellungen › Gruppen an.
-                </p>
-              ) : null}
-            </div>
-
-            {membersQuery.isPending ? (
-              <Skeleton className="h-24 w-full" />
-            ) : (
-              <ul className="space-y-1.5">
-                {members.map((member) => {
-                  const label = member.user?.name ?? member.team?.name ?? member.roleName ?? "—";
-                  const sub = member.user?.email ?? (member.subject === "role" ? "Gruppe" : "Team");
-                  return (
-                    <li
-                      key={member.id}
-                      className="flex items-center gap-2.5 rounded-lg border border-border p-2"
-                    >
-                      <Avatar className="size-7">
-                        <AvatarFallback className="text-[11px]">{initials(label)}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{label}</div>
-                        <div className="truncate text-xs text-muted-foreground">{sub}</div>
-                      </div>
-                      <NativeSelect
-                        size="sm"
-                        value={member.role}
-                        disabled={updateRole.isPending}
-                        onChange={(event) =>
-                          updateRole.mutate({ id: member.id, role: event.target.value as "editor" })
-                        }
-                      >
-                        {WIKI_ROLES.map((r) => (
-                          <NativeSelectOption key={r} value={r}>
-                            {WIKI_ROLE_LABEL[r]}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        title="Entfernen"
-                        disabled={removeMember.isPending}
-                        onClick={() => setRemoveTarget({ id: member.id, label })}
-                      >
-                        <Trash2 className="size-4" />
-                        <span className="sr-only">Entfernen</span>
-                      </Button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+            <MemberAccessManager
+              members={members}
+              isLoading={membersQuery.isPending}
+              addableUsers={addableUsers}
+              addableGroups={addableGroups}
+              defaultRole="editor"
+              onAdd={({ subject, value, role }) =>
+                addMember.mutateAsync(
+                  subject === "user"
+                    ? { spaceId: space.id, subject: "user", userId: value, role: role as "editor" }
+                    : {
+                        spaceId: space.id,
+                        subject: "role",
+                        roleName: value,
+                        role: role as "editor",
+                      },
+                )
+              }
+              addPending={addMember.isPending}
+              onUpdateRole={(id, role) => updateRole.mutate({ id, role: role as "editor" })}
+              updatePending={updateRole.isPending}
+              onRemove={(id) => removeMember.mutateAsync({ id })}
+              removePending={removeMember.isPending}
+              noUsersHint="Alle Organisationsmitglieder sind bereits im Space."
+              noGroupsHint="Keine weiteren Gruppen verfügbar. Lege welche unter Einstellungen › Gruppen an."
+              removeTitle="Mitglied entfernen?"
+              removeDescription={(label) => `„${label}" verliert den Zugriff auf diesen Space.`}
+            />
           </section>
 
           {/* Gefahrenzone: der Sheet wird vom Aufrufer nur für Space-Admins
@@ -440,36 +321,6 @@ export function SpaceSettingsSheet({
             </div>
           </section>
         </div>
-
-        <AlertDialog
-          open={removeTarget !== null}
-          onOpenChange={(o) => {
-            if (!o) setRemoveTarget(null);
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Mitglied entfernen?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {removeTarget
-                  ? `„${removeTarget.label}" verliert den Zugriff auf diesen Space.`
-                  : null}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={removeMember.isPending}>Abbrechen</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={removeMember.isPending}
-                onClick={(event) => {
-                  event.preventDefault();
-                  if (removeTarget) removeMember.mutate({ id: removeTarget.id });
-                }}
-              >
-                {removeMember.isPending ? "Entfernen …" : "Entfernen"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
 
         <AlertDialog open={confirmArchive} onOpenChange={setConfirmArchive}>
           <AlertDialogContent>

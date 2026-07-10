@@ -1,4 +1,5 @@
 import { QueryError } from "@/components/query-error";
+import { splitSnippet } from "@/lib/snippet";
 import { orpc } from "@/utils/orpc";
 import {
   Command,
@@ -15,20 +16,15 @@ import { useNavigate } from "@tanstack/react-router";
 import { FileText, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
-/**
- * Renders a Postgres `ts_headline` snippet: matched terms come wrapped in
- * `<b>…</b>`. We split on those delimiters instead of setting innerHTML so the
- * (unescaped) page content can't inject markup — React escapes each text part.
- */
+/** Renders a `ts_headline` snippet with matched terms bolded. */
 function renderSnippet(snippet: string) {
-  return snippet.split(/<\/?b>/).map((part, i) =>
-    // Odd indices are the highlighted (previously <b>-wrapped) segments.
-    i % 2 === 1 ? (
+  return splitSnippet(snippet).map((part, i) =>
+    part.match ? (
       <strong key={i} className="font-medium text-foreground">
-        {part}
+        {part.value}
       </strong>
     ) : (
-      part
+      part.value
     ),
   );
 }

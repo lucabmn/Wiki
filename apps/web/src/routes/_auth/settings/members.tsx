@@ -8,6 +8,7 @@ import { authClient } from "@/lib/auth-client";
 import { initials } from "@/lib/format";
 import { ROLE_LABEL, ROLE_VARIANT } from "@/lib/labels";
 import { toastError } from "@/lib/query";
+import { splitRoles } from "@/lib/roles";
 import {
   invitationsQueryOptions,
   membersQueryOptions,
@@ -53,14 +54,6 @@ import {
 export const Route = createFileRoute("/_auth/settings/members")({
   component: MembersSettings,
 });
-
-/** Split a member's comma-separated role string into individual role names. */
-function splitRoles(role: string | null | undefined): string[] {
-  return (role ?? "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
 
 function RoleBadges({ roles }: { roles: string[] }) {
   if (roles.length === 0) return <Badge variant="outline">—</Badge>;

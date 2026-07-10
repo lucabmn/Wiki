@@ -1,5 +1,6 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { QueryError } from "@/components/query-error";
+import { splitSnippet } from "@/lib/snippet";
 import { orpc } from "@/utils/orpc";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
@@ -19,25 +20,18 @@ export const Route = createFileRoute("/_auth/search")({
   component: RouteComponent,
 });
 
-/**
- * Renders a `ts_headline` snippet, turning its `<b>…</b>` match markers into
- * highlighted spans. Split-based (not HTML injection), so page text can't smuggle
- * markup into the DOM.
- */
+/** Renders a `ts_headline` snippet, highlighting its matched terms. */
 function HighlightedSnippet({ snippet }: { snippet: string }) {
   if (!snippet) return null;
-  // Split on the `<b>…</b>` markers ts_headline inserts around matches; the odd
-  // segments are the highlighted terms.
-  const segments = snippet.split(/<\/?b>/);
   return (
     <span className="text-sm text-muted-foreground">
-      {segments.map((segment, index) =>
-        index % 2 === 1 ? (
-          <mark key={`${index}-${segment}`} className="rounded bg-amber-500/20 text-foreground">
-            {segment}
+      {splitSnippet(snippet).map((part, index) =>
+        part.match ? (
+          <mark key={`${index}-${part.value}`} className="rounded bg-amber-500/20 text-foreground">
+            {part.value}
           </mark>
         ) : (
-          segment
+          part.value
         ),
       )}
     </span>

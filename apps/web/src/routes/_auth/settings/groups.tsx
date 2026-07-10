@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth-client";
 import { toastError } from "@/lib/query";
+import { splitRoles } from "@/lib/roles";
 import {
   membersQueryOptions,
   rolesQueryOptions,
@@ -47,13 +48,6 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 export const Route = createFileRoute("/_auth/settings/groups")({
   component: GroupsSettings,
 });
-
-function splitRoles(role: string | null | undefined): string[] {
-  return (role ?? "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
 
 function GroupCard({
   group,
