@@ -1,0 +1,49 @@
+---
+title: Updates
+description: Pull, rebuild, and apply database migrations safely.
+icon: RefreshCw
+---
+
+## The easy path
+
+Run the installer again and choose **"Updaten"**. It runs `git pull --ff-only`,
+rebuilds, and restarts — with the TLS overlay when the install is HTTPS.
+
+## Manual equivalent
+
+```sh
+git pull --ff-only
+docker compose up -d --build                      # local
+# or, with the prod overlay:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+The one-shot **`migrate`** service applies any new database migrations **before**
+the app services restart.
+
+## How migrations work
+
+Migrations are versioned SQL files (`packages/db/src/migrations`) tracked in the
+database. Re-running is a **no-op**, and destructive schema diffs can no longer be
+auto-applied — the previous `drizzle-kit push --force` flow could silently drop
+data, and that is gone.
+
+<Callout type="warn" title="Upgrading a pre-migration install">
+  If your install predates the migration switch, the schema was applied with
+  `db push` and the migrations table doesn't exist yet — so the `migrate` service
+  would try to re-create existing tables.
+
+  Take a backup, recreate the database volume (`docker compose down -v`), start
+  fresh, and restore your data — or baseline manually before updating.
+</Callout>
+
+## Related
+
+<Cards>
+  <Card title="Backups" href="/docs/self-hosting/backups">
+    Take a dump before upgrading.
+  </Card>
+  <Card title="The installer" href="/docs/self-hosting/installer">
+    The "Updaten" action in detail.
+  </Card>
+</Cards>

@@ -1,0 +1,80 @@
+---
+title: Core concepts
+description: Organizations, spaces, and pages — the nouns everything else is built on.
+icon: Boxes
+---
+
+Nilovon Wiki has a small, consistent content model. Learn these three nouns and
+the rest of the product follows naturally.
+
+## Organizations
+
+An **organization** is a tenant. It is the top-level boundary: users join an
+organization as **members**, and every query the API runs is scoped to one.
+Two organizations never see each other's content — isolation is enforced
+server-side, not just hidden in the UI.
+
+Your first organization is created during onboarding, right after you register.
+
+<Callout>
+  A user can belong to more than one organization. The API always resolves
+  permissions against the **active** organization for the current session.
+</Callout>
+
+## Spaces
+
+A **space** groups related pages — think of it as a section or a team area. Each
+space has a **visibility**:
+
+| Visibility   | Who can read                                            |
+| ------------ | ------------------------------------------------------- |
+| `public`     | any member of the organization                          |
+| `private`    | members of the space only                               |
+| `restricted` | the creator and explicitly added members                |
+
+Within a space, members carry a **space role** (`viewer`, `commenter`, `editor`,
+`admin`) that decides what they can do with its content.
+
+## Pages
+
+A **page** is a document. Pages live inside a space and form a **tree** — a page
+can have children, nested to any depth. Ordering within a level uses fractional
+(LexoRank) keys, so a page can be reordered or moved without renumbering its
+siblings.
+
+Every page moves through a lifecycle:
+
+```
+draft  →  published  →  archived
+```
+
+Pages also support:
+
+- **Slugs** — per-space, automatically de-duplicated.
+- **Comments** — create, resolve, and moderate.
+- **Tags & attachments** — organize and enrich content.
+- **Backlinks** — internal links are tracked, so you can see what points here.
+- **Favorites & subscriptions** — personal pins and per-page watch lists.
+
+## How access is decided
+
+Two independent layers govern who can do what:
+
+1. **Organization RBAC** — org-level capabilities (create spaces, manage members
+   and roles). Owners and admins act as org managers.
+2. **Space & page access** — who can read and write **content** within a specific
+   space or page, via space roles and optional per-page ACLs.
+
+Reads are gated on **visibility**; content writes are gated on the **effective
+space/page role**; org-management actions are gated on **org RBAC**. Both layers
+are always enforced on the server.
+
+<Card title="Permissions in depth" href="/docs/permissions">
+  The full model: statements, static and dynamic roles, groups, and the exact
+  backend and frontend APIs.
+</Card>
+
+## Everything is auditable
+
+Every mutation appends a row to the **activity log** inside the same database
+transaction — including destructive deletes. Nothing changes without a trail.

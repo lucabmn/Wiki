@@ -1,0 +1,41 @@
+---
+title: Full-text search
+description: Instant, ranked search backed by PostgreSQL tsvector columns.
+icon: Search
+---
+
+Search is powered directly by **PostgreSQL** — no external search service to run
+or keep in sync.
+
+## How it works
+
+Each page maintains a generated **`tsvector`** column derived from its content,
+indexed with a **GIN** index. Queries are matched and ranked by Postgres's
+full-text search, so results are instant and relevance-ordered, and they can
+never drift out of sync with the content the way a separate index can.
+
+The search text is extracted from the same page document that produces the
+rendered rich text, so what you see is what gets indexed.
+
+## Access filtering
+
+Search respects **space access**: you only get results from spaces you are allowed
+to read.
+
+<Callout type="warn" title="Known limitation (v1)">
+  Search filters by **space** access but not by per-page ACL overrides. A page
+  whose visibility has been narrowed below its space can still surface in search
+  results to an excluded member. The page list and page tree do apply per-page
+  overrides.
+</Callout>
+
+## Related
+
+<Cards>
+  <Card title="Spaces" href="/docs/concepts/spaces">
+    Visibility governs what search can return.
+  </Card>
+  <Card title="Database" href="/docs/architecture/database">
+    Where the `tsvector` columns and indexes are defined.
+  </Card>
+</Cards>

@@ -1,0 +1,43 @@
+---
+title: Activity log & audit
+description: Every mutation leaves a trail — in the same transaction that made it.
+icon: History
+---
+
+Nilovon Wiki records an **audit row for every mutation** — creating a page,
+changing a role, deleting a space. The row is written **inside the same database
+transaction** as the change itself, so the log can never disagree with reality:
+if the write commits, the audit row commits with it; if it rolls back, so does the
+record.
+
+## What is captured
+
+- The actor (who).
+- The action and the affected resource (what).
+- Enough context to reconstruct the change.
+
+Destructive actions — including deletes — are captured too, so a removal is never
+silent.
+
+## Activity feed
+
+The same data powers an **activity feed**: a per-organization stream of recent
+changes, so members can see what's been happening across their spaces and pages.
+
+## Why in-transaction matters
+
+Logging after the fact — in a separate write, or from application code that might
+crash between the change and the log — leaves gaps. Appending the audit row within
+the transaction makes the trail **atomic** with the change. That is the guarantee
+an audit log needs to be trustworthy.
+
+## Related
+
+<Cards>
+  <Card title="Database" href="/docs/architecture/database">
+    Transactions and the audit table.
+  </Card>
+  <Card title="Permissions" href="/docs/permissions">
+    Who can perform the actions that get logged.
+  </Card>
+</Cards>

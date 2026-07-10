@@ -1,0 +1,135 @@
+---
+title: Development setup
+description: Run the monorepo from a checkout to build, customize, and contribute.
+icon: Code
+---
+
+This is the path for working **on** Nilovon Wiki. If you only want to run it, use
+the [self-hosting guide](/docs/self-hosting/docker) instead.
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org) LTS
+- [pnpm](https://pnpm.io) 10 — pinned via `packageManager`; run `corepack enable` to pick it up automatically
+- [Docker](https://www.docker.com) — for the local PostgreSQL database
+- [Bun](https://bun.sh) — runs the `server` and `tui` dev scripts
+
+## Install and start the database
+
+<Steps>
+
+<Step>
+
+### Install dependencies
+
+```bash
+pnpm install
+```
+
+This also installs the [lefthook](https://github.com/evilmartians/lefthook) git
+hooks that lint and format staged files on commit.
+
+</Step>
+
+<Step>
+
+### Start PostgreSQL
+
+```bash
+pnpm db:start
+```
+
+Runs Postgres via Docker Compose, detached, bound to `127.0.0.1:5432`.
+
+</Step>
+
+<Step>
+
+### Configure the apps
+
+Copy the example env files and fill in values:
+
+```bash
+cp apps/server/.env.example apps/server/.env
+cp apps/web/.env.example apps/web/.env
+```
+
+See the [configuration reference](/docs/self-hosting/configuration) for what each
+variable does.
+
+</Step>
+
+<Step>
+
+### Apply the schema
+
+```bash
+pnpm db:push
+```
+
+Pushes the Drizzle schema directly to your local database — the fast path for
+development.
+
+</Step>
+
+<Step>
+
+### Run the apps
+
+```bash
+pnpm dev
+```
+
+Starts everything: web on **:3001**, server on **:3000**, collab on **:1234**.
+Open [http://localhost:3001](http://localhost:3001) and register — onboarding
+creates your first organization.
+
+</Step>
+
+</Steps>
+
+## Running a single app
+
+```bash
+pnpm dev:web        # web only
+pnpm dev:server     # server only
+pnpm dev:collab     # collab service only
+pnpm dev:tui        # terminal installer / ops UI
+```
+
+## Checks
+
+Run these before opening a pull request — CI runs the same set:
+
+```bash
+pnpm test           # Vitest, via Turborepo
+pnpm check-types    # TypeScript across every package
+pnpm check          # oxlint + oxfmt
+```
+
+## Database scripts
+
+| Script             | Description                                    |
+| ------------------ | ---------------------------------------------- |
+| `pnpm db:push`     | Push the schema directly (dev shortcut)        |
+| `pnpm db:generate` | Generate SQL migrations from schema changes    |
+| `pnpm db:migrate`  | Apply pending migrations                       |
+| `pnpm db:studio`   | Open Drizzle Studio                            |
+| `pnpm db:stop`     | Stop the Postgres container                    |
+| `pnpm db:down`     | Remove the Postgres container                  |
+
+<Callout type="info">
+  `db:push` is for development only. Production installs apply **versioned SQL
+  migrations** automatically. See [Updates](/docs/self-hosting/updates).
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card title="Repository layout" href="/docs/architecture/monorepo">
+    What lives in each app and package.
+  </Card>
+  <Card title="Contributing" href="/docs/development/contributing">
+    Workflow, checks, and pull-request expectations.
+  </Card>
+</Cards>

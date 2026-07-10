@@ -1,0 +1,39 @@
+---
+title: Backups
+description: Postgres holds everything — dump it, restore it, automate it.
+icon: DatabaseBackup
+---
+
+PostgreSQL holds **everything**: pages, Yjs collaboration snapshots, users, and
+audit history. Backing up the database backs up the whole instance.
+
+## Take a backup
+
+```sh
+docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki \
+  | gzip > backup-$(date +%F).sql.gz
+```
+
+## Restore
+
+Into a fresh stack with an empty database:
+
+```sh
+gunzip -c backup-2026-07-09.sql.gz \
+  | docker exec -i nilovon-wiki-postgres psql -U postgres nilovon-wiki
+```
+
+## Automate with cron
+
+Daily at 03:00, keeping 14 days of history:
+
+```bash
+0 3 * * * cd /path/to/Wiki && docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki | gzip > /var/backups/wiki-$(date +\%F).sql.gz && find /var/backups -name 'wiki-*.sql.gz' -mtime +14 -delete
+```
+
+<Callout type="warn" title="Keep your secret with your backups">
+  Sessions and collab tokens are signed with `BETTER_AUTH_SECRET`, and the
+  database is encrypted-at-rest only as far as your host is. Keep the `.env` file —
+  or at least `BETTER_AUTH_SECRET` and `POSTGRES_PASSWORD` — alongside your
+  backups, or a restore won't be able to validate existing sessions.
+</Callout>

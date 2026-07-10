@@ -1,0 +1,57 @@
+---
+title: Overview
+description: The two ways to call the API — type-safe RPC and generated REST.
+icon: Plug
+---
+
+The server exposes the **same** router two ways. Pick the one that fits your
+caller.
+
+<Cards>
+  <Card title="RPC client (TypeScript)" href="/docs/api-reference/rpc-client">
+    Full type inference, no codegen. The way the web and terminal clients call it.
+  </Card>
+  <Card title="REST & OpenAPI" href="/docs/api-reference/rest">
+    A generated HTTP surface with an interactive reference — for anything not
+    written in TypeScript.
+  </Card>
+</Cards>
+
+## The surfaces
+
+| Path             | Surface                                                    |
+| ---------------- | --------------------------------------------------------- |
+| `/rpc`           | Type-safe oRPC endpoint the clients call.                 |
+| `/api-reference` | Generated OpenAPI document + interactive reference.        |
+| `/api/auth/*`    | Better Auth routes (sign-in, session, organization, etc.). |
+| `/health`        | Deep health check (verifies the database).                |
+
+Both `/rpc` and `/api-reference` are generated from **one** router definition, so
+they never drift. See [API & oRPC](/docs/architecture/api) for how that works.
+
+## Router map
+
+The top-level routers, each in its own module under `packages/api/src/routers`:
+
+| Router          | Responsibility                                        |
+| --------------- | ----------------------------------------------------- |
+| `spaces`        | Create and manage spaces.                             |
+| `spaceMembers`  | Space membership and roles (`myRole`).                |
+| `pages`         | Page CRUD, lifecycle, tree, drafts, revisions.        |
+| `pageAccess`    | Per-page ACLs (`get`, `setVisibility`, members).      |
+| `comments`      | Create, resolve, moderate comments.                   |
+| `tags`          | Tag CRUD and assignment.                              |
+| `attachments`   | Upload and delete attachments.                        |
+| `links`         | Internal link / backlink tracking.                    |
+| `activity`      | Activity feed / audit stream.                         |
+| `search`        | Full-text search.                                     |
+| `me`            | Per-user state (favorites, subscriptions).            |
+| `onboarding`    | First-run org creation and sample seeding.            |
+| `dashboard`     | Aggregated home-screen data.                          |
+| `health`        | Liveness probe.                                       |
+
+## Authorization
+
+Every non-public procedure is gated. Organization capabilities use
+`requireOrgPermission` / `assertOrgPermission`; content actions use space/page
+capabilities. See [Permissions](/docs/permissions).

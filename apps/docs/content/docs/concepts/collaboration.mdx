@@ -1,0 +1,63 @@
+---
+title: Real-time collaboration
+description: Edit pages together with live cursors, powered by Hocuspocus and Yjs.
+icon: Users
+---
+
+Pages can be edited by several people at once, with **live cursors** and
+conflict-free merging.
+
+## How it works
+
+Collaboration runs as a dedicated **Node service** (`apps/collab`) built on
+[Hocuspocus](https://tiptap.dev/hocuspocus) and [Yjs](https://yjs.dev). The editor
+in the web app connects to it over WebSocket; edits are exchanged as **CRDT**
+updates, which merge deterministically without a central lock — so two people
+typing in the same paragraph never clobber each other, and offline edits reconcile
+when the connection returns.
+
+```
+Browser (TipTap editor)  ──ws──▶  apps/collab (Hocuspocus)
+        │                               │
+        │                               ▼
+        │                    yjs_state column (PostgreSQL)
+        ▼
+   shared TipTap schema  ◀── same schema used on both ends
+```
+
+## Shared schema
+
+The editor and the collab service share **one TipTap schema**. Because both ends
+agree on the document shape, the Yjs document and the rendered content stay
+consistent, and the extracted text (used for search and internal links) is derived
+from the same source.
+
+## Persistence
+
+The collaborative document state is stored in a **`yjs_state`** column on the
+page. The service loads it on connect and persists updates, so a page's live state
+survives restarts.
+
+## Authentication
+
+Connections are authorized with a **page-scoped, signed token**. The web app
+requests a collab token for a specific page (`pages.collabToken`), and the collab
+service verifies it with the **same `BETTER_AUTH_SECRET`** the API uses — which is
+why the collab service must share that secret.
+
+<Callout type="info">
+  In a self-hosted deployment the collab service listens on port **1234** and the
+  browser reaches it via `VITE_COLLAB_URL` (`ws://` locally, `wss://` in
+  production). See [Configuration](/docs/self-hosting/configuration).
+</Callout>
+
+## Related
+
+<Cards>
+  <Card title="Collaboration architecture" href="/docs/architecture/collaboration">
+    The service, the schema, and the token flow in depth.
+  </Card>
+  <Card title="Pages" href="/docs/concepts/pages">
+    Drafts, revisions, and how content is stored.
+  </Card>
+</Cards>

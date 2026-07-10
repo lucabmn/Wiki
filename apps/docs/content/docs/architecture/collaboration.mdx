@@ -1,0 +1,59 @@
+---
+title: Collaboration architecture
+description: The Hocuspocus service, the shared TipTap schema, and the token flow.
+icon: Waypoints
+---
+
+Real-time editing runs as a **dedicated Node service** — `apps/collab` — separate
+from the main API. It is built on [Hocuspocus](https://tiptap.dev/hocuspocus) and
+[Yjs](https://yjs.dev).
+
+## Why a separate service
+
+Collaboration is a long-lived **WebSocket** workload with different scaling and
+runtime characteristics than the request/response API. Isolating it keeps the HTTP
+server stateless and lets the collab service own the CRDT lifecycle.
+
+```
+Browser (TipTap editor)  ──ws──▶  apps/collab (Hocuspocus)
+        │                               │  persists
+        │                               ▼
+        │                    page.yjs_state (PostgreSQL)
+        ▼
+  packages/editor  ◀── shared TipTap schema used on both ends
+```
+
+## The shared schema
+
+`packages/editor` exports **one TipTap schema** consumed by both the web editor and
+the collab service. A single schema on both ends is what keeps the Yjs document,
+the rendered content, and the extracted search text consistent — they are all
+derived from the same document shape.
+
+## Persistence
+
+Collaborative state is stored in a **`yjs_state`** column on the page. The service
+loads it when the first client connects and persists updates, so live state
+survives restarts.
+
+## Authentication: page-scoped tokens
+
+The client can't just connect — it must present a **signed, page-scoped token**:
+
+<Steps>
+<Step>The web app asks the API for a collab token for a specific page (`pages.collabToken`).</Step>
+<Step>The API signs a token scoped to that page with `BETTER_AUTH_SECRET`.</Step>
+<Step>The browser opens a WebSocket to the collab service and presents the token.</Step>
+<Step>The collab service verifies it with the **same** `BETTER_AUTH_SECRET`, and only then joins the client to that page's document.</Step>
+</Steps>
+
+<Callout type="warn">
+  This is why `apps/collab` must share `BETTER_AUTH_SECRET` with the server — the
+  token is worthless if the two ends don't agree on the signing key.
+</Callout>
+
+## Deployment
+
+In a self-hosted stack the collab service listens on port **1234**; the browser
+reaches it via `VITE_COLLAB_URL` (`ws://` locally, `wss://` in production, proxied
+by Caddy). See [Configuration](/docs/self-hosting/configuration).

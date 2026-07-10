@@ -1,0 +1,5 @@
+{
+  "title": "Permissions",
+  "icon": "KeyRound",
+  "pages": ["index", "org-rbac", "space-page-access", "groups"]
+}

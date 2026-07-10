@@ -1,0 +1,139 @@
+---
+title: Organization RBAC
+description: Statements, static roles, and the backend and frontend guards.
+icon: Shield
+---
+
+Organization RBAC controls **org-level capabilities** — who may create spaces,
+manage members, and manage roles. It is built on **Better Auth's dynamic access
+control**.
+
+## The statement
+
+The **statement** is the full permission surface — a map of `resource → actions`,
+defined once and shared everywhere.
+
+```ts
+// packages/auth/src/permissions.ts
+export const statement = {
+  ...defaultStatements, // organization / member / invitation / team / ac
+  space: ["create", "update", "delete"],
+  page: ["create", "read", "update", "delete", "publish", "move"],
+  comment: ["create", "update", "delete", "moderate"],
+  attachment: ["create", "delete"],
+} as const;
+```
+
+- `...defaultStatements` keeps Better Auth's built-in org-management permissions,
+  **plus the `ac` resource**, which controls who may manage dynamic roles.
+- `as const` is what makes the whole system type-safe — it is required.
+
+### Adding a permission
+
+<Steps>
+<Step>Add the resource/actions to `statement`.</Step>
+<Step>Grant it in the relevant static `roles` if needed.</Step>
+<Step>Done — `PermissionRequest` updates automatically, so backend guards and the frontend hook accept it and reject typos. No codegen, no DB change for the statement itself.</Step>
+</Steps>
+
+## Static roles
+
+Defined in code, always available in every org:
+
+- **owner** — everything.
+- **admin** — content management + org admin, minus destructive org actions.
+- **member** — read/create pages and comments, upload attachments.
+
+They spread the matching Better Auth defaults (`ownerAc` / `adminAc` / `memberAc`),
+so owners and admins keep org-management and role-management (`ac`) rights.
+
+## Backend usage
+
+All guards live in `packages/api/src/index.ts` and are fully typed against the
+statement.
+
+### Gate a whole route (checks the active org)
+
+```ts
+import { requireOrgPermission } from "@nilovon-wiki/api";
+
+export const deletePage = requireOrgPermission({ page: ["delete"] })
+  .input(z.object({ pageId: z.string() }))
+  .handler(async ({ input, context }) => {
+    // reached only if the caller may delete pages in their active org
+  });
+```
+
+### Gate on a resource's own org (preferred cross-org)
+
+`requireOrgPermission` checks the **active** org. If a request targets a resource
+in some *other* org, check against **that resource's** org id instead — otherwise
+rights in the active org would authorize actions elsewhere.
+
+```ts
+import { protectedProcedure, assertOrgPermission } from "@nilovon-wiki/api";
+
+export const deletePage = protectedProcedure
+  .input(z.object({ pageId: z.string() }))
+  .handler(async ({ input, context }) => {
+    const page = await getPage(input.pageId);
+    await assertOrgPermission(context.headers, { page: ["delete"] }, page.organizationId);
+    // ... delete
+  });
+```
+
+### Helpers
+
+```ts
+// Boolean, never throws on "denied":
+hasOrgPermission(headers, permissions, organizationId?) => Promise<boolean>
+
+// Throws ORPCError("FORBIDDEN") when denied:
+assertOrgPermission(headers, permissions, organizationId?) => Promise<void>
+```
+
+Both accept an optional `organizationId`; omit it to check the active org.
+
+## Frontend usage
+
+### `usePermission` — the default
+
+Runs the check **server-side** (so it accounts for both static and dynamic roles)
+and caches the result in TanStack Query.
+
+```tsx
+import { usePermission } from "@/lib/use-permissions";
+
+function DeleteButton() {
+  const { allowed, isPending } = usePermission({ page: ["delete"] });
+  if (isPending) return <Skeleton />;
+  if (!allowed) return null;
+  return <Button onClick={deletePage}>Delete</Button>;
+}
+```
+
+After changing roles or members, refresh gated UI:
+
+```ts
+import { PERMISSION_QUERY_KEY } from "@/lib/use-permissions";
+queryClient.invalidateQueries({ queryKey: PERMISSION_QUERY_KEY });
+```
+
+### `checkStaticRolePermission` — synchronous, static only
+
+No network call, so it **ignores dynamic roles**. Use only when you already know
+the user's static role.
+
+```ts
+const canDelete = checkStaticRolePermission({ page: ["delete"] }, "admin");
+```
+
+## Gotchas
+
+<Callout type="warn">
+- **Everything is org-scoped.** No active org ⇒ checks fail.
+- **Client `hasPermission` always uses the active org** — it takes no `organizationId`. Switch orgs with `setActive`.
+- **Cross-org safety is the backend's job.** Prefer `assertOrgPermission(headers, perms, resource.organizationId)` whenever the target may live in another org.
+- **`checkStaticRolePermission` ignores dynamic roles.** Use `usePermission` when groups matter.
+- **Type-checking won't catch the active-org and cross-org pitfalls** — exercise a real check.
+</Callout>

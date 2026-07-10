@@ -1,0 +1,53 @@
+---
+title: Security
+description: How to report a vulnerability, and the model that backs the app.
+icon: ShieldAlert
+---
+
+## Reporting a vulnerability
+
+<Callout type="error" title="Do not open public issues">
+  Please do **not** report security vulnerabilities through public GitHub issues,
+  discussions, or pull requests.
+</Callout>
+
+Report privately via **GitHub Security Advisories**: open the repository's
+**Security** tab and click **Report a vulnerability**.
+
+Include as much as you can:
+
+- A description of the vulnerability and its impact.
+- Steps to reproduce (a proof of concept if possible).
+- The affected component (app/package) and version or commit.
+- Any suggested mitigation or fix.
+
+## What to expect
+
+- Acknowledgement within **7 days**.
+- Updates while the fix is investigated and worked on.
+- Credit in the advisory once a fix ships, unless you prefer to remain anonymous.
+
+## Scope & supported versions
+
+This policy covers the code in this repository. Third-party dependency issues
+should be reported upstream (but feel free to notify us too). Security fixes are
+applied to the latest release / `main` branch.
+
+## The security model, briefly
+
+Understanding what already protects the app helps when assessing a report:
+
+- **Authorization is server-side.** Every read and write is checked in
+  `packages/api`; the frontend only mirrors checks for UI. See
+  [Permissions](/docs/permissions).
+- **Tenants are isolated.** Every query is organization-scoped; cross-org access is
+  the backend's responsibility (`assertOrgPermission` against the resource's own
+  org).
+- **Secrets are validated at startup.** Placeholder or low-entropy
+  `BETTER_AUTH_SECRET` / `POSTGRES_PASSWORD` values are rejected.
+- **Postgres is not exposed.** It binds to `127.0.0.1:5432`; in production only
+  Caddy is public.
+- **Everything is audited.** Mutations append an audit row in the same
+  transaction — see [Activity log](/docs/concepts/activity-log).
+- **Rate limiting** guards the API and auth routes (`RATE_LIMIT_MAX`,
+  `RATE_LIMIT_AUTH_MAX`).

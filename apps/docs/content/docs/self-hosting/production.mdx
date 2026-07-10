@@ -1,0 +1,81 @@
+---
+title: Production (HTTPS)
+description: Public domains with automatic TLS via the bundled Caddy proxy.
+icon: Globe
+---
+
+For a public deployment, the repo ships a **Caddy** reverse proxy that provisions
+**Let's Encrypt** certificates automatically.
+
+## 1. DNS
+
+Point three records at the host:
+
+| Record               | Serves       |
+| -------------------- | ------------ |
+| `wiki.example.com`   | web app      |
+| `api.example.com`    | API server   |
+| `collab.example.com` | collab (WSS) |
+
+## 2. Install
+
+Run the installer and enter the public URLs in the form:
+
+- **Web URL** — `https://wiki.example.com`
+- **Server URL** — `https://api.example.com`
+- **Collab URL** — `wss://collab.example.com`
+- **TLS email** — `admin@example.com` (Let's Encrypt contact)
+
+With `https` URLs, the installer writes the domain config (`WEB_DOMAIN`,
+`API_DOMAIN`, `COLLAB_DOMAIN`, `ACME_EMAIL`) plus generated secrets into `.env` and
+brings the stack up **with the production overlay** automatically.
+
+### Manual equivalent
+
+Copy `.env.example` to `.env`, fill in the secrets and the production section,
+then:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+<Callout type="warn" title="VITE_* is baked at build time">
+  `VITE_*` values are compiled into the web bundle when the image is **built** —
+  changing a domain means rebuilding the web image:
+
+  ```sh
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build web
+  ```
+</Callout>
+
+## What the prod overlay does
+
+The production overlay (`docker-compose.prod.yml`):
+
+- adds **Caddy** on ports 80/443 with auto-TLS,
+- **un-publishes** the app ports — only Caddy is exposed to the network,
+- derives `BETTER_AUTH_URL` and `CORS_ORIGIN` from the domains, so Caddy, CORS, and
+  auth can never disagree,
+- sets every service to `restart: always`.
+
+Postgres is bound to `127.0.0.1:5432` in the base file already — it is never
+reachable from the network.
+
+Open `https://wiki.example.com` and register.
+
+## Cookies over HTTPS
+
+Over HTTPS, auth cookies are issued `SameSite=None; Secure`, which supports the web
+app and API living on different subdomains. (Over plain HTTP they fall back to
+`SameSite=Lax`, which is why localhost and LAN pilots work without TLS.)
+
+## Next
+
+<Cards>
+  <Card title="Configuration" href="/docs/self-hosting/configuration">
+    The full environment-variable reference.
+  </Card>
+  <Card title="Updates" href="/docs/self-hosting/updates">
+    Pull, rebuild, and apply migrations safely.
+  </Card>
+</Cards>

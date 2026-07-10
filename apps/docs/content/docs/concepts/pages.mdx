@@ -1,0 +1,75 @@
+---
+title: Pages
+description: The document model — hierarchy, lifecycle, slugs, links, and revisions.
+icon: FileText
+---
+
+A **page** is a document inside a space. Pages are the core unit of content in
+Nilovon Wiki.
+
+## Hierarchy
+
+Pages form a **tree**: any page can have children, nested to any depth. Ordering
+within a level uses **fractional (LexoRank) keys**, so inserting or moving a page
+only touches that page's key — its siblings never need renumbering.
+
+Moving a page (`pages.move`) re-parents it and recomputes a single order key.
+
+## Lifecycle
+
+Every page has a status:
+
+```
+draft  →  published  →  archived
+```
+
+- **draft** — a work in progress. Drafts are stored separately from the published
+  content, so you can edit without affecting what readers see.
+- **published** — the live version.
+- **archived** — retired but not deleted; can be restored.
+
+<Callout type="info">
+  Status is **not** an access control. A draft is not "private" — visibility
+  governs who can see a page. Use a page's `visibility` for access, not its status.
+</Callout>
+
+## Slugs
+
+Each page has a **slug**, unique within its space and de-duplicated
+automatically — creating two pages titled "Runbook" yields distinct slugs rather
+than a collision.
+
+## Drafts and revisions
+
+Pages keep a **draft** alongside the published content and a history of
+**revisions**. The API exposes:
+
+- `pages.getDraft` / `pages.saveDraft` / `pages.deleteDraft`
+- `pages.listRevisions` and `pages.restoreRevision` — roll a page back to an
+  earlier version.
+
+## Internal links and backlinks
+
+Page content can link to other pages with internal `/pages/<id>` links. These
+links are **tracked**, so each page knows what points at it — its **backlinks**.
+The relationship stays consistent because rich-text content, the extracted search
+text, and internal links are all derived from the same page document.
+
+## Enrichment
+
+- **Tags** — categorize pages; filter and group by them.
+- **Attachments** — attach files to a page.
+- **Comments** — discuss inline; resolve and moderate.
+- **Favorites** — a personal pin.
+- **Subscriptions** — watch a page for changes.
+
+## Related
+
+<Cards>
+  <Card title="Real-time collaboration" href="/docs/concepts/collaboration">
+    How multiple people edit a page at once.
+  </Card>
+  <Card title="Comments" href="/docs/concepts/comments">
+    Threaded discussion on pages.
+  </Card>
+</Cards>

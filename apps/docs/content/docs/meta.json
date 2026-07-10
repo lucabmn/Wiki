@@ -1,0 +1,17 @@
+{
+  "title": "Documentation",
+  "root": true,
+  "pages": [
+    "index",
+    "---Getting started---",
+    "getting-started",
+    "---Guides---",
+    "concepts",
+    "permissions",
+    "self-hosting",
+    "---Reference---",
+    "architecture",
+    "api-reference",
+    "development"
+  ]
+}

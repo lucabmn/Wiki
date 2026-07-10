@@ -1,0 +1,62 @@
+---
+title: Spaces
+description: Group related pages, and control who can see and edit them.
+icon: FolderTree
+---
+
+A **space** groups related pages inside an organization — a section, a team area,
+a project. It is also the primary unit of **content access control**.
+
+## Visibility
+
+Every space has a visibility that gates **who can read** it:
+
+| Visibility   | Who can read                                            |
+| ------------ | ------------------------------------------------------- |
+| `public`     | any member of the organization                          |
+| `private`    | members of the space only                               |
+| `restricted` | the creator and explicitly added members                |
+
+<Callout>
+  Visibility gates **reads**. Writing always requires a space role — a member can
+  read a public space without being able to edit it.
+</Callout>
+
+## Space roles
+
+Every `spaceMember` row carries a **role**. A user's effective role in a space is
+the strongest of:
+
+- an **org manager** (owner/admin) → treated as `admin`,
+- the **space creator** → `admin`,
+- a direct or team `spaceMember` row,
+- a `viewer` baseline on **public** spaces.
+
+| Role        | Capabilities                                              |
+| ----------- | --------------------------------------------------------- |
+| `viewer`    | read                                                      |
+| `commenter` | read + comment                                            |
+| `editor`    | read + write pages/attachments/tags + comment             |
+| `admin`     | editor + manage the space (settings, visibility, members) |
+
+<Callout type="warn" title="Private stays private">
+  Org managers only reach spaces they can already read. A `private` space is not
+  visible to an owner or admin who isn't a member of it.
+</Callout>
+
+## Managing a space
+
+Space settings — visibility and membership — live on the space page and are gated
+on the `admin` (manage) capability. Adding a member creates a `spaceMember` row
+with the role you choose.
+
+## Related
+
+<Cards>
+  <Card title="Pages" href="/docs/concepts/pages">
+    The documents a space contains.
+  </Card>
+  <Card title="Space & page access" href="/docs/permissions/space-page-access">
+    The precise resolution rules, including per-page overrides.
+  </Card>
+</Cards>

@@ -1,0 +1,62 @@
+---
+title: The installer
+description: The guided terminal wizard that installs, configures, and updates the stack.
+icon: SquareTerminal
+---
+
+The installer (`apps/tui`) is a self-contained **terminal wizard** — the
+recommended way to install, reconfigure, and update a Nilovon Wiki deployment. It
+needs **no Node, pnpm, or Bun**: it is shipped as a single binary on GitHub
+Releases.
+
+## Getting it
+
+Download the binary for your platform from GitHub Releases:
+
+```sh
+curl -fsSLo installer "https://github.com/Nilovon/Wiki/releases/latest/download/nilovon-wiki-installer-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
+chmod +x installer && ./installer
+```
+
+From a checkout with the dev toolchain, run the same wizard with:
+
+```sh
+pnpm dev:tui
+```
+
+## What it does
+
+The wizard is menu-driven. Its three main actions:
+
+| Action           | What it does                                                                 |
+| ---------------- | --------------------------------------------------------------------------- |
+| **Installieren** | Generate secrets, write `.env`, build images, start the stack, wait for health. |
+| **Konfigurieren** | Reconfigure an existing install (change domains, secrets, ports).           |
+| **Updaten**      | `git pull --ff-only`, rebuild, restart — with the TLS overlay if the install is HTTPS. |
+
+For a public install, enter `https://` / `wss://` URLs plus a Let's Encrypt email
+in the form, and the wizard brings the stack up behind the bundled Caddy TLS proxy
+automatically.
+
+<Callout type="info">
+  The installer is the operations front door: everything it does has a documented
+  manual `docker compose` equivalent, so you are never locked into the wizard.
+</Callout>
+
+## Under the hood
+
+The installer generates each secret with strong entropy (equivalent to
+`openssl rand -base64 48`) and refuses placeholder values — the same startup
+validation the services enforce. Migrations always run inside the stack, so the
+installer never touches your database directly.
+
+## Related
+
+<Cards>
+  <Card title="Quick start" href="/docs/self-hosting/docker">
+    The install flow end to end.
+  </Card>
+  <Card title="Updates" href="/docs/self-hosting/updates">
+    How the "Updaten" action applies migrations.
+  </Card>
+</Cards>

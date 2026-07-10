@@ -1,0 +1,75 @@
+---
+title: Introduction
+description: A self-hostable, organization-scoped knowledge base built on an end-to-end type-safe TypeScript stack.
+icon: Rocket
+---
+
+**Nilovon Wiki** is a multi-tenant knowledge base for teams. Every piece of content
+lives inside an **organization**; content is grouped into **spaces**, and spaces
+hold a tree of **pages**. Access is governed server-side and mirrored in the UI,
+so what a user can see and do is always enforced where it matters.
+
+It is designed to be **run by you** — a Docker Compose stack you deploy on your own
+host, with a guided installer, automatic HTTPS, and no managed cloud dependency.
+
+<Callout title="Built for ownership">
+  No seats, no per-user pricing, no lock-in. Nilovon Wiki is MIT licensed and
+  ships everything you need to operate it yourself.
+</Callout>
+
+## What you get
+
+<Cards>
+  <Card title="Organizations & members" href="/docs/concepts/organizations">
+    Multi-tenant by default. Every query is scoped to an organization.
+  </Card>
+  <Card title="Spaces & pages" href="/docs/concepts/spaces">
+    Group pages into spaces with visibility controls; nest pages into a tree.
+  </Card>
+  <Card title="Real-time collaboration" href="/docs/concepts/collaboration">
+    Edit together with live cursors, powered by Hocuspocus and Yjs.
+  </Card>
+  <Card title="Fine-grained access control" href="/docs/permissions">
+    Static and dynamic roles at the org level, plus per-space and per-page access.
+  </Card>
+  <Card title="Full-text search" href="/docs/concepts/search">
+    PostgreSQL `tsvector` columns with GIN indexes for instant, ranked results.
+  </Card>
+  <Card title="Type-safe API" href="/docs/api-reference/overview">
+    One oRPC definition drives both the RPC surface and a generated OpenAPI spec.
+  </Card>
+</Cards>
+
+## Where to start
+
+<Cards>
+  <Card title="Self-host it" href="/docs/self-hosting/docker">
+    Clone, run the installer, open the app. The fastest path to a running instance.
+  </Card>
+  <Card title="Understand the concepts" href="/docs/getting-started/concepts">
+    Organizations, spaces, pages, and how they fit together.
+  </Card>
+  <Card title="Set up local development" href="/docs/getting-started/development-setup">
+    Run the monorepo from a checkout to build and contribute.
+  </Card>
+  <Card title="Explore the architecture" href="/docs/architecture/overview">
+    The boundary between transport, business logic, and clients.
+  </Card>
+</Cards>
+
+## The stack
+
+| Layer            | Technology                                             |
+| ---------------- | ------------------------------------------------------ |
+| Web client       | React 19, TanStack Start & Router, Tailwind CSS 4      |
+| Terminal client  | OpenTUI + React _(preview)_                            |
+| HTTP server      | Hono                                                   |
+| API / RPC        | oRPC with OpenAPI generation                           |
+| Auth             | Better Auth (organization + dynamic access control)    |
+| Database / ORM   | PostgreSQL + Drizzle ORM                               |
+| Real-time        | Hocuspocus + Yjs, shared TipTap schema                 |
+| Validation       | Zod                                                    |
+| Tooling          | pnpm, Turborepo, Vitest, Oxlint / Oxfmt                |
+
+Everything is type-checked from the database schema through to the browser — a
+change to a data contract surfaces as a compile error, not a runtime surprise.

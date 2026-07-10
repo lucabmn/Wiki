@@ -1,0 +1,64 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+/* Brand typefaces — the same faces the web app ships, bundled locally (offline). */
+@import "@fontsource-variable/public-sans";
+@import "@fontsource-variable/source-serif-4";
+@import "@fontsource/jetbrains-mono";
+
+/*
+ * Brand tokens. Fumadocs exposes its own `--color-fd-*` design tokens; we only
+ * override what carries the Nilovon identity (primary blue + type) and leave the
+ * neutral scale from the preset untouched so light/dark contrast stays correct.
+ */
+:root {
+  --font-sans: "Public Sans Variable", Inter, system-ui, sans-serif;
+  --font-serif: "Source Serif 4 Variable", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-fd-primary: oklch(0.556 0.192 259);
+  --color-fd-ring: oklch(0.556 0.192 259);
+}
+
+.dark {
+  --color-fd-primary: oklch(0.685 0.152 259);
+  --color-fd-ring: oklch(0.685 0.152 259);
+}
+
+body {
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+/* Subtle grid + radial glow used by the marketing hero. */
+.hero-grid {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklch, var(--color-fd-border) 60%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklch, var(--color-fd-border) 60%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 3rem 3rem;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+}

@@ -1,0 +1,85 @@
+---
+title: Contributing
+description: Workflow, checks, and what we expect from a pull request.
+icon: GitPullRequest
+---
+
+Contributions are welcome. This page covers the workflow; for the full
+environment setup, see [Development setup](/docs/getting-started/development-setup).
+
+## Before a large change
+
+Open an issue first. It's cheaper to align on approach before code than after.
+
+## Workflow
+
+<Steps>
+
+<Step>
+
+### Set up
+
+```bash
+pnpm install
+pnpm db:start
+cp apps/server/.env.example apps/server/.env
+cp apps/web/.env.example apps/web/.env
+pnpm db:push
+```
+
+</Step>
+
+<Step>
+
+### Develop
+
+```bash
+pnpm dev            # all apps
+```
+
+</Step>
+
+<Step>
+
+### Run the checks
+
+The same set CI runs — all three must pass:
+
+```bash
+pnpm test           # Vitest, via Turborepo
+pnpm check-types    # TypeScript across every package
+pnpm check          # oxlint + oxfmt
+```
+
+</Step>
+
+<Step>
+
+### Open a focused PR
+
+- One logical change per PR.
+- Include tests for behavior changes where practical.
+- Make sure `pnpm test`, `pnpm check-types`, and `pnpm check` all pass.
+
+</Step>
+
+</Steps>
+
+## Git hooks
+
+Hooks are managed by [lefthook](https://github.com/evilmartians/lefthook)
+(installed with `pnpm install`). The pre-commit hook runs `oxlint --fix` and
+`oxfmt --write` on staged files and re-stages the fixes — so formatting is never a
+review conversation.
+
+## Conventions
+
+- **Business logic goes in `packages/api`**, not in the server or a client.
+- **Keep `permissions.ts` server-free** — it ships in the browser bundle.
+- **Authorize on the server**; the frontend only mirrors checks for UI.
+- **Wrap writes in a transaction** and let them append the audit row.
+
+## Security issues
+
+Do **not** open public issues for vulnerabilities. See
+[Security](/docs/development/security) and `SECURITY.md`.

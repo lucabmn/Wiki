@@ -1,0 +1,53 @@
+---
+title: Scripts reference
+description: The pnpm scripts you'll actually use, from the repository root.
+icon: SquareTerminal
+---
+
+Run these from the repository root.
+
+## Development
+
+| Script            | Description                          |
+| ----------------- | ------------------------------------ |
+| `pnpm dev`        | Start all apps in development mode    |
+| `pnpm dev:web`    | Web app only (`:3001`)               |
+| `pnpm dev:server` | Server only (`:3000`)                |
+| `pnpm dev:collab` | Collab service only (`:1234`)        |
+| `pnpm dev:tui`    | Terminal installer / ops wizard      |
+
+## Build & quality
+
+| Script             | Description                              |
+| ------------------ | ---------------------------------------- |
+| `pnpm build`       | Build all apps and packages              |
+| `pnpm test`        | Run the test suite (Vitest, via Turbo)   |
+| `pnpm check-types` | Type-check every package                 |
+| `pnpm check`       | Lint and format with Oxlint + Oxfmt      |
+
+## Database
+
+| Script             | Description                                    |
+| ------------------ | ---------------------------------------------- |
+| `pnpm db:start`    | Start PostgreSQL via Docker Compose (detached) |
+| `pnpm db:watch`    | Start PostgreSQL in the foreground             |
+| `pnpm db:push`     | Push the schema directly (dev shortcut)        |
+| `pnpm db:generate` | Generate SQL migrations from schema changes    |
+| `pnpm db:migrate`  | Apply pending migrations                       |
+| `pnpm db:studio`   | Open Drizzle Studio                            |
+| `pnpm db:stop`     | Stop the Postgres container                    |
+| `pnpm db:down`     | Remove the Postgres container                  |
+
+## Docker
+
+| Script             | Description                              |
+| ------------------ | ---------------------------------------- |
+| `pnpm docker:build`| Build the Compose images                 |
+| `pnpm docker:up`   | Build and start the full stack           |
+| `pnpm docker:logs` | Tail logs                                |
+| `pnpm docker:down` | Stop the stack                           |
+
+<Callout type="info">
+  Scripts are thin wrappers over `turbo run …`. Use `-F <package>` (or the
+  `dev:*` shortcuts) to target a single workspace.
+</Callout>

@@ -1,0 +1,45 @@
+---
+title: Overview
+description: The two paths through Nilovon Wiki — run it, or develop on it.
+icon: Compass
+---
+
+There are two reasons you might be here. Pick the path that matches yours.
+
+## I want to run it
+
+You want a working instance for your team. You need Docker and about five
+minutes. The installer does the rest — secrets, configuration, migrations, and
+health checks.
+
+<Cards>
+  <Card title="Self-host with Docker" href="/docs/self-hosting/docker">
+    The quickest path to a running instance on localhost or a LAN.
+  </Card>
+  <Card title="Production with HTTPS" href="/docs/self-hosting/production">
+    Public domains and automatic TLS via the bundled Caddy proxy.
+  </Card>
+</Cards>
+
+## I want to develop on it
+
+You want to run the monorepo from a checkout — to contribute, to customize, or to
+understand how it fits together.
+
+<Cards>
+  <Card title="Development setup" href="/docs/getting-started/development-setup">
+    Prerequisites, install, database, and the dev servers.
+  </Card>
+  <Card title="Architecture" href="/docs/architecture/overview">
+    How the apps and packages relate.
+  </Card>
+</Cards>
+
+## First, the mental model
+
+Before either path, it helps to know the three nouns everything is built on —
+**organizations**, **spaces**, and **pages**.
+
+<Card title="Core concepts" href="/docs/getting-started/concepts">
+  A five-minute tour of the content model and how access is decided.
+</Card>

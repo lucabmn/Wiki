@@ -1,0 +1,45 @@
+---
+title: Testing
+description: What is tested, and how to run it.
+icon: FlaskConical
+---
+
+Tests run on [**Vitest**](https://vitest.dev), orchestrated by Turborepo.
+
+```bash
+pnpm test                     # everything
+pnpm --filter @nilovon-wiki/api test   # one package
+```
+
+## What has tests
+
+- **Access resolution** — the pure resolvers in `packages/api/src/lib/access.ts`
+  (`resolveSpaceRole`, `resolvePageRole`, `filterReadablePages`) are auth-free and
+  unit-tested. This is the heart of content authorization.
+- **Web components** — route components are render-tested with Vitest + jsdom +
+  React Testing Library.
+
+## The limit of type-checking
+
+Type-checking (`pnpm check-types`) catches a lot, but **not** the authorization
+pitfalls that depend on runtime state:
+
+<Callout type="warn">
+  The **active-org** and **cross-org** rules can't be caught by types alone. A
+  handler can compile perfectly and still check the wrong organization. Exercise a
+  real permission round-trip — see the
+  [verification steps](/docs/permissions/groups#verifying-it-works-round-trip).
+</Callout>
+
+## In CI
+
+CI runs the same three commands you should run locally before a PR:
+
+```bash
+pnpm test
+pnpm check-types
+pnpm check
+```
+
+Keep them green — the pre-commit hook already handles formatting, so failures are
+real signal.

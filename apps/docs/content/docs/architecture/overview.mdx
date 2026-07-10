@@ -1,0 +1,75 @@
+---
+title: Overview
+description: The boundary between transport, business logic, and clients.
+icon: Network
+---
+
+Nilovon Wiki is a **pnpm + Turborepo monorepo** with a strict boundary between the
+HTTP surface, the business logic and data contracts, and the clients that consume
+them.
+
+```
+                 ┌─────────────┐        ┌─────────────┐
+   Browser  ───▶ │  apps/web   │        │  apps/tui   │ ◀─── Terminal
+                 │ TanStack St │        │  OpenTUI    │
+                 └──────┬──────┘        └──────┬──────┘
+                        │  type-safe oRPC client │
+                        └───────────┬────────────┘
+                                    ▼
+                            ┌───────────────┐
+                            │  apps/server  │  Hono + oRPC handler
+                            │  /rpc  /api-… │  (+ generated OpenAPI)
+                            └───────┬───────┘
+                                    ▼
+                            ┌───────────────┐
+                            │ packages/api  │  routers · schemas · access control
+                            └───────┬───────┘
+              ┌─────────────────────┼─────────────────────┐
+              ▼                     ▼                     ▼
+      ┌──────────────┐     ┌──────────────┐      ┌──────────────┐
+      │ packages/db  │     │ packages/auth│      │ packages/env │
+      │ Drizzle + PG │     │ Better Auth  │      │ typed env    │
+      └──────────────┘     └──────────────┘      └──────────────┘
+```
+
+## The principle
+
+There is **one place** where business logic and data contracts live:
+`packages/api`. The server (`apps/server`) is a thin Hono host that exposes those
+contracts over HTTP; the clients (`apps/web`, `apps/tui`) consume them through a
+**type-safe oRPC client** with no hand-written API glue.
+
+This means:
+
+- A change to a router's input or output is a **compile error** in every client
+  that used it — not a runtime surprise.
+- The RPC surface and the generated OpenAPI document come from the **same
+  definition**, so they can't drift.
+- The database, auth, and environment schemas are isolated packages the API layer
+  depends on — not concerns leaking into the transport or the clients.
+
+## Where authorization happens
+
+<Callout title="Server-side, always">
+  Reads are gated on **space visibility** (`packages/api/src/lib/access.ts`);
+  content writes on the **effective space/page role**; organization management on
+  **org RBAC** (`assertOrgPermission`). Every write runs in a transaction and
+  appends an audit row. The frontend mirrors these checks only to gate UI.
+</Callout>
+
+## Explore each layer
+
+<Cards>
+  <Card title="Monorepo layout" href="/docs/architecture/monorepo">
+    What lives in each app and package.
+  </Card>
+  <Card title="API & oRPC" href="/docs/architecture/api">
+    One definition, two surfaces (RPC + OpenAPI).
+  </Card>
+  <Card title="Database" href="/docs/architecture/database">
+    Drizzle schema, migrations, transactions.
+  </Card>
+  <Card title="Auth" href="/docs/architecture/auth">
+    Better Auth, sessions, and the shared secret.
+  </Card>
+</Cards>

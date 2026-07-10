@@ -1,0 +1,64 @@
+---
+title: Monorepo layout
+description: What each app and package is responsible for.
+icon: FolderGit2
+---
+
+The repository is a **pnpm workspace** driven by **Turborepo**. Apps are
+deployable units; packages are shared libraries consumed by the apps.
+
+<Files>
+  <Folder name="apps" defaultOpen>
+    <File name="web — React (TanStack Start) client · :3001" />
+    <File name="server — Hono + oRPC HTTP host · :3000" />
+    <File name="collab — Hocuspocus + Yjs real-time service · :1234" />
+    <File name="tui — guided terminal installer / ops wizard" />
+    <File name="docs — this documentation & marketing site · :3002" />
+  </Folder>
+  <Folder name="packages" defaultOpen>
+    <File name="api — oRPC routers, Zod schemas, access control" />
+    <File name="auth — Better Auth config, statement & roles" />
+    <File name="db — Drizzle schema & SQL migrations" />
+    <File name="editor — shared TipTap schema (web + collab)" />
+    <File name="ui — shared shadcn/ui primitives and styles" />
+    <File name="env — typed environment-variable schemas" />
+    <File name="config — shared TypeScript configuration" />
+  </Folder>
+</Files>
+
+## Apps
+
+| App           | Role                                                                       |
+| ------------- | -------------------------------------------------------------------------- |
+| `apps/web`    | The primary client — React 19, TanStack Start & Router, Tailwind CSS 4.    |
+| `apps/server` | Thin Hono host that mounts the oRPC handler, OpenAPI, and auth routes.     |
+| `apps/collab` | Node-only real-time collaboration service (Hocuspocus + Yjs).              |
+| `apps/tui`    | Self-contained installer/ops wizard (OpenTUI + React), shipped as a binary. |
+| `apps/docs`   | The docs + marketing site (Fumadocs on TanStack Start).                    |
+
+## Packages
+
+| Package             | Role                                                                          |
+| ------------------- | ----------------------------------------------------------------------------- |
+| `packages/api`      | **Business logic and data contracts.** All routers, schemas, and access control. |
+| `packages/auth`     | Better Auth configuration; the RBAC `statement` and static `roles` (single source of truth). |
+| `packages/db`       | Drizzle ORM schema and versioned SQL migrations.                              |
+| `packages/editor`   | The shared TipTap schema used by both the web editor and the collab service.  |
+| `packages/ui`       | Shared UI primitives (shadcn/ui on base-ui) and Tailwind styles.              |
+| `packages/env`      | Typed environment-variable schemas (t3-env style).                            |
+| `packages/config`   | Shared `tsconfig` base.                                                        |
+
+## Why this shape
+
+The strict boundary keeps the **HTTP surface** (`apps/server`) separate from the
+**business logic** (`packages/api`) separate from the **clients**. A single oRPC
+router definition drives both the type-safe RPC surface and the generated OpenAPI
+document — see [API & oRPC](/docs/architecture/api).
+
+## Tooling
+
+- **pnpm** — workspace + catalog for shared dependency versions.
+- **Turborepo** — task pipeline and caching (`build`, `test`, `check-types`).
+- **Vitest** — tests.
+- **Oxlint / Oxfmt** — lint and format.
+- **lefthook** — git hooks that lint/format staged files on commit.

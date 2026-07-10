@@ -1,0 +1,65 @@
+---
+title: Organizations & members
+description: The tenant boundary — how multi-tenancy and membership work.
+icon: Building2
+---
+
+An **organization** is the top-level tenant in Nilovon Wiki. It is the unit of
+isolation: all content, and every authorization decision, is scoped to one.
+
+## Multi-tenant by default
+
+Every query the API runs is scoped to an organization. This is not a UI
+convenience — it is enforced in the business-logic layer (`packages/api`), so two
+organizations can never read or write each other's data, regardless of what the
+client asks for.
+
+<Callout title="The active organization">
+  A user can be a member of several organizations. Each session has one **active**
+  organization, and permission checks resolve against the member row in *that*
+  org. Switching orgs changes what the same user is allowed to do.
+</Callout>
+
+## Members and roles
+
+Joining an organization creates a **member** row for the user. That row carries
+one or more **roles** (stored comma-separated), which is where the user's
+capabilities come from.
+
+There are three static roles, always available in every org:
+
+| Role     | Summary                                                        |
+| -------- | ------------------------------------------------------------- |
+| `owner`  | Everything.                                                   |
+| `admin`  | Content management + org admin, minus destructive org actions. |
+| `member` | Read/create pages and comments, upload attachments.           |
+
+Owners and admins (anyone with the `member:["update"]` capability) act as **org
+managers** — a global override for organization-level management.
+
+Beyond the static roles, admins can create **dynamic roles** ("groups") at
+runtime and assign them to members. See [Permissions](/docs/permissions) for the
+full model.
+
+## Onboarding
+
+When you register the first user, onboarding walks you through creating your first
+organization and optionally seeding sample content, so you land on a populated
+workspace rather than an empty one.
+
+<Callout type="warn">
+  Creating an org must be followed by setting it active — otherwise the first
+  permission check resolves against nothing and fails. The onboarding flow does
+  this for you.
+</Callout>
+
+## Related
+
+<Cards>
+  <Card title="Spaces" href="/docs/concepts/spaces">
+    How content is grouped within an organization.
+  </Card>
+  <Card title="Permissions" href="/docs/permissions">
+    Roles, groups, and how capabilities are checked.
+  </Card>
+</Cards>

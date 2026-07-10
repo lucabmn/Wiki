@@ -1,0 +1,33 @@
+---
+title: Comments
+description: Discuss pages inline — create, resolve, and moderate.
+icon: MessageSquare
+---
+
+**Comments** let members discuss a page without changing its content.
+
+## Capabilities
+
+- **Create** — anyone with the `commenter` space role (or higher) can comment.
+- **Resolve** — mark a thread as handled.
+- **Moderate** — remove or manage others' comments.
+
+Authorization is **author-or-permission**: you can always act on your own
+comment; acting on someone else's requires the moderate capability. Content-level
+comment actions are governed by the **space role**, not organization RBAC.
+
+## Where they live
+
+Comments attach to a page and are shown alongside it. Resolving a comment keeps it
+for the record while clearing it from the active view.
+
+## Related
+
+<Cards>
+  <Card title="Space roles" href="/docs/concepts/spaces">
+    `commenter` and above can comment.
+  </Card>
+  <Card title="Permissions" href="/docs/permissions/space-page-access">
+    How content actions are authorized.
+  </Card>
+</Cards>

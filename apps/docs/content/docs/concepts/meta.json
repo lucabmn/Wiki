@@ -1,0 +1,13 @@
+{
+  "title": "Concepts",
+  "icon": "Boxes",
+  "pages": [
+    "organizations",
+    "spaces",
+    "pages",
+    "comments",
+    "search",
+    "activity-log",
+    "collaboration"
+  ]
+}

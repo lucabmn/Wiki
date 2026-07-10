@@ -1,0 +1,60 @@
+---
+title: Authentication
+description: Better Auth, organizations, sessions, and the shared signing secret.
+icon: LockKeyhole
+---
+
+Authentication and organization membership are handled by
+[**Better Auth**](https://better-auth.com), configured in `packages/auth` and
+mounted by the server under `/api/auth/*`.
+
+## Organizations & dynamic access control
+
+The **organization plugin** provides multi-tenancy — organizations, members,
+invitations, and teams. On top of it, **dynamic access control** powers the RBAC
+system: the `statement`, static `roles`, and runtime **dynamic roles** ("groups").
+
+The RBAC source of truth (`packages/auth/src/permissions.ts`) is deliberately
+**server-free** so it can be imported by both the server and the browser bundle —
+never import the database or server code into it. See
+[Permissions](/docs/permissions).
+
+## Sessions & cookies
+
+Sessions are cookie-based and signed with **`BETTER_AUTH_SECRET`**:
+
+- Over **HTTPS**: `SameSite=None; Secure` — supports web and API on different
+  subdomains.
+- Over **plain HTTP**: falls back to `SameSite=Lax`, so localhost and LAN pilots
+  work without TLS.
+
+<Callout type="warn" title="One secret, several services">
+  `BETTER_AUTH_SECRET` signs sessions **and** the page-scoped collab tokens. The
+  collab service must be given the **same** secret so it can verify those tokens.
+  Keep it with your backups — a restore can't validate existing sessions without
+  it.
+</Callout>
+
+## Rate limiting
+
+The server applies per-IP rate limits, tuned separately for the API and the auth
+routes:
+
+- `RATE_LIMIT_MAX` — general API requests/minute.
+- `RATE_LIMIT_AUTH_MAX` — auth routes/minute.
+
+## White-labeling
+
+`APP_NAME` sets the display name used in auth flows, so a deployment can present
+its own product name.
+
+## Related
+
+<Cards>
+  <Card title="Permissions" href="/docs/permissions">
+    The full authorization model built on top of auth.
+  </Card>
+  <Card title="Configuration" href="/docs/self-hosting/configuration">
+    Where the secret and rate limits are set.
+  </Card>
+</Cards>

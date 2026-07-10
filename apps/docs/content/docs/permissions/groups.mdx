@@ -1,0 +1,79 @@
+---
+title: Groups (dynamic roles)
+description: Create custom roles at runtime and assign them to members.
+icon: UsersRound
+---
+
+**Groups** are **dynamic roles**: created at runtime, stored in the
+`organizationRole` table, permissioned from the same statement as static roles,
+and assigned to members. Only users whose role has the `ac` resource with
+`create` (i.e. `admin` / `owner`) may manage them.
+
+## Create, update, delete, list
+
+```ts
+// Create a group with permissions
+await authClient.organization.createRole({
+  role: "editors",
+  permission: { page: ["create", "update", "publish"], comment: ["moderate"] },
+  organizationId, // optional; defaults to active org
+});
+
+await authClient.organization.updateRole({
+  roleName: "editors",
+  organizationId,
+  data: {
+    permission: { page: ["create", "update", "delete"] },
+    roleName: "senior-editors",
+  },
+});
+
+await authClient.organization.deleteRole({ roleName: "editors", organizationId });
+
+const { data: roles } = await authClient.organization.listRoles({
+  query: { organizationId },
+});
+```
+
+Server equivalents: `auth.api.createOrgRole`, `updateOrgRole`, `deleteOrgRole`,
+`listOrgRoles`, `getOrgRole` — each takes `{ body | query, headers }`.
+
+## Assign a group to a user
+
+A member's `role` field is comma-separated, so assigning multiple groups means
+multiple roles:
+
+```ts
+await authClient.organization.updateMemberRole({
+  memberId,
+  role: ["member", "editors"], // static + dynamic combined
+  organizationId,
+});
+```
+
+## Per-user override
+
+There is no native per-user permission grant. To give one user something extra,
+create a dynamic role for that grant and add it to their member's role list.
+
+## Groups are not teams
+
+<Callout type="warn">
+  **Teams ≠ groups.** Teams (`teams: { enabled: true }`) are org sub-units and
+  carry **no** permissions. Permissions come from roles only.
+</Callout>
+
+## Verifying it works (round-trip)
+
+After a DB migration (`pnpm --filter @nilovon-wiki/db db:push`), a quick
+end-to-end check:
+
+<Steps>
+<Step>Create an org → `setActive`.</Step>
+<Step>`createRole({ role: "editors", permission: { page: ["delete"] } })`.</Step>
+<Step>Assign it to a member via `updateMemberRole`.</Step>
+<Step>`hasPermission({ permissions: { page: ["delete"] } })` returns `true`; `{ page: ["publish"] }` (not granted) returns `false`.</Step>
+</Steps>
+
+Type-checking alone won't catch the active-org and cross-org pitfalls — exercise a
+real check.

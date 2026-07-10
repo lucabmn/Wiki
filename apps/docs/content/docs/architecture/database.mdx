@@ -1,0 +1,58 @@
+---
+title: Database
+description: Drizzle ORM, versioned migrations, transactions, and full-text search.
+icon: Database
+---
+
+Data lives in **PostgreSQL**, accessed through **Drizzle ORM**. The schema and
+migrations are owned by `packages/db`.
+
+## Schema and migrations
+
+The schema is defined in Drizzle and applied one of two ways:
+
+- **Development:** `pnpm db:push` pushes the schema directly — fast, no migration
+  files.
+- **Production:** versioned SQL migrations (`packages/db/src/migrations`) are
+  applied by the one-shot `migrate` service before the apps start.
+
+Migrations are tracked in the database, so re-running is a no-op. Destructive
+schema diffs are **not** auto-applied — the safety that replaced the old
+`push --force` flow. See [Updates](/docs/self-hosting/updates).
+
+```bash
+pnpm db:generate   # generate SQL migrations from schema changes
+pnpm db:migrate    # apply pending migrations
+pnpm db:push       # push directly (dev)
+pnpm db:studio     # open Drizzle Studio
+```
+
+## Transactions and auditing
+
+**Every write runs in a transaction and appends an audit row** — including
+destructive deletes. Because the audit row is written inside the same transaction
+as the change, the log is atomic with the data: it can never record a change that
+didn't happen, or miss one that did. See
+[Activity log & audit](/docs/concepts/activity-log).
+
+## Full-text search
+
+Pages carry a generated **`tsvector`** column indexed with a **GIN** index, so
+search is served by Postgres itself — no external index to run or reconcile. See
+[Full-text search](/docs/concepts/search).
+
+## Ordering
+
+Page order within a tree level uses **fractional (LexoRank) keys**, so inserting or
+moving a page updates only that page's key without renumbering siblings.
+
+## Collaboration state
+
+The real-time document state is persisted in a **`yjs_state`** column on the page,
+loaded and updated by the collab service. See
+[Collaboration](/docs/architecture/collaboration).
+
+## Networking
+
+Postgres is bound to `127.0.0.1:5432` — never exposed to the network. Only the
+app services (and, in production, Caddy) can reach it.

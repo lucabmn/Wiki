@@ -1,0 +1,58 @@
+---
+title: Overview
+description: The two-layer authorization model, and where each decision is made.
+icon: ShieldCheck
+---
+
+Authorization in Nilovon Wiki has **two independent layers**. Understanding which
+layer governs a given action is the key to the whole model.
+
+<Cards>
+  <Card title="Organization RBAC" href="/docs/permissions/org-rbac">
+    Org-level capabilities: who may create spaces, manage members, and manage
+    roles. Built on Better Auth's dynamic access control.
+  </Card>
+  <Card title="Space & page access" href="/docs/permissions/space-page-access">
+    Who may read and write **content** within a specific space or page, via space
+    roles and optional per-page ACLs.
+  </Card>
+</Cards>
+
+## The split, precisely
+
+| Action                                       | Governed by            |
+| -------------------------------------------- | ---------------------- |
+| Create a space, manage members, manage roles | **Organization RBAC**  |
+| Read / write pages, comments, attachments, tags | **Space & page access** |
+
+Content actions (`page`, `comment`, `attachment`) are **not** gated by org RBAC
+`page:*` / `comment:*` statements — those are governed by the space and page layer.
+Org RBAC governs organization management.
+
+<Callout title="Always enforced server-side">
+  Both layers are enforced on the server. The frontend only **mirrors** them to
+  gate UI — never rely on the client for enforcement, because the server always
+  re-checks.
+</Callout>
+
+## Everything is org-scoped
+
+A permission check always resolves against a specific organization's member row.
+With **no active organization**, checks fail — there is nothing to resolve
+against. Switch the active org with `authClient.organization.setActive(...)`.
+
+## Where it lives in the code
+
+| File                                | Contents                                                     |
+| ----------------------------------- | ------------------------------------------------------------ |
+| `packages/auth/src/permissions.ts`  | The `statement`, the `ac` engine, and static `roles`. Single source of truth, server-free. |
+| `packages/api/src/index.ts`         | Backend guards: `requireOrgPermission`, `assertOrgPermission`, `hasOrgPermission`. |
+| `packages/api/src/lib/access.ts`    | Pure space/page role resolvers (unit-tested, auth-free).     |
+| `packages/api/src/lib/authz.ts`     | Router-facing space/page gates that fold in the org-manager override. |
+| `apps/web/src/lib/use-permissions.ts` | Frontend `usePermission` hook and static checks.           |
+
+<Callout type="warn" title="Keep permissions.ts server-free">
+  `permissions.ts` is imported by both the server and the browser bundle. Never
+  import the database, env, or server code into it, or the database gets pulled
+  into the client build.
+</Callout>

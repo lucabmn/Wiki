@@ -1,0 +1,84 @@
+---
+title: API & oRPC
+description: One router definition, two surfaces — type-safe RPC and generated OpenAPI.
+icon: Webhook
+---
+
+The API is built on [**oRPC**](https://orpc.unnoq.com). A single router definition
+in `packages/api` is the source of truth for both surfaces the server exposes.
+
+## One definition, two surfaces
+
+Every procedure carries REST metadata (`method` / `path` / `tags` / `summary`)
+alongside its handler, so the same definition produces:
+
+- **`/rpc`** — the type-safe RPC surface the clients call, and
+- **`/api-reference`** — a generated **OpenAPI** document and interactive
+  reference.
+
+```ts
+// packages/api/src/routers/index.ts
+export const appRouter = {
+  health: { check: publicProcedure.route({ method: "GET", path: "/health", ... }) },
+  spaces: spaceRouter,
+  spaceMembers: spaceMemberRouter,
+  pages: pageRouter,
+  pageAccess: pageAccessRouter,
+  comments: commentRouter,
+  tags: tagRouter,
+  attachments: attachmentRouter,
+  links: linkRouter,
+  activity: activityRouter,
+  search: searchRouter,
+  me: userStateRouter,
+  onboarding: onboardingRouter,
+  dashboard: dashboardRouter,
+};
+
+export type AppRouter = typeof appRouter;
+export type AppRouterClient = RouterClient<typeof appRouter>;
+```
+
+Because the client type is **inferred** from `AppRouter`, there is no codegen step
+and no way for the client and server to disagree.
+
+## Procedure builders
+
+Routers are composed from a few base builders (in `packages/api/src/index.ts`):
+
+| Builder                  | Guarantees                                                        |
+| ------------------------ | ---------------------------------------------------------------- |
+| `publicProcedure`        | No auth required.                                                 |
+| `protectedProcedure`     | An authenticated session; `context.headers` available.           |
+| `requireOrgPermission()` | The caller holds a given org permission in the **active** org.    |
+
+Content routes additionally gate on **space/page capabilities** via the helpers in
+`packages/api/src/lib/authz.ts`. See [Permissions](/docs/permissions).
+
+## The server host
+
+`apps/server` is a thin **Hono** app that mounts:
+
+- the **RPCHandler** under `/rpc`,
+- the **OpenAPIHandler** (with the reference plugin) under `/api-reference`,
+- Better Auth under `/api/auth/*`,
+- a deep `/health` check.
+
+CORS and per-IP rate limiting (`RATE_LIMIT_MAX`, `RATE_LIMIT_AUTH_MAX`) are applied
+at this layer.
+
+<Callout type="info">
+  The generated REST surface uses `PATCH` / `PUT` / `DELETE`, so CORS is configured
+  to allow them — otherwise preflight would reject batched `/rpc` calls.
+</Callout>
+
+## Consuming it
+
+<Cards>
+  <Card title="RPC client" href="/docs/api-reference/rpc-client">
+    Call the API from TypeScript with full inference.
+  </Card>
+  <Card title="REST & OpenAPI" href="/docs/api-reference/rest">
+    The generated HTTP surface and where to find the reference.
+  </Card>
+</Cards>

@@ -1,0 +1,31 @@
+---
+title: Health & monitoring
+description: Health checks and log retention.
+icon: Activity
+---
+
+## Health endpoint
+
+```
+GET http://<api>/health
+```
+
+A **deep** health check — it verifies database connectivity, not just that the
+process is up. It returns `503` when the database is unreachable, which is what the
+Compose health checks rely on to decide a service is ready.
+
+## Logs
+
+Container logs are JSON-file capped at **10 MB × 3 files** per service, so a busy
+instance won't fill the disk with logs.
+
+```sh
+pnpm docker:logs        # tail all services
+docker compose logs -f server   # one service
+```
+
+## What to watch
+
+- **`/health` on the API** — the single best liveness/readiness signal.
+- **Postgres disk usage** — everything lives here; pair with [backups](/docs/self-hosting/backups).
+- **Caddy logs** (production) — TLS issuance and proxy errors.

@@ -8,6 +8,7 @@
     "test": "turbo run test",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web",
+    "dev:docs": "turbo run dev -F docs",
     "dev:tui": "turbo run dev -F tui",
     "dev:server": "turbo run dev -F server",
     "dev:collab": "turbo run dev -F collab",

@@ -1,0 +1,73 @@
+---
+title: RPC client
+description: Call the API from TypeScript with end-to-end inference.
+icon: Braces
+---
+
+The clients call the API through a **type-safe oRPC client**. The client's types
+are inferred from the server's `AppRouter` — there is no codegen and no generated
+SDK to keep in sync.
+
+## The shape
+
+```ts
+import type { AppRouterClient } from "@nilovon-wiki/api/routers/index";
+
+// client: AppRouterClient — fully typed from the server definition
+const page = await client.pages.create({
+  spaceId,
+  title: "Runbook",       // ✅ input type checked against the Zod schema
+});
+//    ^? { id: string; slug: string; ... }  — output inferred
+```
+
+Rename a field in the router's schema and every call site stops compiling — that's
+the point.
+
+## In the web app (TanStack Query)
+
+The web client wires oRPC into **TanStack Query** via `@orpc/tanstack-query`, so
+procedures become query and mutation options:
+
+```ts
+import { useQuery } from "@tanstack/react-query";
+import { orpc } from "@/lib/orpc";
+
+// Read
+const { data: access } = useQuery(
+  orpc.pageAccess.myRole.queryOptions({ input: { pageId } }),
+);
+
+// Mutate
+const create = useMutation(orpc.pages.create.mutationOptions());
+create.mutate({ spaceId, title: "Runbook" });
+```
+
+## Authorization is server-side
+
+The client never decides what you may do — it only surfaces what the server
+returns. Gate UI on the server's answer:
+
+```ts
+// access.canWrite  → show edit / publish
+// access.canManage → show the sharing panel
+```
+
+See [Permissions](/docs/permissions) for `usePermission` and the space/page access
+hooks.
+
+## Errors
+
+Denied requests come back as `ORPCError` with codes like `FORBIDDEN` or
+`UNAUTHORIZED`; validation failures reflect the Zod schema that rejected the input.
+
+## Related
+
+<Cards>
+  <Card title="REST & OpenAPI" href="/docs/api-reference/rest">
+    For callers that aren't TypeScript.
+  </Card>
+  <Card title="API architecture" href="/docs/architecture/api">
+    How one definition produces both surfaces.
+  </Card>
+</Cards>
