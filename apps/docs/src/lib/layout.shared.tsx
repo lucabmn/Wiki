@@ -44,7 +44,7 @@ export function baseOptions(): BaseLayoutProps {
       },
       {
         text: "API Reference",
-        url: `${docsRoute}/api-reference/overview`,
+        url: `${docsRoute}/v1/overview`,
       },
     ],
   };

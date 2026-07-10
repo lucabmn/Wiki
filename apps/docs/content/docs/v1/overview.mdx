@@ -8,10 +8,10 @@ The server exposes the **same** router two ways. Pick the one that fits your
 caller.
 
 <Cards>
-  <Card title="RPC client (TypeScript)" href="/docs/api-reference/rpc-client">
+  <Card title="RPC client (TypeScript)" href="/docs/v1/rpc-client">
     Full type inference, no codegen. The way the web and terminal clients call it.
   </Card>
-  <Card title="REST & OpenAPI" href="/docs/api-reference/rest">
+  <Card title="REST & OpenAPI" href="/docs/v1/rest">
     A generated HTTP surface with an interactive reference — for anything not
     written in TypeScript.
   </Card>
@@ -22,11 +22,11 @@ caller.
 | Path             | Surface                                                    |
 | ---------------- | --------------------------------------------------------- |
 | `/rpc`           | Type-safe oRPC endpoint the clients call.                 |
-| `/api-reference` | Generated OpenAPI document + interactive reference.        |
+| `/v1` | Generated OpenAPI document + interactive reference.        |
 | `/api/auth/*`    | Better Auth routes (sign-in, session, organization, etc.). |
 | `/health`        | Deep health check (verifies the database).                |
 
-Both `/rpc` and `/api-reference` are generated from **one** router definition, so
+Both `/rpc` and `/v1` are generated from **one** router definition, so
 they never drift. See [API & oRPC](/docs/architecture/api) for how that works.
 
 ## Router map

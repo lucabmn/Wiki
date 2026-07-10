@@ -313,11 +313,7 @@ function Architecture() {
             <ArrowRight className="hidden size-6 lg:block" />
           </div>
           <div className="grid gap-4">
-            <Node
-              icon={GitBranch}
-              title="apps/server"
-              sub="Hono + oRPC handler · /rpc · /api-reference"
-            />
+            <Node icon={GitBranch} title="apps/server" sub="Hono + oRPC handler · /rpc · /v1" />
             <Node
               icon={Zap}
               title="packages/api"
