@@ -1,4 +1,4 @@
-import { and, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { page } from "@nilovon-wiki/db/schema/index";
@@ -56,6 +56,9 @@ export const searchRouter = {
           and(
             inArray(page.spaceId, spaceIds),
             isNull(page.archivedAt),
+            // Only published pages are indexed for readers: an unpublished draft
+            // must not surface via full-text search (its body isn't visible).
+            eq(page.status, "published"),
             sql`${page.searchVector} @@ ${tsquery}`,
           ),
         )

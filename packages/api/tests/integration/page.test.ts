@@ -7,6 +7,8 @@ vi.mock("@nilovon-wiki/auth", () => ({ auth: { api: { hasPermission } } }));
 import { organization, user, member, space } from "@nilovon-wiki/db/schema/index";
 
 import { pageRouter } from "../../src/routers/page";
+import { linkRouter } from "../../src/routers/link";
+import { searchRouter } from "../../src/routers/search";
 import { createTestDb, type TestDb } from "./db";
 import { testContext } from "./context";
 
@@ -107,6 +109,99 @@ describe("page.publish", () => {
 
     const acts = await db.query.activity.findMany();
     expect(acts.some((x) => x.action === "page.published" && x.pageId === p.id)).toBe(true);
+  });
+
+  it("promotes the working copy (title + content) into the published projection", async () => {
+    const p = await call(pageRouter.create, { spaceId: "sp", title: "Draft" }, { context: ctx() });
+    const content = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "Body v1" }] }],
+    };
+    const published = await call(
+      pageRouter.publish,
+      { id: p.id, title: "Published Title", content, textContent: "Body v1" },
+      { context: ctx() },
+    );
+    // The read-facing projection now advances to the promoted working copy…
+    expect(published.title).toBe("Published Title");
+    expect(published.textContent).toBe("Body v1");
+    expect(published.content).toEqual(content);
+    // …and the same is snapshotted as the revision.
+    const revisions = await call(pageRouter.listRevisions, { id: p.id }, { context: ctx() });
+    expect(revisions[0]!.title).toBe("Published Title");
+    expect(revisions[0]!.textContent).toBe("Body v1");
+  });
+
+  it("re-publish without content keeps the last published projection", async () => {
+    const p = await call(pageRouter.create, { spaceId: "sp", title: "T" }, { context: ctx() });
+    await call(
+      pageRouter.publish,
+      { id: p.id, content: { type: "doc", content: [] }, textContent: "first" },
+      { context: ctx() },
+    );
+    const again = await call(pageRouter.publish, { id: p.id }, { context: ctx() });
+    expect(again.textContent).toBe("first");
+  });
+});
+
+// Option B: reader-facing surfaces (search, backlinks) expose published pages
+// only — an unpublished draft is invisible even when its columns are populated.
+describe("draft invisibility on reader surfaces", () => {
+  it("full-text search excludes a draft and includes it after publish", async () => {
+    const p = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "Hidden", textContent: "zzsearchable" },
+      { context: ctx() },
+    );
+    const beforeHits = await call(
+      searchRouter.pages,
+      { query: "zzsearchable" },
+      { context: ctx() },
+    );
+    expect(beforeHits.map((h) => h.pageId)).not.toContain(p.id);
+
+    await call(pageRouter.publish, { id: p.id, textContent: "zzsearchable" }, { context: ctx() });
+    const afterHits = await call(searchRouter.pages, { query: "zzsearchable" }, { context: ctx() });
+    expect(afterHits.map((h) => h.pageId)).toContain(p.id);
+  });
+
+  it("backlinks exclude a draft source and include it after publish", async () => {
+    const target = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "Target" },
+      { context: ctx() },
+    );
+    const linkContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "see",
+              marks: [{ type: "link", attrs: { href: `/pages/${target.id}` } }],
+            },
+          ],
+        },
+      ],
+    };
+    // Created with link content: the pageLink row exists, but the source is a draft.
+    const source = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "Source", content: linkContent },
+      { context: ctx() },
+    );
+    const before = await call(linkRouter.backlinks, { id: target.id }, { context: ctx() });
+    expect(before.map((b) => b.id)).not.toContain(source.id);
+
+    await call(
+      pageRouter.publish,
+      { id: source.id, content: linkContent, textContent: "see" },
+      { context: ctx() },
+    );
+    const after = await call(linkRouter.backlinks, { id: target.id }, { context: ctx() });
+    expect(after.map((b) => b.id)).toContain(source.id);
   });
 });
 

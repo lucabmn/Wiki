@@ -9,6 +9,7 @@ import { Button } from "@nilovon-wiki/ui/components/button";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import type { Editor } from "@tiptap/core";
 import { useMutation } from "@tanstack/react-query";
+import { useBlocker } from "@tanstack/react-router";
 import { Check, History, Loader2, Send, Users, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -24,12 +25,18 @@ import { RevisionHistory } from "./revision-history";
  * the publish action — mirroring the server's authorization so the UI never
  * offers an action the API would reject.
  *
- * Collaboration model: the page body lives in a shared Yjs document synced by
- * `apps/collab` (see `RichTextEditor`). The collab server projects the live doc
- * back into `page.content`/`textContent` on a debounce, so concurrent editors
- * merge without clobbering. "Speichern"/"Veröffentlichen" additionally flush the
- * editor's current document to the DB immediately (deterministic, not waiting on
- * the debounce) — the title, which is not collaborative, rides along.
+ * Publish model: the page body lives in a shared Yjs document synced by
+ * `apps/collab` (see `RichTextEditor`), which persists it as the private working
+ * draft (`yjsState`) only. The DB's `content`/`textContent` — what readers,
+ * search, and backlinks see — advance ONLY when "Veröffentlichen" promotes the
+ * editor's current document via `pages.publish`. So:
+ *  - "Schließen" just leaves the editor; the collaborative draft is untouched
+ *    (a shared doc can't be privately discarded).
+ *  - "Speichern" persists the (non-collaborative) title as a draft and closes;
+ *    the body is already autosaved by collab.
+ *  - "Veröffentlichen" promotes body + title into the published projection.
+ * The title is local React state, so a `useBlocker` guards against losing an
+ * unsaved title on navigation or reload.
  */
 export function PageEditor({
   page,
@@ -98,38 +105,49 @@ function PageEditorForm({
     };
   }, [provider, doc]);
 
-  // Flush the current title + live document to the DB. Title-only pages (no
-  // editor yet) still persist their title.
-  const persist = async () => {
-    const trimmed = title.trim() || "Ohne Titel";
-    const editor = editorRef.current;
-    await update.mutateAsync({
-      id: page.id,
-      title: trimmed,
-      ...(editor ? { content: editor.getJSON(), textContent: editor.getText() } : {}),
-    });
-  };
-
   const finish = () => {
     invalidatePage();
     invalidateList();
     onDone();
   };
 
+  // "Speichern": persist only the title (the body is a collaborative draft,
+  // continuously autosaved by the collab server) and close.
   const handleSave = async () => {
-    await persist();
-    toast.success("Seite gespeichert");
+    await update.mutateAsync({ id: page.id, title: title.trim() || "Ohne Titel" });
+    toast.success("Entwurf gespeichert");
     finish();
   };
 
+  // "Veröffentlichen": promote the current working copy — body (read from the
+  // live editor) plus title — into the published projection readers see.
   const handlePublish = async () => {
-    await persist();
-    await publish.mutateAsync({ id: page.id });
+    const editor = editorRef.current;
+    await publish.mutateAsync({
+      id: page.id,
+      title: title.trim() || "Ohne Titel",
+      ...(editor ? { content: editor.getJSON(), textContent: editor.getText() } : {}),
+    });
     toast.success("Seite veröffentlicht");
     finish();
   };
 
   const busy = update.isPending || publish.isPending;
+
+  // The title is not part of the collaborative doc, so unsaved title edits would
+  // be lost silently on navigation/reload. Guard both, but stand down while a
+  // save/publish is in flight (which is itself persisting the title).
+  const titleDirty = title !== page.title;
+  useBlocker({
+    disabled: busy,
+    shouldBlockFn: () => {
+      if (!titleDirty) return false;
+      return !window.confirm(
+        "Der Seitentitel hat ungespeicherte Änderungen. Ohne Speichern verlassen?",
+      );
+    },
+    enableBeforeUnload: () => titleDirty && !busy,
+  });
 
   return (
     <div>
@@ -140,7 +158,7 @@ function PageEditorForm({
             <History className="size-4" /> Verlauf
           </Button>
           <Button variant="outline" size="sm" disabled={busy} onClick={onDone}>
-            <X className="size-4" /> Abbrechen
+            <X className="size-4" /> Schließen
           </Button>
           <Button size="sm" disabled={busy} onClick={handleSave}>
             <Check className="size-4" /> {update.isPending ? "Speichern …" : "Speichern"}
@@ -153,6 +171,12 @@ function PageEditorForm({
           ) : null}
         </div>
       </div>
+
+      <p className="mb-3 text-xs text-muted-foreground">
+        {page.status === "published"
+          ? "Änderungen sind erst nach „Veröffentlichen“ für andere sichtbar — bis dahin sehen Leser die zuletzt veröffentlichte Fassung."
+          : "Änderungen sind erst nach „Veröffentlichen“ für andere sichtbar."}
+      </p>
 
       <Input
         value={title}

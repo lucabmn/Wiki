@@ -58,6 +58,8 @@ beforeAll(async () => {
       createdBy: "u1",
     },
   ]);
+  // Published: search indexes only published pages, and these fixtures exercise
+  // space-access filtering, not the draft/published gate.
   await db.insert(page).values([
     {
       id: "pPub",
@@ -65,6 +67,7 @@ beforeAll(async () => {
       slug: "pub",
       title: "Public Onboarding",
       textContent: "engineer onboarding",
+      status: "published",
     },
     {
       id: "pPriv",
@@ -72,6 +75,7 @@ beforeAll(async () => {
       slug: "priv",
       title: "Secret Roadmap",
       textContent: "engineer roadmap",
+      status: "published",
     },
   ]);
   // content in each space so the read paths have something to return / hide

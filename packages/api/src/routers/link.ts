@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { page, pageLink } from "@nilovon-wiki/db/schema/index";
@@ -32,7 +32,9 @@ export const linkRouter = {
         .select({ page })
         .from(pageLink)
         .innerJoin(page, eq(pageLink.sourcePageId, page.id))
-        .where(eq(pageLink.targetPageId, input.id))
+        // A backlink is only real once the linking page is published — an
+        // unpublished draft's links must not surface as incoming references.
+        .where(and(eq(pageLink.targetPageId, input.id), eq(page.status, "published")))
         .orderBy(asc(page.title));
       // Linked pages live in the same space; hide any the caller can't read.
       return filterReadablePages(

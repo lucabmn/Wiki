@@ -4,11 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Real RichTextEditor (real TipTap + Yjs) — this test exists precisely to catch
 // what the stubbed page-editor test can't: behavior that depends on TipTap
-// actually running against the shared collab document (title-only saves must
-// flush the live body, not an empty editor).
-const { updateSpy } = vi.hoisted(() => ({
+// actually running against the shared collab document. Publish is the single
+// point that promotes the working copy, so it must carry the live body.
+const { updateSpy, publishSpy } = vi.hoisted(() => ({
   updateSpy: vi.fn((_v?: unknown) => Promise.resolve({})),
+  publishSpy: vi.fn((_v?: unknown) => Promise.resolve({})),
 }));
+
+// The editor guards unsaved title edits via router `useBlocker`; there is no
+// RouterProvider in this harness, so stub it inert.
+vi.mock("@tanstack/react-router", () => ({ useBlocker: () => undefined }));
 
 vi.mock("@/lib/auth-client", () => ({
   authClient: {
@@ -101,7 +106,9 @@ vi.mock("@/utils/orpc", () => ({
       update: {
         mutationOptions: (o: Record<string, unknown>) => ({ mutationFn: updateSpy, ...o }),
       },
-      publish: { mutationOptions: (o: Record<string, unknown>) => ({ mutationFn: vi.fn(), ...o }) },
+      publish: {
+        mutationOptions: (o: Record<string, unknown>) => ({ mutationFn: publishSpy, ...o }),
+      },
     },
     search: {
       pages: { queryOptions: () => ({ queryKey: ["search"], queryFn: async () => [] }) },
@@ -126,7 +133,7 @@ function renderEditor() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <PageEditor page={page} canPublish={false} onDone={vi.fn()} />
+      <PageEditor page={page} canPublish onDone={vi.fn()} />
     </QueryClientProvider>,
   );
 }
@@ -134,9 +141,10 @@ function renderEditor() {
 describe("PageEditor (real editor)", () => {
   beforeEach(() => {
     updateSpy.mockClear();
+    publishSpy.mockClear();
   });
 
-  it("preserves the body text when only the title is edited", async () => {
+  it("publish promotes the live body read from the collab document", async () => {
     renderEditor();
     // Put a body into the live editor, then wait for it to render.
     fireEvent.click(await screen.findByText("seed-revision"));
@@ -145,12 +153,15 @@ describe("PageEditor (real editor)", () => {
     fireEvent.change(screen.getByPlaceholderText("Seitentitel"), {
       target: { value: "New Runbook" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    fireEvent.click(screen.getByRole("button", { name: "Veröffentlichen" }));
 
-    await waitFor(() => expect(updateSpy).toHaveBeenCalled());
-    const payload = updateSpy.mock.calls[0]?.[0] as { title: string; textContent: string };
+    await waitFor(() => expect(publishSpy).toHaveBeenCalled());
+    const payload = publishSpy.mock.calls[0]?.[0] as { title: string; textContent: string };
     expect(payload.title).toBe("New Runbook");
-    // The regression: title-only edits used to send textContent: "".
+    // The promoted body is read live from the TipTap/Yjs document, not an empty
+    // editor — the regression this real-editor test guards against.
     expect(payload.textContent).toBe("Restart the pods");
+    // Saving is separate from publishing; publish does not also PATCH the page.
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 });

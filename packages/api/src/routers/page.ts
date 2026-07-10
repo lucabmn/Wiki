@@ -23,6 +23,7 @@ import {
   PageDraftSchema,
   PageRevisionSchema,
   PageSchema,
+  PublishPageInputSchema,
   SaveDraftInputSchema,
   UpdatePageInputSchema,
 } from "../schemas/page";
@@ -262,9 +263,6 @@ export const pageRouter = {
           .where(eq(page.id, id))
           .returning();
         const row = firstRow(rows);
-        if (patch.content !== undefined) {
-          await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(patch.content));
-        }
         await recordActivity(tx, {
           organizationId,
           action: "page.updated",
@@ -282,9 +280,9 @@ export const pageRouter = {
       method: "POST",
       path: "/pages/{id}/publish",
       tags: TAGS,
-      summary: "Publish a page and snapshot a revision",
+      summary: "Publish a page: promote the working copy and snapshot a revision",
     })
-    .input(z.object({ id: IdSchema, summary: z.string().max(500).optional() }))
+    .input(PublishPageInputSchema)
     .output(PageSchema)
     .handler(async ({ input, context }) => {
       const existing = await loadPage(context.db, input.id);
@@ -296,6 +294,14 @@ export const pageRouter = {
         "write",
       );
       const userId = context.session.user.id;
+      // Promote the caller's current working copy into the published projection.
+      // Collab only persists the working draft as `yjsState`, so publish is the
+      // single point where `content`/`textContent` (and thus the read view,
+      // search, and backlinks) advance. Absent input falls back to the last
+      // published state, making an API-only re-publish a safe no-content op.
+      const nextTitle = input.title?.trim() || existing.title;
+      const nextContent = input.content !== undefined ? input.content : existing.content;
+      const nextText = input.textContent !== undefined ? input.textContent : existing.textContent;
       return context.db.transaction(async (tx) => {
         const latest = await tx.query.pageRevision.findFirst({
           where: eq(pageRevision.pageId, existing.id),
@@ -305,26 +311,37 @@ export const pageRouter = {
         await tx.insert(pageRevision).values({
           pageId: existing.id,
           version: (latest?.version ?? 0) + 1,
-          title: existing.title,
-          content: existing.content,
-          textContent: existing.textContent,
+          title: nextTitle,
+          content: nextContent,
+          textContent: nextText,
           summary: input.summary ?? null,
           editedBy: userId,
         });
         const rows = await tx
           .update(page)
-          .set({ status: "published", publishedAt: new Date(), lastEditedBy: userId })
+          .set({
+            title: nextTitle,
+            content: nextContent,
+            textContent: nextText,
+            status: "published",
+            publishedAt: new Date(),
+            lastEditedBy: userId,
+          })
           .where(eq(page.id, existing.id))
           .returning();
+        const row = firstRow(rows);
+        // Backlinks reflect published content only — resynced here, never by the
+        // collab store.
+        await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(nextContent));
         await recordActivity(tx, {
           organizationId,
           action: "page.published",
           actorId: userId,
           spaceId: existing.spaceId,
           pageId: existing.id,
-          metadata: { title: existing.title },
+          metadata: { title: nextTitle },
         });
-        return firstRow(rows);
+        return row;
       });
     }),
 

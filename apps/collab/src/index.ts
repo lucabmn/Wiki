@@ -1,13 +1,11 @@
 import { Database } from "@hocuspocus/extension-database";
 import { Server } from "@hocuspocus/server";
 import { TiptapTransformer } from "@hocuspocus/transformer";
-import { generateText } from "@tiptap/core";
 import { eq } from "drizzle-orm";
 import { initLogger, log, parseError } from "evlog";
 import * as Y from "yjs";
 
 import { pageIdFromDocName, verifyCollabToken } from "@nilovon-wiki/api/lib/collab-token";
-import { extractPageLinks, syncPageLinks } from "@nilovon-wiki/api/lib/page-links";
 import { db } from "@nilovon-wiki/db";
 import { page } from "@nilovon-wiki/db/schema/index";
 import { pageEditorExtensions } from "@nilovon-wiki/editor";
@@ -18,10 +16,16 @@ import { env } from "@nilovon-wiki/env/collab";
  *
  * Runs as a standalone Node process (Hocuspocus is built on `ws`/crossws and
  * refuses to run under Bun), separate from the Bun/Hono API. One Yjs document
- * per page (`page:<id>`); the Yjs CRDT is the source of truth while a page is
- * open. On every (debounced) save the server projects the shared doc back into
- * the page's `content` + `textContent` so search, the read-only renderer, and
- * `pages.publish` (which snapshots `content`) keep working unchanged.
+ * per page (`page:<id>`); the Yjs CRDT is the source of truth for the *working
+ * copy* while a page is open.
+ *
+ * Publish model: the shared doc is the private working draft. The server
+ * persists it as `yjsState` ONLY — it does NOT project into `content` /
+ * `textContent`. Those columns are the *published* projection and are written
+ * exclusively by `pages.publish`, so in-progress edits stay invisible to
+ * readers, search, and backlinks until an editor explicitly publishes. On first
+ * connect the doc is seeded from the last published `content` (see
+ * `fetchDocument`).
  *
  * Authorization is delegated to the API server: a client presents a short-lived,
  * page-scoped token minted by `pages.collabToken` only after a full `page:write`
@@ -44,8 +48,9 @@ async function fetchDocument(pageId: string): Promise<Uint8Array | null> {
   if (!row) return null;
   if (row.yjsState && row.yjsState.byteLength > 0) return row.yjsState;
 
-  // First time this page is opened collaboratively: hydrate the Yjs doc from the
-  // last content persisted by the (pre-collab) editor so nothing is lost.
+  // First time this page is opened collaboratively: seed the working-copy Yjs
+  // doc from the last published `content` so editing resumes from what readers
+  // currently see (empty for a page that has never been published).
   if (row.content) {
     const ydoc = TiptapTransformer.toYdoc(row.content, FIELD, pageEditorExtensions());
     return Y.encodeStateAsUpdate(ydoc);
@@ -53,22 +58,14 @@ async function fetchDocument(pageId: string): Promise<Uint8Array | null> {
   return null;
 }
 
-/** Persist the Yjs snapshot and project it back into content/textContent. */
-async function storeDocument(pageId: string, state: Uint8Array, document: Y.Doc): Promise<void> {
-  const json = TiptapTransformer.fromYdoc(document, FIELD);
-  const textContent = generateText(json, pageEditorExtensions());
-  const targets = extractPageLinks(json);
-
-  await db.transaction(async (tx) => {
-    const rows = await tx
-      .update(page)
-      .set({ yjsState: state, content: json, textContent })
-      .where(eq(page.id, pageId))
-      .returning({ spaceId: page.spaceId });
-    const row = rows[0];
-    if (!row) return; // page was deleted while open — nothing to reconcile
-    await syncPageLinks(tx, pageId, row.spaceId, targets);
-  });
+/**
+ * Persist the working-copy CRDT snapshot ONLY. The published projection
+ * (`content` / `textContent` + backlinks) is written solely by `pages.publish`,
+ * so debounced edits never leak into any reader-facing surface.
+ */
+async function storeDocument(pageId: string, state: Uint8Array): Promise<void> {
+  // A no-op WHERE (page deleted while open) simply updates nothing.
+  await db.update(page).set({ yjsState: state }).where(eq(page.id, pageId));
 }
 
 const server = new Server({
@@ -99,7 +96,7 @@ const server = new Server({
         const pageId = pageIdFromDocName(documentName);
         if (!pageId) return;
         try {
-          await storeDocument(pageId, state, document);
+          await storeDocument(pageId, state);
         } catch (error) {
           log.error({ source: "collab", op: "store", documentName, ...parseError(error) });
           // Persisting failed: without this, users keep typing into a document

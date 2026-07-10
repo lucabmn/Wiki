@@ -58,15 +58,32 @@ export const CreatePageInputSchema = z.object({
   isTemplate: z.boolean().default(false),
 });
 
+// Note: no `content`/`textContent` here. The page body is a collaborative
+// working copy (see `apps/collab`) whose published projection advances ONLY via
+// `pages.publish`. Letting a plain PATCH write `content` would leak an
+// unpublished body into the reader-facing columns, so update carries metadata
+// only.
 export const UpdatePageInputSchema = z.object({
   id: IdSchema,
   title: z.string().min(1).max(300).optional(),
   slug: SlugSchema.optional(),
   icon: z.string().max(64).nullish(),
   coverImage: z.string().max(2048).nullish(),
+  isTemplate: z.boolean().optional(),
+});
+
+/**
+ * Publishing promotes the caller's current working copy (the live collab doc,
+ * read client-side via `editor.getJSON()`/`getText()`) into the page's
+ * published projection and snapshots a revision. Content/title are optional so
+ * an API-only re-publish falls back to the page's existing published state.
+ */
+export const PublishPageInputSchema = z.object({
+  id: IdSchema,
+  title: z.string().min(1).max(300).optional(),
   content: DocumentSchema.optional(),
   textContent: z.string().optional(),
-  isTemplate: z.boolean().optional(),
+  summary: z.string().max(500).optional(),
 });
 
 export const MovePageInputSchema = z

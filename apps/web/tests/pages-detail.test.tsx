@@ -196,13 +196,15 @@ describe("page view route", () => {
     data.error = false;
   });
 
+  // Published so its body renders — these fixtures exercise edit/archive/subscribe
+  // affordances, not the draft-visibility gate (covered separately).
   const somePage = {
     id: "p1",
     spaceId: "s1",
     title: "Blank",
     slug: "blank",
     icon: null,
-    status: "draft",
+    status: "published",
     textContent: "body",
     updatedAt: new Date("2026-01-02T10:00:00Z"),
   };
@@ -250,7 +252,7 @@ describe("page view route", () => {
     expect(screen.queryByText("resolved one")).toBeNull();
   });
 
-  it("shows an empty-content hint when the page has no text", async () => {
+  it("shows a not-yet-published hint for an empty draft", async () => {
     data.page = {
       id: "p1",
       spaceId: "s1",
@@ -263,8 +265,24 @@ describe("page view route", () => {
     };
     renderView();
 
-    expect(await screen.findByText("Diese Seite hat noch keinen Inhalt.")).toBeDefined();
+    expect(await screen.findByText("Diese Seite wurde noch nicht veröffentlicht.")).toBeDefined();
     expect(screen.getByText("Noch keine Kommentare.")).toBeDefined();
+  });
+
+  it("shows a generic empty hint for a published page with no content", async () => {
+    data.page = {
+      id: "p1",
+      spaceId: "s1",
+      title: "Blank",
+      slug: "blank",
+      icon: null,
+      status: "published",
+      textContent: "   ",
+      updatedAt: new Date("2026-01-02T10:00:00Z"),
+    };
+    renderView();
+
+    expect(await screen.findByText("Diese Seite hat noch keinen Inhalt.")).toBeDefined();
   });
 
   it("shows a not-found state when the page errors", async () => {

@@ -445,7 +445,8 @@ function RouteComponent() {
     );
   }
 
-  const headings = extractHeadings(page.content);
+  // TOC mirrors the read view: derive headings from the published body only.
+  const headings = extractHeadings(page.status === "published" ? page.content : null);
 
   return (
     <DashboardLayout className="p-7">
@@ -496,7 +497,17 @@ function RouteComponent() {
           </div>
 
           <div className="mt-6">
-            <PageContent content={page.content} fallbackText={page.textContent} />
+            {/* Readers see the published projection only: an unpublished page
+                (or draft with leftover content) never renders its body. */}
+            <PageContent
+              content={page.status === "published" ? page.content : null}
+              fallbackText={page.status === "published" ? page.textContent : ""}
+              emptyLabel={
+                page.status === "published"
+                  ? "Diese Seite hat noch keinen Inhalt."
+                  : "Diese Seite wurde noch nicht veröffentlicht."
+              }
+            />
           </div>
 
           <section id="page-comments" className="mt-10 scroll-mt-6">

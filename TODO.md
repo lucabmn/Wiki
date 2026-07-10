@@ -4,26 +4,7 @@ Behobene Punkte des Audits (ACL-Bypässe, Fehlerzustände, Bestätigungsdialoge,
 Space-Verwaltung, Breadcrumbs u. a.) sind nicht mehr aufgeführt — dies sind die
 bewusst offen gelassenen, größeren Brocken.
 
-## 1. Editor-Speichersemantik überarbeiten (UX, hoch)
-
-Der Collab-Server projiziert das live Yjs-Dokument per Debounce in
-`page.content`/`textContent` (siehe Doku-Kommentar in
-`apps/web/src/components/editor/page-editor.tsx`), die Lese-Ansicht rendert
-`page.content`. Folgen:
-
-- "Abbrechen" im Editor verwirft Body-Änderungen **nicht** — sie sind bereits
-  persistiert. Falsche Affordanz.
-- Änderungen an bereits veröffentlichten Seiten erreichen den gespeicherten
-  Inhalt, bevor "Veröffentlichen" geklickt wird — andere Nutzer sehen
-  unveröffentlichte Edits.
-- Titel ist lokaler State (nicht kollaborativ) ohne `useBlocker`/`beforeunload`
-  — Navigation mitten im Edit verliert Titeländerungen stumm.
-
-Braucht Architektur-Entscheidung: Draft-Branch (Edits in separatem Doc bis
-Publish) vs. Publish-Snapshot (Lese-Ansicht rendert letzte Revision statt
-live `content`). Danach Cancel/Publish-Buttons an die echte Semantik anpassen.
-
-## 2. Bilder / Dateien / Medien im Editor (Feature, hoch)
+## 1. Bilder / Dateien / Medien im Editor (Feature, hoch)
 
 Das gemeinsame Schema (`packages/editor/src/index.ts`) hat keinen Image- oder
 Attachment-Node; Slash-Menü und Toolbar bieten kein Einfügen von
@@ -32,7 +13,7 @@ Bildern/Embeds/Callouts. Backend-Seite existiert bereits teilweise
 Storage-Key). Fehlt: Upload-Flow im Frontend, Image-Node im TipTap-Schema,
 Rendering in Lese-Ansicht, Anzeige in Suche.
 
-## 3. i18n-Schicht (strukturell, mittel)
+## 2. i18n-Schicht (strukturell, mittel)
 
 Sämtliche Copy ist hart deutsch inline (`lib/labels.ts`, jede Route/Komponente,
 Editor-Placeholder in `packages/editor/src/index.ts`, `<html lang="de">` in
@@ -40,7 +21,7 @@ Editor-Placeholder in `packages/editor/src/index.ts`, `<html lang="de">` in
 (z. B. i18next/paraglide) + Extraktion der Strings. Groß, aber je später,
 desto teurer.
 
-## 4. Kleinere offene Befunde
+## 3. Kleinere offene Befunde
 
 - **Member-E-Mails sichtbar für alle Space-Leser**: `spaceMembers.list` und
   `pageAccess.get` liefern `email` an jeden mit Leserecht

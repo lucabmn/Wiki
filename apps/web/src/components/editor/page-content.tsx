@@ -11,9 +11,19 @@ import "./editor.css";
  * HTML once (memoized) rather than mounting a second ProseMirror instance per
  * viewer, and intercepts clicks on internal `/pages/<id>` links so they navigate
  * client-side instead of triggering a full reload. Pages without rich content
- * yet (imported / never edited) fall back to their plain `textContent`.
+ * yet (imported / never edited) fall back to their plain `textContent`;
+ * `emptyLabel` overrides the message shown when there is nothing to render
+ * (e.g. a draft that has never been published).
  */
-export function PageContent({ content, fallbackText }: { content: unknown; fallbackText: string }) {
+export function PageContent({
+  content,
+  fallbackText,
+  emptyLabel = "Diese Seite hat noch keinen Inhalt.",
+}: {
+  content: unknown;
+  fallbackText: string;
+  emptyLabel?: string;
+}) {
   const navigate = useNavigate();
 
   const html = useMemo(() => {
@@ -38,7 +48,7 @@ export function PageContent({ content, fallbackText }: { content: unknown; fallb
     return text ? (
       <div className="tiptap whitespace-pre-wrap">{text}</div>
     ) : (
-      <p className="text-muted-foreground">Diese Seite hat noch keinen Inhalt.</p>
+      <p className="text-muted-foreground">{emptyLabel}</p>
     );
   }
 

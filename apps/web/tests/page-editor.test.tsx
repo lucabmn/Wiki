@@ -18,6 +18,10 @@ const { data, updateSpy, publishSpy, onDoneSpy, toastSuccessSpy } = vi.hoisted((
 
 vi.mock("@/components/editor/revision-history", () => ({ RevisionHistory: () => null }));
 
+// The editor guards unsaved title edits via router `useBlocker`; there is no
+// RouterProvider in this unit harness, so stub it inert.
+vi.mock("@tanstack/react-router", () => ({ useBlocker: () => undefined }));
+
 vi.mock("@/lib/auth-client", () => ({
   authClient: {
     useSession: () => ({ data: { user: { id: "u1", name: "Luca", email: "luca@acme.io" } } }),
@@ -112,22 +116,16 @@ describe("PageEditor", () => {
     toastSuccessSpy.mockClear();
   });
 
-  it("saves the page: update with content + textContent, toasts, exits", async () => {
+  it("saves the draft: title-only update, toasts, exits (body is autosaved by collab)", async () => {
     renderEditor();
     fireEvent.click(await screen.findByRole("button", { name: "Speichern" }));
 
+    // The body lives in the collaborative doc and is not flushed on save — only
+    // the non-collaborative title is persisted.
     await waitFor(() =>
-      expect(updateSpy.mock.calls[0]?.[0]).toEqual({
-        id: "p1",
-        title: "Runbook",
-        content: {
-          type: "doc",
-          content: [{ type: "paragraph", content: [{ type: "text", text: "new body" }] }],
-        },
-        textContent: "new body",
-      }),
+      expect(updateSpy.mock.calls[0]?.[0]).toEqual({ id: "p1", title: "Runbook" }),
     );
-    await waitFor(() => expect(toastSuccessSpy).toHaveBeenCalledWith("Seite gespeichert"));
+    await waitFor(() => expect(toastSuccessSpy).toHaveBeenCalledWith("Entwurf gespeichert"));
     await waitFor(() => expect(onDoneSpy).toHaveBeenCalled());
     expect(publishSpy).not.toHaveBeenCalled();
   });
@@ -145,13 +143,25 @@ describe("PageEditor", () => {
     });
   });
 
-  it("publishes: persists, then calls pages.publish, toasts, exits", async () => {
+  it("publishes: promotes body + title via pages.publish, toasts, exits", async () => {
     data.canPublish = true;
     renderEditor();
     fireEvent.click(await screen.findByRole("button", { name: "Veröffentlichen" }));
 
-    await waitFor(() => expect(updateSpy).toHaveBeenCalled());
-    await waitFor(() => expect(publishSpy.mock.calls[0]?.[0]).toEqual({ id: "p1" }));
+    // Publish is the single point that promotes the working copy — it carries
+    // the current body from the live editor plus the title; no separate update.
+    await waitFor(() =>
+      expect(publishSpy.mock.calls[0]?.[0]).toEqual({
+        id: "p1",
+        title: "Runbook",
+        content: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "new body" }] }],
+        },
+        textContent: "new body",
+      }),
+    );
+    expect(updateSpy).not.toHaveBeenCalled();
     await waitFor(() => expect(toastSuccessSpy).toHaveBeenCalledWith("Seite veröffentlicht"));
     await waitFor(() => expect(onDoneSpy).toHaveBeenCalled());
   });
@@ -163,9 +173,9 @@ describe("PageEditor", () => {
     expect(screen.queryByRole("button", { name: "Veröffentlichen" })).toBeNull();
   });
 
-  it("cancels without persisting", async () => {
+  it("closes without persisting", async () => {
     renderEditor();
-    fireEvent.click(await screen.findByRole("button", { name: "Abbrechen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Schließen" }));
     expect(onDoneSpy).toHaveBeenCalled();
     expect(updateSpy).not.toHaveBeenCalled();
   });
