@@ -117,12 +117,23 @@ const SlashCommandList = forwardRef<SlashListRef, ListProps>(({ items, command }
 
   useImperativeHandle(ref, () => ({
     onKeyDown: ({ event }) => {
-      if (event.key === "ArrowUp") {
+      // Shift+Tab / Tab mirror the arrows so the menu is fully keyboard-drivable
+      // without leaving the home row; returning true suppresses the browser's
+      // default focus-move for Tab.
+      if (event.key === "ArrowUp" || (event.key === "Tab" && event.shiftKey)) {
         setSelected((i) => (i + items.length - 1) % items.length);
         return true;
       }
-      if (event.key === "ArrowDown") {
+      if (event.key === "ArrowDown" || (event.key === "Tab" && !event.shiftKey)) {
         setSelected((i) => (i + 1) % items.length);
+        return true;
+      }
+      if (event.key === "Home") {
+        setSelected(0);
+        return true;
+      }
+      if (event.key === "End") {
+        setSelected(items.length - 1);
         return true;
       }
       if (event.key === "Enter") {
@@ -207,6 +218,12 @@ export const SlashCommand = Extension.create({
         render: () => {
           let component: ReactRenderer<SlashListRef, ListProps> | null = null;
           let el: HTMLElement | null = null;
+          // Escape dismisses the menu but leaves the typed "/query" as literal
+          // text. We hide the popup and stop capturing keys, but keep the
+          // ProseMirror suggestion session alive so onExit still runs its full
+          // teardown (destroy the renderer, drop the element) when the caret
+          // eventually leaves the trigger — no orphaned node, no half-open state.
+          let dismissed = false;
 
           return {
             onStart: (props) => {
@@ -222,14 +239,18 @@ export const SlashCommand = Extension.create({
               place(el, props.clientRect);
             },
             onUpdate: (props) => {
+              if (dismissed) return;
               component?.updateProps({ items: props.items, command: props.command });
               if (el) place(el, props.clientRect);
             },
             onKeyDown: (props) => {
               if (props.event.key === "Escape") {
-                el?.remove();
+                dismissed = true;
+                if (el) el.style.display = "none";
                 return true;
               }
+              // Once dismissed, let keystrokes flow to the editor normally.
+              if (dismissed) return false;
               return component?.ref?.onKeyDown({ event: props.event }) ?? false;
             },
             onExit: () => {

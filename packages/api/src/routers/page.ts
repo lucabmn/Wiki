@@ -14,6 +14,7 @@ import { COLLAB_TOKEN_TTL_SECONDS, collabDocName, signCollabToken } from "../lib
 import { generateKeyBetween } from "../lib/fractional";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { extractPageLinks, syncPageLinks } from "../lib/page-links";
+import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
 import {
@@ -193,38 +194,44 @@ export const pageRouter = {
       const position = await positionAtEnd(context.db, input.spaceId, parentId);
       const userId = context.session.user.id;
 
-      return context.db.transaction(async (tx) => {
-        const rows = await tx
-          .insert(page)
-          .values({
-            spaceId: input.spaceId,
-            parentId,
-            title: input.title,
-            slug,
-            icon: input.icon ?? null,
-            coverImage: input.coverImage ?? null,
-            content: input.content ?? null,
-            textContent: input.textContent,
-            isTemplate: input.isTemplate,
-            position,
-            createdBy: userId,
-            lastEditedBy: userId,
-          })
-          .returning();
-        const row = firstRow(rows);
-        if (input.content !== undefined) {
-          await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(input.content));
-        }
-        await recordActivity(tx, {
-          organizationId,
-          action: "page.created",
-          actorId: userId,
-          spaceId: row.spaceId,
-          pageId: row.id,
-          metadata: { title: row.title },
-        });
-        return row;
-      });
+      // uniqueSlug pre-checks, but two concurrent creates can both pass it and
+      // then collide on `page_space_slug_uq`; map that race to a 409, not a 500.
+      return mapUniqueViolation(
+        () =>
+          context.db.transaction(async (tx) => {
+            const rows = await tx
+              .insert(page)
+              .values({
+                spaceId: input.spaceId,
+                parentId,
+                title: input.title,
+                slug,
+                icon: input.icon ?? null,
+                coverImage: input.coverImage ?? null,
+                content: input.content ?? null,
+                textContent: input.textContent,
+                isTemplate: input.isTemplate,
+                position,
+                createdBy: userId,
+                lastEditedBy: userId,
+              })
+              .returning();
+            const row = firstRow(rows);
+            if (input.content !== undefined) {
+              await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(input.content));
+            }
+            await recordActivity(tx, {
+              organizationId,
+              action: "page.created",
+              actorId: userId,
+              spaceId: row.spaceId,
+              pageId: row.id,
+              metadata: { title: row.title },
+            });
+            return row;
+          }),
+        "A page with this slug already exists in the space",
+      );
     }),
 
   update: protectedProcedure

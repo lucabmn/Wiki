@@ -23,31 +23,19 @@ desto teurer.
 
 ## 3. Kleinere offene Befunde
 
-- **Member-E-Mails sichtbar für alle Space-Leser**: `spaceMembers.list` und
-  `pageAccess.get` liefern `email` an jeden mit Leserecht
-  (`packages/api/src/routers/space-member.ts`, `page-access.ts`). Entscheiden:
-  E-Mail nur für Manager ausliefern oder bewusst so lassen (Confluence zeigt
-  sie auch).
-- **Collab-Socket revalidiert nur beim Connect**
-  (`apps/collab/src/index.ts`): Entzogener Seitenzugriff wirkt erst beim
-  Disconnect. Periodische Re-Validierung offener Verbindungen oder TTL-basierte
-  Re-Auth über den bestehenden Token-Mechanismus.
-- **Slug-Race → 500 statt 409**: `uniqueSlug`-Check-then-insert in
-  `packages/api/src/routers/page.ts` / `space.ts`; parallele Creates kollidieren
-  auf dem Unique-Index. Unique-Violation abfangen und als `CONFLICT` mappen.
-- **RPC-Batch multipliziert Rate-Limit**: `BatchHandlerPlugin` (10 Calls/Batch)
-  zählt als 1 Request im `/rpc`-Limiter (`apps/server/src/index.ts`). Limiter
-  batch-bewusst machen oder Batchgröße einpreisen.
-- **Slash-Menü-Tastatur-Lücken**: nur Arrow/Enter, kein Tab/Home/End; Escape
-  räumt DOM-Node direkt ab statt Suggestion sauber zu beenden
-  (`apps/web/src/components/editor/slash-command.tsx`).
+Behoben (2026-07-10): Slug-Race → `CONFLICT` (`lib/pg-errors.ts`),
+RPC-Batch-Rate-Limit batch-bewusst, Slash-Menü-Tastatur (Tab/Home/End + sauberes
+Escape), Optimistic Toggles (Favorit/Abo), Collab-Socket periodische
+TTL-Re-Validierung.
+
+Bewusst offen gelassen:
+
 - **Duplizierte Logik**: Snippet-Highlighter (`search.tsx` vs.
   `command-palette.tsx`), `splitRoles` (`settings/members.tsx` vs. `groups.tsx`),
   Member-Add/Remove-Block (`space-settings-sheet.tsx` vs.
   `page-access-sheet.tsx`). Bei nächster Berührung zusammenziehen.
-- **Optimistic Updates** für Favorit/Abo/Archiv-Toggles auf der Seitenansicht
-  (`apps/web/src/routes/_auth/pages/$id.tsx`) — fühlt sich träge an.
-- **Hardcodierte Farben** am Design-System vorbei: `editor-toolbar.tsx`
-  (TEXT_COLORS/HIGHLIGHTS als Hex), `page-editor.tsx` (`userColor` HSL),
-  vereinzelt `emerald-500`/`amber-500` — auf Tokens umstellen, sonst bricht
-  Theming.
+- **Hardcodierte Farben**: `editor-toolbar.tsx` TEXT_COLORS/HIGHLIGHTS und
+  `page-editor.tsx` `userColor` sind bewusst konkrete Werte (Inhalts-/Cursor-
+  Farben, die in Dokumente serialisiert werden — kein Token-Kandidat).
+  Verbleibend nur vereinzelte UI-Chrome-Fälle (`emerald-500`/`amber-500`), die
+  erst mit passenden semantischen Tokens umgestellt werden sollten.

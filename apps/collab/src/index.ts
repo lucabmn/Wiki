@@ -82,7 +82,8 @@ const server = new Server({
     if (!claims || claims.p !== pageId) throw new Error("unauthorized");
 
     // Exposed to awareness (collaboration cursors) and to hooks as `context`.
-    return { user: { id: claims.u, name: claims.n } };
+    // `exp` drives the periodic re-auth sweep below.
+    return { user: { id: claims.u, name: claims.n }, exp: claims.exp };
   },
 
   extensions: [
@@ -112,6 +113,32 @@ const server = new Server({
   ],
 });
 
+/**
+ * Periodic re-authorization sweep.
+ *
+ * `onAuthenticate` only runs at connect time, so an already-open socket would
+ * otherwise outlive a revoked page grant indefinitely. Each connection carries
+ * its token's `exp`; once that passes we close the socket. The browser provider
+ * reconnects and re-fetches a fresh token from the API (`pages.collabToken`),
+ * which re-runs the full `page:write` check — so a user whose access was revoked
+ * can no longer obtain a token and is evicted. This makes the revocation bound
+ * documented on `COLLAB_TOKEN_TTL_SECONDS` real for long-lived connections,
+ * without duplicating any authorization logic here.
+ */
+const REVALIDATE_INTERVAL_MS = 60_000;
+const revalidator = setInterval(() => {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  for (const document of server.hocuspocus.documents.values()) {
+    for (const connection of document.getConnections()) {
+      const exp = (connection.context as { exp?: number } | undefined)?.exp;
+      if (typeof exp === "number" && exp <= nowSeconds) {
+        connection.close();
+      }
+    }
+  }
+}, REVALIDATE_INTERVAL_MS);
+revalidator.unref?.();
+
 server
   .listen()
   .then(() => log.info({ source: "collab", msg: "listening", port: env.COLLAB_PORT }))
@@ -126,6 +153,7 @@ let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
+  clearInterval(revalidator);
   log.info({ source: "collab", msg: "shutting down", signal });
   try {
     await server.destroy();

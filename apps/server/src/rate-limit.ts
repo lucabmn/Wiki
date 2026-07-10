@@ -16,7 +16,14 @@ interface Bucket {
 
 const WINDOW_MS = 60_000;
 
-export function rateLimit(options: { max: number; keyPrefix: string }): MiddlewareHandler {
+export function rateLimit(options: {
+  max: number;
+  keyPrefix: string;
+  // Per-request cost against the window. Defaults to 1. Used to charge a batched
+  // RPC request for the multiple calls it bundles, so batching can't multiply
+  // the effective limit. Always charges at least 1.
+  weight?: (c: Parameters<MiddlewareHandler>[0]) => number;
+}): MiddlewareHandler {
   const buckets = new Map<string, Bucket>();
 
   // Drop expired buckets so long-running processes don't accumulate one entry
@@ -46,7 +53,7 @@ export function rateLimit(options: { max: number; keyPrefix: string }): Middlewa
       bucket = { count: 0, resetAt: now + WINDOW_MS };
       buckets.set(key, bucket);
     }
-    bucket.count += 1;
+    bucket.count += Math.max(1, Math.floor(options.weight?.(c) ?? 1));
 
     const remaining = Math.max(0, options.max - bucket.count);
     const resetSeconds = Math.ceil((bucket.resetAt - now) / 1000);

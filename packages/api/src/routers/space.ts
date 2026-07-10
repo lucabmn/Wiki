@@ -9,6 +9,7 @@ import { assertSpaceRead, buildSpaceReadFilter } from "../lib/access";
 import { requireSpaceManage } from "../lib/authz";
 import { recordActivity } from "../lib/activity";
 import { loadSpace } from "../lib/loaders";
+import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
 import {
@@ -86,38 +87,44 @@ export const spaceRouter = {
           })),
       );
       const userId = context.session.user.id;
-      return context.db.transaction(async (tx) => {
-        const rows = await tx
-          .insert(space)
-          .values({
-            organizationId,
-            slug,
-            name: input.name,
-            description: input.description ?? null,
-            icon: input.icon ?? null,
-            color: input.color ?? null,
-            visibility: input.visibility,
-            createdBy: userId,
-          })
-          .returning();
-        const row = firstRow(rows);
-        // Grant the creator explicit admin membership so private spaces are
-        // usable by their author and they appear in member lists.
-        await tx.insert(spaceMember).values({
-          spaceId: row.id,
-          subject: "user",
-          userId,
-          role: "admin",
-        });
-        await recordActivity(tx, {
-          organizationId,
-          action: "space.created",
-          actorId: userId,
-          spaceId: row.id,
-          metadata: { name: row.name },
-        });
-        return row;
-      });
+      // uniqueSlug pre-checks, but concurrent creates can still race onto the
+      // (organizationId, slug) unique index; surface that as a 409, not a 500.
+      return mapUniqueViolation(
+        () =>
+          context.db.transaction(async (tx) => {
+            const rows = await tx
+              .insert(space)
+              .values({
+                organizationId,
+                slug,
+                name: input.name,
+                description: input.description ?? null,
+                icon: input.icon ?? null,
+                color: input.color ?? null,
+                visibility: input.visibility,
+                createdBy: userId,
+              })
+              .returning();
+            const row = firstRow(rows);
+            // Grant the creator explicit admin membership so private spaces are
+            // usable by their author and they appear in member lists.
+            await tx.insert(spaceMember).values({
+              spaceId: row.id,
+              subject: "user",
+              userId,
+              role: "admin",
+            });
+            await recordActivity(tx, {
+              organizationId,
+              action: "space.created",
+              actorId: userId,
+              spaceId: row.id,
+              metadata: { name: row.name },
+            });
+            return row;
+          }),
+        "A space with this slug already exists in the organization",
+      );
     }),
 
   update: protectedProcedure

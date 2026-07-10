@@ -6,8 +6,9 @@ import { PageAccessSheet } from "@/components/pages/page-access-sheet";
 import { RevisionHistory } from "@/components/editor/revision-history";
 import { extractHeadings } from "@/components/editor/headings";
 import { STATUS_LABEL } from "@/lib/labels";
-import { toastError, useInvalidate } from "@/lib/query";
+import { toastError, useInvalidate, useOptimisticListToggle } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
+import type { Page } from "@nilovon-wiki/api/schemas/page";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,23 +72,23 @@ function PageToggleButton({
   );
 }
 
-function FavoriteButton({ pageId }: { pageId: string }) {
-  const { data: favorites } = useQuery(orpc.me.listFavorites.queryOptions({ input: {} }));
-  const isFavorite = favorites?.some((favorite) => favorite.id === pageId) ?? false;
+function FavoriteButton({ page }: { page: Page }) {
+  const listOptions = orpc.me.listFavorites.queryOptions({ input: {} });
+  const { data: favorites } = useQuery(listOptions);
+  const isFavorite = favorites?.some((favorite) => favorite.id === page.id) ?? false;
 
-  const invalidate = useInvalidate(orpc.me.listFavorites.key());
-  const add = useMutation(
-    orpc.me.addFavorite.mutationOptions({ onSuccess: invalidate, onError: toastError }),
+  const optimistic = useOptimisticListToggle<Page>(
+    listOptions.queryKey,
+    orpc.me.listFavorites.key(),
   );
-  const remove = useMutation(
-    orpc.me.removeFavorite.mutationOptions({ onSuccess: invalidate, onError: toastError }),
-  );
+  const add = useMutation(orpc.me.addFavorite.mutationOptions(optimistic(page, true)));
+  const remove = useMutation(orpc.me.removeFavorite.mutationOptions(optimistic(page, false)));
 
   return (
     <PageToggleButton
       isOn={isFavorite}
       pending={add.isPending || remove.isPending}
-      onToggle={() => (isFavorite ? remove : add).mutate({ pageId })}
+      onToggle={() => (isFavorite ? remove : add).mutate({ pageId: page.id })}
       labelOn="Favorit"
       labelOff="Merken"
       icon={Star}
@@ -96,23 +97,23 @@ function FavoriteButton({ pageId }: { pageId: string }) {
   );
 }
 
-function SubscribeButton({ pageId }: { pageId: string }) {
-  const { data: subscriptions } = useQuery(orpc.me.listSubscriptions.queryOptions({ input: {} }));
-  const isSubscribed = subscriptions?.some((subscription) => subscription.id === pageId) ?? false;
+function SubscribeButton({ page }: { page: Page }) {
+  const listOptions = orpc.me.listSubscriptions.queryOptions({ input: {} });
+  const { data: subscriptions } = useQuery(listOptions);
+  const isSubscribed = subscriptions?.some((subscription) => subscription.id === page.id) ?? false;
 
-  const invalidate = useInvalidate(orpc.me.listSubscriptions.key());
-  const subscribe = useMutation(
-    orpc.me.subscribe.mutationOptions({ onSuccess: invalidate, onError: toastError }),
+  const optimistic = useOptimisticListToggle<Page>(
+    listOptions.queryKey,
+    orpc.me.listSubscriptions.key(),
   );
-  const unsubscribe = useMutation(
-    orpc.me.unsubscribe.mutationOptions({ onSuccess: invalidate, onError: toastError }),
-  );
+  const subscribe = useMutation(orpc.me.subscribe.mutationOptions(optimistic(page, true)));
+  const unsubscribe = useMutation(orpc.me.unsubscribe.mutationOptions(optimistic(page, false)));
 
   return (
     <PageToggleButton
       isOn={isSubscribed}
       pending={subscribe.isPending || unsubscribe.isPending}
-      onToggle={() => (isSubscribed ? unsubscribe : subscribe).mutate({ pageId })}
+      onToggle={() => (isSubscribed ? unsubscribe : subscribe).mutate({ pageId: page.id })}
       labelOn="Abonniert"
       labelOff="Abonnieren"
       icon={Bell}
@@ -490,8 +491,8 @@ function RouteComponent() {
                   <Pencil className="size-4" />
                 </Button>
               ) : null}
-              <SubscribeButton pageId={page.id} />
-              <FavoriteButton pageId={page.id} />
+              <SubscribeButton page={page} />
+              <FavoriteButton page={page} />
               <ArchiveButton pageId={page.id} spaceSlug={space?.slug} />
             </div>
           </div>

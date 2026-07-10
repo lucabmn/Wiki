@@ -52,8 +52,21 @@ app.use(
 // headroom while bounding what an unauthenticated client can make us buffer.
 app.use("/*", bodyLimit({ maxSize: 10 * 1024 * 1024 }));
 
+// Max RPC calls the client's BatchLinkPlugin bundles into one HTTP request;
+// pinned so the batch handler and the rate limiter agree on the ceiling.
+const RPC_BATCH_MAX = 10;
+
 app.use("/api/auth/*", rateLimit({ max: env.RATE_LIMIT_AUTH_MAX, keyPrefix: "auth" }));
-app.use("/rpc/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
+app.use(
+  "/rpc/*",
+  rateLimit({
+    max: env.RATE_LIMIT_MAX,
+    keyPrefix: "api",
+    // A batched request (`x-orpc-batch`) bundles up to RPC_BATCH_MAX calls in
+    // one HTTP request; charge it for the whole batch so 10 calls cost 10, not 1.
+    weight: (c) => (c.req.header("x-orpc-batch") ? RPC_BATCH_MAX : 1),
+  }),
+);
 app.use("/api-reference/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
@@ -73,8 +86,9 @@ export const apiHandler = new OpenAPIHandler(appRouter, {
 
 export const rpcHandler = new RPCHandler(appRouter, {
   // Decodes batched calls from the client's BatchLinkPlugin. Must be present
-  // or batched requests 404. maxSize defaults to 10 calls per batch.
-  plugins: [new BatchHandlerPlugin()],
+  // or batched requests 404. `maxSize` is pinned to the same ceiling the rate
+  // limiter charges per batch (see RPC_BATCH_MAX).
+  plugins: [new BatchHandlerPlugin({ maxSize: RPC_BATCH_MAX })],
   interceptors: [
     onError((error) => {
       log.error({ source: "orpc", handler: "rpc", ...parseError(error) });
