@@ -38,6 +38,43 @@ docker compose up -d --build
 
 Placeholder or low-entropy secrets are rejected at startup by design.
 
+### Pull pre-built images (skip the local build)
+
+Pre-built multi-arch images (amd64 + arm64) are published to GHCR, so a
+**localhost** install can pull instead of building:
+
+```sh
+cp .env.example .env    # fill in the two secrets as above
+docker compose pull     # fetch web/server/collab from ghcr.io/nilovon/wiki-*
+docker compose up -d    # note: no --build
+```
+
+The default `latest` tag exists **only after the first tagged release** (`v*`).
+Before that, pull the rolling image built from `main`, or just use the
+`--build` quick start above:
+
+```sh
+WIKI_VERSION=main docker compose pull && WIKI_VERSION=main docker compose up -d
+```
+
+Pin a release instead of the moving `latest` tag with `WIKI_VERSION`:
+
+```sh
+WIKI_VERSION=1.4.0 docker compose pull && WIKI_VERSION=1.4.0 docker compose up -d
+```
+
+> The GHCR packages must be **public** for anonymous `docker compose pull` to
+> work. GHCR creates them private on first publish even for a public repo — a
+> maintainer flips `wiki-web`, `wiki-server`, `wiki-collab` to public once under
+> the org's package settings. Until then, run `docker login ghcr.io` first, or
+> use the `--build` path (no registry auth needed).
+
+> **localhost only.** The published `web` image bakes `VITE_SERVER_URL` /
+> `VITE_COLLAB_URL` at build time with `http://localhost:3000` /
+> `ws://localhost:1234`. A custom-domain install can **not** use the pulled web
+> image — it must rebuild web from its own domain vars (see Production below).
+> The production overlay enforces this automatically (`pull_policy: build`).
+
 ## Production (public domain, HTTPS)
 
 The repo ships a Caddy reverse proxy that provisions Let's Encrypt certificates
@@ -102,6 +139,12 @@ git pull --ff-only
 docker compose up -d --build                      # local
 # or, with the prod overlay:
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+A localhost install running the pulled GHCR images updates without a rebuild:
+
+```sh
+docker compose pull && docker compose up -d       # localhost only
 ```
 
 The `migrate` service applies any new database migrations before the app
