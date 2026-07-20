@@ -1,29 +1,48 @@
-import { Link, Outlet, createFileRoute, redirect } from "@tanstack/react-router";
+import { Link, Outlet, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import DashboardLayout from "@/components/layouts/dashboard-layout";
-import { checkStaticRolePermission } from "@/lib/permissions";
+import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
+import { usePermission } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_auth/settings")({
-  // Gate the whole settings area on a management right. This is a UX guard using
-  // the caller's *static* role from SSR context; the server re-checks every
-  // mutation, so dynamic-role holders are still enforced server-side.
-  //
-  // Known limitation: a user whose management rights come *solely* from a custom
-  // group (e.g. a group granted `member`/`ac`) is fail-closed out of this UI,
-  // because the check is static-only. The server would admit them; to open the
-  // client too, swap this for a server-backed check (`usePermission`) in a
-  // loader-friendly form. Acceptable for now — owners/admins are unaffected.
-  beforeLoad: ({ context }) => {
-    const { organization, session } = context.auth;
-    const me = organization.members.find((member) => member.user.id === session.user.id);
-    const role = me?.role ?? "";
-    const canManage =
-      checkStaticRolePermission({ member: ["update"] }, role) ||
-      checkStaticRolePermission({ ac: ["create"] }, role);
-    if (!canManage) throw redirect({ to: "/" });
-  },
-  component: SettingsLayout,
+  component: SettingsGuard,
 });
+
+/**
+ * Gates the whole settings area on a management right. The check is
+ * server-backed (`usePermission` → `organization.hasPermission`) so it resolves
+ * **dynamic** roles too: a member whose management rights come solely from a
+ * custom group reaches this UI, matching what the server already allows on
+ * every mutation. A static, role-only check would fail those users closed.
+ *
+ * `usePermission` is fail-closed while pending, so we must wait for both checks
+ * to settle before redirecting — otherwise every visit would bounce to "/".
+ */
+function SettingsGuard() {
+  const navigate = useNavigate();
+  const members = usePermission({ member: ["update"] });
+  const roles = usePermission({ ac: ["create"] });
+
+  const pending = members.isPending || roles.isPending;
+  const canManage = members.allowed || roles.allowed;
+
+  useEffect(() => {
+    if (!pending && !canManage) navigate({ to: "/", replace: true });
+  }, [pending, canManage, navigate]);
+
+  if (pending) {
+    return (
+      <DashboardLayout className="gap-0 p-7">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="mt-4 h-64 w-full" />
+      </DashboardLayout>
+    );
+  }
+  if (!canManage) return null;
+
+  return <SettingsLayout />;
+}
 
 const TABS = [
   { to: "/settings/members", label: "Mitglieder" },
