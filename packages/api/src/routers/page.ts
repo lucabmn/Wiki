@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@nilovon-wiki/db";
-import { page, pageDraft, pageRevision } from "@nilovon-wiki/db/schema/index";
+import { page, pageRevision } from "@nilovon-wiki/db/schema/index";
 import { env } from "@nilovon-wiki/env/server";
 
 import { isOrgManager, protectedProcedure } from "../index";
@@ -21,11 +21,9 @@ import {
   CreatePageInputSchema,
   ListPagesInputSchema,
   MovePageInputSchema,
-  PageDraftSchema,
   PageRevisionSchema,
   PageSchema,
   PublishPageInputSchema,
-  SaveDraftInputSchema,
   UpdatePageInputSchema,
 } from "../schemas/page";
 import { IdSchema } from "../schemas/shared";
@@ -478,40 +476,6 @@ export const pageRouter = {
       });
     }),
 
-  delete: protectedProcedure
-    .route({
-      method: "DELETE",
-      path: "/pages/{id}",
-      tags: TAGS,
-      summary: "Permanently delete a page and its subtree",
-    })
-    .input(z.object({ id: IdSchema }))
-    .output(z.object({ id: IdSchema }))
-    .handler(async ({ input, context }) => {
-      const existing = await loadPage(context.db, input.id);
-      const { organizationId } = await requirePageCapability(
-        context.db,
-        context,
-        context.headers,
-        existing,
-        "write",
-      );
-      await context.db.transaction(async (tx) => {
-        // `parentId` self-reference cascades, so children are removed with it.
-        await tx.delete(page).where(eq(page.id, existing.id));
-        // `activity.pageId` is set-null on delete, so keep the id/title in
-        // metadata — the audit row must survive the page it describes.
-        await recordActivity(tx, {
-          organizationId,
-          action: "page.deleted",
-          actorId: context.session.user.id,
-          spaceId: existing.spaceId,
-          metadata: { pageId: existing.id, title: existing.title },
-        });
-      });
-      return { id: existing.id };
-    }),
-
   // --- Revisions ---------------------------------------------------------
 
   listRevisions: protectedProcedure
@@ -587,79 +551,6 @@ export const pageRouter = {
         });
         return row;
       });
-    }),
-
-  // --- Per-user drafts ---------------------------------------------------
-
-  getDraft: protectedProcedure
-    .route({
-      method: "GET",
-      path: "/pages/{id}/draft",
-      tags: TAGS,
-      summary: "Get the caller's autosave draft for a page",
-    })
-    .input(z.object({ id: IdSchema }))
-    .output(PageDraftSchema.nullable())
-    .handler(async ({ input, context }) => {
-      const existing = await loadPage(context.db, input.id);
-      await requirePageCapability(context.db, context, context.headers, existing, "read");
-      const row = await context.db.query.pageDraft.findFirst({
-        where: and(
-          eq(pageDraft.pageId, existing.id),
-          eq(pageDraft.userId, context.session.user.id),
-        ),
-      });
-      return row ?? null;
-    }),
-
-  saveDraft: protectedProcedure
-    .route({
-      method: "PUT",
-      path: "/pages/{pageId}/draft",
-      tags: TAGS,
-      summary: "Upsert the caller's autosave draft for a page",
-    })
-    .input(SaveDraftInputSchema)
-    .output(PageDraftSchema)
-    .handler(async ({ input, context }) => {
-      const existing = await loadPage(context.db, input.pageId);
-      // Drafting requires write access to the page.
-      await requirePageCapability(context.db, context, context.headers, existing, "write");
-      const userId = context.session.user.id;
-      const rows = await context.db
-        .insert(pageDraft)
-        .values({
-          pageId: existing.id,
-          userId,
-          title: input.title ?? null,
-          content: input.content ?? null,
-        })
-        .onConflictDoUpdate({
-          target: [pageDraft.pageId, pageDraft.userId],
-          set: { title: input.title ?? null, content: input.content ?? null },
-        })
-        .returning();
-      return firstRow(rows);
-    }),
-
-  deleteDraft: protectedProcedure
-    .route({
-      method: "DELETE",
-      path: "/pages/{id}/draft",
-      tags: TAGS,
-      summary: "Discard the caller's autosave draft for a page",
-    })
-    .input(z.object({ id: IdSchema }))
-    .output(z.object({ pageId: IdSchema }))
-    .handler(async ({ input, context }) => {
-      const existing = await loadPage(context.db, input.id);
-      await requirePageCapability(context.db, context, context.headers, existing, "read");
-      await context.db
-        .delete(pageDraft)
-        .where(
-          and(eq(pageDraft.pageId, existing.id), eq(pageDraft.userId, context.session.user.id)),
-        );
-      return { pageId: existing.id };
     }),
 
   collabToken: protectedProcedure

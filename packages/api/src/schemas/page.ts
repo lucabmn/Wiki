@@ -112,23 +112,6 @@ export const PageRevisionSchema = z.object({
   createdAt: z.date(),
 });
 
-/** Per-user autosave draft. */
-export const PageDraftSchema = z.object({
-  id: IdSchema,
-  pageId: IdSchema,
-  userId: IdSchema,
-  title: z.string().nullable(),
-  content: DocumentSchema.nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-});
-
-export const SaveDraftInputSchema = z.object({
-  pageId: IdSchema,
-  title: z.string().max(300).nullish(),
-  content: DocumentSchema.optional(),
-});
-
 // --- Page access (per-page ACL) --------------------------------------------
 
 export const WikiRoleSchema = z.enum(["viewer", "commenter", "editor", "admin"]);

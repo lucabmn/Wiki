@@ -123,21 +123,3 @@ export const pageRevision = wikiSchema.table(
     index("page_revision_page_idx").on(t.pageId),
   ],
 );
-
-/** Per-user autosave draft so unpublished edits aren't lost. One per user/page. */
-export const pageDraft = wikiSchema.table(
-  "page_draft",
-  {
-    id: id(),
-    pageId: text("page_id")
-      .notNull()
-      .references(() => page.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    title: text("title"),
-    content: jsonb("content"),
-    ...timestamps,
-  },
-  (t) => [uniqueIndex("page_draft_uq").on(t.pageId, t.userId)],
-);

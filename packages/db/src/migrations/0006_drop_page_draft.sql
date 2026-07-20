@@ -1,0 +1,1 @@
+DROP TABLE "wiki"."page_draft" CASCADE;
