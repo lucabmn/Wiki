@@ -103,8 +103,13 @@ function RouteComponent() {
               ? `Du bist als ${session?.user.email} angemeldet. Melde dich mit ${invitation.email} an, um die Einladung anzunehmen.`
               : "Erstelle zuerst ein Konto mit dieser Adresse und öffne dann den Link aus der E-Mail erneut."}
           </p>
-          <Button size="lg" className="w-full" nativeButton={false}>
-            <Link to="/auth/register">Konto erstellen</Link>
+          <Button
+            size="lg"
+            className="w-full"
+            nativeButton={false}
+            render={<Link to="/auth/register" />}
+          >
+            Konto erstellen
           </Button>
         </div>
       </AuthLayout>

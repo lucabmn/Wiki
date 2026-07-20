@@ -5,11 +5,13 @@ import { eq } from "drizzle-orm";
 import { initLogger, log, parseError } from "evlog";
 import * as Y from "yjs";
 
-import { pageIdFromDocName, verifyCollabToken } from "@nilovon-wiki/api/lib/collab-token";
+import { pageIdFromDocName } from "@nilovon-wiki/api/lib/collab-token";
 import { db } from "@nilovon-wiki/db";
 import { page } from "@nilovon-wiki/db/schema/index";
 import { pageEditorExtensions } from "@nilovon-wiki/editor";
 import { env } from "@nilovon-wiki/env/collab";
+
+import { authorizeCollab } from "./authorize";
 
 /**
  * Real-time collaboration server for page bodies.
@@ -72,19 +74,10 @@ const server = new Server({
   port: env.COLLAB_PORT,
   name: "nilovon-wiki-collab",
 
-  async onAuthenticate({ token, documentName }) {
-    const pageId = pageIdFromDocName(documentName);
-    if (!pageId) throw new Error("invalid document");
-
-    const claims = await verifyCollabToken(env.BETTER_AUTH_SECRET, token);
-    // Reject a missing/expired/tampered token, or a valid token scoped to a
-    // different page than the socket is trying to open.
-    if (!claims || claims.p !== pageId) throw new Error("unauthorized");
-
-    // Exposed to awareness (collaboration cursors) and to hooks as `context`.
-    // `exp` drives the periodic re-auth sweep below.
-    return { user: { id: claims.u, name: claims.n }, exp: claims.exp };
-  },
+  // The returned identity is exposed to awareness (collaboration cursors) and
+  // to hooks as `context`; its `exp` drives the periodic re-auth sweep below.
+  onAuthenticate: ({ token, documentName }) =>
+    authorizeCollab(env.BETTER_AUTH_SECRET, token, documentName),
 
   extensions: [
     new Database({

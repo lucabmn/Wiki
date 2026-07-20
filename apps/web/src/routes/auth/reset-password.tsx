@@ -73,8 +73,13 @@ function RouteComponent() {
           <p className="text-sm text-muted-foreground">
             Dieser Link ist ungültig oder abgelaufen. Fordere einen neuen an.
           </p>
-          <Button size="lg" className="w-full" nativeButton={false}>
-            <Link to="/auth/forgot-password">Neuen Link anfordern</Link>
+          <Button
+            size="lg"
+            className="w-full"
+            nativeButton={false}
+            render={<Link to="/auth/forgot-password" />}
+          >
+            Neuen Link anfordern
           </Button>
         </div>
       ) : (
