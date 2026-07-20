@@ -118,7 +118,24 @@ and destructive schema diffs can no longer be auto-applied (the previous
 
 ## Backups
 
-Postgres holds everything (pages, Yjs snapshots, users). Back it up:
+Two things need backing up: **Postgres** (pages, revisions, Yjs snapshots,
+users, and all attachment _metadata_) and the **object store** (the attachment
+bytes themselves). A database dump alone restores a wiki whose attachments all 404.
+
+### Automatic
+
+```sh
+docker compose --profile backup up -d backup
+```
+
+Dumps the database nightly into the `nilovon-wiki_backups` volume and prunes
+anything older than `BACKUP_KEEP_DAYS` (default 14). Copy that volume — and the
+`nilovon-wiki_rustfs_data` volume — off the host; a backup that only exists on
+the machine it protects is not a backup.
+
+### Manual
+
+Postgres holds everything except attachment bytes. Back it up:
 
 ```sh
 docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki | gzip > backup-$(date +%F).sql.gz
@@ -134,6 +151,14 @@ Automate it with cron, e.g. daily at 03:00 with 14 days retention:
 
 ```cron
 0 3 * * * cd /path/to/Wiki && docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki | gzip > /var/backups/wiki-$(date +\%F).sql.gz && find /var/backups -name 'wiki-*.sql.gz' -mtime +14 -delete
+```
+
+Attachment bytes live in the object store, not in Postgres. With the bundled
+RustFS service that is the `nilovon-wiki_rustfs_data` volume:
+
+```sh
+docker run --rm -v nilovon-wiki_rustfs_data:/data -v "$PWD":/out alpine \
+  tar czf /out/attachments-$(date +%F).tar.gz -C /data .
 ```
 
 Keep the `.env` file (or at least `BETTER_AUTH_SECRET` and
