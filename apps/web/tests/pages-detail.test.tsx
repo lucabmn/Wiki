@@ -161,6 +161,32 @@ vi.mock("@/utils/orpc", () => ({
         queryOptions: () => ({ queryKey: ["spaces"], queryFn: async () => data.spaces }),
       },
     },
+    // The tag row and the aside's reference lists render alongside the page;
+    // both stay empty here so they collapse and leave the assertions alone.
+    tags: {
+      listForPage: {
+        queryOptions: () => ({ queryKey: ["pageTags"], queryFn: async () => [] }),
+      },
+      list: {
+        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
+          queryKey: ["spaceTags"],
+          queryFn: async () => [],
+          enabled,
+        }),
+        key: () => ["spaceTags"],
+      },
+      attach: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+      detach: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+      create: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+    },
+    links: {
+      backlinks: {
+        queryOptions: () => ({ queryKey: ["backlinks"], queryFn: async () => [] }),
+      },
+      outgoing: {
+        queryOptions: () => ({ queryKey: ["outgoing"], queryFn: async () => [] }),
+      },
+    },
     pageAccess: {
       myRole: {
         queryOptions: () => ({

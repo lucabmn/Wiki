@@ -3,6 +3,7 @@ import { PageAside } from "@/components/editor/page-aside";
 import { PageContent } from "@/components/editor/page-content";
 import { PageEditor } from "@/components/editor/page-editor";
 import { PageAccessSheet } from "@/components/pages/page-access-sheet";
+import { PageTags } from "@/components/pages/page-tags";
 import { RevisionHistory } from "@/components/editor/revision-history";
 import { extractHeadings } from "@/components/editor/headings";
 import { STATUS_LABEL } from "@/lib/labels";
@@ -495,6 +496,10 @@ function RouteComponent() {
               <FavoriteButton page={page} />
               <ArchiveButton pageId={page.id} spaceSlug={space?.slug} />
             </div>
+          </div>
+
+          <div className="mt-3 pl-9">
+            <PageTags pageId={page.id} spaceId={page.spaceId} canEdit={canEdit} />
           </div>
 
           <div className="mt-6">
