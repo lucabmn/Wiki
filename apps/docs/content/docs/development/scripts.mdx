@@ -8,22 +8,22 @@ Run these from the repository root.
 
 ## Development
 
-| Script            | Description                          |
-| ----------------- | ------------------------------------ |
-| `pnpm dev`        | Start all apps in development mode    |
-| `pnpm dev:web`    | Web app only (`:3001`)               |
-| `pnpm dev:server` | Server only (`:3000`)                |
-| `pnpm dev:collab` | Collab service only (`:1234`)        |
-| `pnpm dev:tui`    | Terminal installer / ops wizard      |
+| Script            | Description                        |
+| ----------------- | ---------------------------------- |
+| `pnpm dev`        | Start all apps in development mode |
+| `pnpm dev:web`    | Web app only (`:3001`)             |
+| `pnpm dev:server` | Server only (`:3000`)              |
+| `pnpm dev:collab` | Collab service only (`:1234`)      |
+| `pnpm dev:tui`    | Terminal installer / ops wizard    |
 
 ## Build & quality
 
-| Script             | Description                              |
-| ------------------ | ---------------------------------------- |
-| `pnpm build`       | Build all apps and packages              |
-| `pnpm test`        | Run the test suite (Vitest, via Turbo)   |
-| `pnpm check-types` | Type-check every package                 |
-| `pnpm check`       | Lint and format with Oxlint + Oxfmt      |
+| Script             | Description                            |
+| ------------------ | -------------------------------------- |
+| `pnpm build`       | Build all apps and packages            |
+| `pnpm test`        | Run the test suite (Vitest, via Turbo) |
+| `pnpm check-types` | Type-check every package               |
+| `pnpm check`       | Lint and format with Oxlint + Oxfmt    |
 
 ## Database
 
@@ -40,12 +40,12 @@ Run these from the repository root.
 
 ## Docker
 
-| Script             | Description                              |
-| ------------------ | ---------------------------------------- |
-| `pnpm docker:build`| Build the Compose images                 |
-| `pnpm docker:up`   | Build and start the full stack           |
-| `pnpm docker:logs` | Tail logs                                |
-| `pnpm docker:down` | Stop the stack                           |
+| Script              | Description                    |
+| ------------------- | ------------------------------ |
+| `pnpm docker:build` | Build the Compose images       |
+| `pnpm docker:up`    | Build and start the full stack |
+| `pnpm docker:logs`  | Tail logs                      |
+| `pnpm docker:down`  | Stop the stack                 |
 
 <Callout type="info">
   Scripts are thin wrappers over `turbo run …`. Use `-F <package>` (or the

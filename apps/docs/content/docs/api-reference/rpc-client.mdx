@@ -16,7 +16,7 @@ import type { AppRouterClient } from "@nilovon-wiki/api/routers/index";
 // client: AppRouterClient — fully typed from the server definition
 const page = await client.pages.create({
   spaceId,
-  title: "Runbook",       // ✅ input type checked against the Zod schema
+  title: "Runbook", // ✅ input type checked against the Zod schema
 });
 //    ^? { id: string; slug: string; ... }  — output inferred
 ```
@@ -34,9 +34,7 @@ import { useQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc";
 
 // Read
-const { data: access } = useQuery(
-  orpc.pageAccess.myRole.queryOptions({ input: { pageId } }),
-);
+const { data: access } = useQuery(orpc.pageAccess.myRole.queryOptions({ input: { pageId } }));
 
 // Mutate
 const create = useMutation(orpc.pages.create.mutationOptions());

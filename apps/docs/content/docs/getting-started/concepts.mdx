@@ -17,8 +17,8 @@ server-side, not just hidden in the UI.
 Your first organization is created during onboarding, right after you register.
 
 <Callout>
-  A user can belong to more than one organization. The API always resolves
-  permissions against the **active** organization for the current session.
+  A user can belong to more than one organization. The API always resolves permissions against the
+  **active** organization for the current session.
 </Callout>
 
 ## Spaces
@@ -26,11 +26,11 @@ Your first organization is created during onboarding, right after you register.
 A **space** groups related pages — think of it as a section or a team area. Each
 space has a **visibility**:
 
-| Visibility   | Who can read                                            |
-| ------------ | ------------------------------------------------------- |
-| `public`     | any member of the organization                          |
-| `private`    | members of the space only                               |
-| `restricted` | the creator and explicitly added members                |
+| Visibility   | Who can read                             |
+| ------------ | ---------------------------------------- |
+| `public`     | any member of the organization           |
+| `private`    | members of the space only                |
+| `restricted` | the creator and explicitly added members |
 
 Within a space, members carry a **space role** (`viewer`, `commenter`, `editor`,
 `admin`) that decides what they can do with its content.
@@ -70,8 +70,8 @@ space/page role**; org-management actions are gated on **org RBAC**. Both layers
 are always enforced on the server.
 
 <Card title="Permissions in depth" href="/docs/permissions">
-  The full model: statements, static and dynamic roles, groups, and the exact
-  backend and frontend APIs.
+  The full model: statements, static and dynamic roles, groups, and the exact backend and frontend
+  APIs.
 </Card>
 
 ## Everything is auditable

@@ -43,9 +43,10 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
   `VITE_*` values are compiled into the web bundle when the image is **built** —
   changing a domain means rebuilding the web image:
 
-  ```sh
-  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build web
-  ```
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build web
+```
+
 </Callout>
 
 ## What the prod overlay does

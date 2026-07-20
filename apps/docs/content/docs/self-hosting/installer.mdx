@@ -28,19 +28,19 @@ pnpm dev:tui
 
 The wizard is menu-driven. Its three main actions:
 
-| Action           | What it does                                                                 |
-| ---------------- | --------------------------------------------------------------------------- |
-| **Installieren** | Generate secrets, write `.env`, build images, start the stack, wait for health. |
-| **Konfigurieren** | Reconfigure an existing install (change domains, secrets, ports).           |
-| **Updaten**      | `git pull --ff-only`, rebuild, restart — with the TLS overlay if the install is HTTPS. |
+| Action            | What it does                                                                           |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| **Installieren**  | Generate secrets, write `.env`, build images, start the stack, wait for health.        |
+| **Konfigurieren** | Reconfigure an existing install (change domains, secrets, ports).                      |
+| **Updaten**       | `git pull --ff-only`, rebuild, restart — with the TLS overlay if the install is HTTPS. |
 
 For a public install, enter `https://` / `wss://` URLs plus a Let's Encrypt email
 in the form, and the wizard brings the stack up behind the bundled Caddy TLS proxy
 automatically.
 
 <Callout type="info">
-  The installer is the operations front door: everything it does has a documented
-  manual `docker compose` equivalent, so you are never locked into the wizard.
+  The installer is the operations front door: everything it does has a documented manual `docker
+  compose` equivalent, so you are never locked into the wizard.
 </Callout>
 
 ## Under the hood

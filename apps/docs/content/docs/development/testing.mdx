@@ -25,9 +25,8 @@ Type-checking (`pnpm check-types`) catches a lot, but **not** the authorization
 pitfalls that depend on runtime state:
 
 <Callout type="warn">
-  The **active-org** and **cross-org** rules can't be caught by types alone. A
-  handler can compile perfectly and still check the wrong organization. Exercise a
-  real permission round-trip — see the
+  The **active-org** and **cross-org** rules can't be caught by types alone. A handler can compile
+  perfectly and still check the wrong organization. Exercise a real permission round-trip — see the
   [verification steps](/docs/permissions/groups#verifying-it-works-round-trip).
 </Callout>
 

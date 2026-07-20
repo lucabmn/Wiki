@@ -15,6 +15,7 @@ import { evlog, type EvlogVariables } from "evlog/hono";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
+import { attachmentRoutes } from "./attachments";
 import { rateLimit } from "./rate-limit";
 
 initLogger({
@@ -50,7 +51,12 @@ app.use(
 
 // Page documents are the largest legitimate payloads; 10 MB leaves generous
 // headroom while bounding what an unauthenticated client can make us buffer.
-app.use("/*", bodyLimit({ maxSize: 10 * 1024 * 1024 }));
+// Attachment uploads are exempt — they carry file bytes and enforce their own,
+// larger ceiling (ATTACHMENT_MAX_MB) inside the route.
+app.use("/*", async (c, next) => {
+  if (c.req.path.startsWith("/attachments/")) return next();
+  return bodyLimit({ maxSize: 10 * 1024 * 1024 })(c, next);
+});
 
 // Max RPC calls the client's BatchLinkPlugin bundles into one HTTP request;
 // pinned so the batch handler and the rate limiter agree on the ceiling.
@@ -69,7 +75,12 @@ app.use(
 );
 app.use("/api-reference/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
+app.use("/attachments/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
+
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// Binary transfer for attachments; the metadata lives on the oRPC router.
+app.route("/attachments", attachmentRoutes);
 
 export const apiHandler = new OpenAPIHandler(appRouter, {
   plugins: [

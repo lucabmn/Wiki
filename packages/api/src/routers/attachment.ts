@@ -5,19 +5,11 @@ import { attachment } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure } from "../index";
 import { assertSpaceRead } from "../lib/access";
-import {
-  requireOwnerOrSpaceCapability,
-  requirePageCapability,
-  requireSpaceCapabilityById,
-} from "../lib/authz";
+import { requireOwnerOrSpaceCapability, requirePageCapability } from "../lib/authz";
 import { recordActivity } from "../lib/activity";
 import { loadAttachment, loadPage, loadSpace } from "../lib/loaders";
-import { firstRow } from "../lib/rows";
-import {
-  AttachmentSchema,
-  CreateAttachmentInputSchema,
-  ListAttachmentsInputSchema,
-} from "../schemas/attachment";
+import { getStorage } from "../lib/storage";
+import { AttachmentSchema, ListAttachmentsInputSchema } from "../schemas/attachment";
 import { IdSchema } from "../schemas/shared";
 
 const TAGS = ["Attachments"];
@@ -51,67 +43,27 @@ export const attachmentRouter = {
       });
     }),
 
-  create: protectedProcedure
+  // Metadata for one attachment, gated on read access to its page (or space for
+  // a page-less upload). The download proxy in `apps/server` calls this to
+  // authorize before it streams any bytes.
+  get: protectedProcedure
     .route({
-      method: "POST",
-      path: "/attachments",
+      method: "GET",
+      path: "/attachments/{id}",
       tags: TAGS,
-      summary: "Register an uploaded attachment",
+      summary: "Get one attachment's metadata",
     })
-    .input(CreateAttachmentInputSchema)
+    .input(z.object({ id: IdSchema }))
     .output(AttachmentSchema)
     .handler(async ({ input, context }) => {
-      // Attaching to a page requires write on that page; a bare space upload
-      // requires write on the space. The row's spaceId is derived from the
-      // checked resource — never taken from the client alongside a pageId, or
-      // write access to one page would allow planting rows in foreign spaces.
-      let organizationId: string;
-      let spaceId: string;
-      if (input.pageId) {
-        const target = await loadPage(context.db, input.pageId);
-        ({ organizationId } = await requirePageCapability(
-          context.db,
-          context,
-          context.headers,
-          target,
-          "write",
-        ));
-        spaceId = target.spaceId;
+      const existing = await loadAttachment(context.db, input.id);
+      if (existing.pageId) {
+        const target = await loadPage(context.db, existing.pageId);
+        await requirePageCapability(context.db, context, context.headers, target, "read");
       } else {
-        ({ organizationId } = await requireSpaceCapabilityById(
-          context.db,
-          context,
-          context.headers,
-          input.spaceId,
-          "write",
-        ));
-        spaceId = input.spaceId;
+        await assertSpaceRead(context.db, context, await loadSpace(context.db, existing.spaceId));
       }
-      return context.db.transaction(async (tx) => {
-        const rows = await tx
-          .insert(attachment)
-          .values({
-            spaceId,
-            pageId: input.pageId ?? null,
-            fileName: input.fileName,
-            mimeType: input.mimeType,
-            size: input.size,
-            storageKey: input.storageKey,
-            checksum: input.checksum ?? null,
-            uploadedBy: context.session.user.id,
-          })
-          .returning();
-        const row = firstRow(rows);
-        await recordActivity(tx, {
-          organizationId,
-          action: "attachment.uploaded",
-          actorId: context.session.user.id,
-          spaceId: row.spaceId,
-          pageId: row.pageId,
-          metadata: { fileName: row.fileName, attachmentId: row.id },
-        });
-        return row;
-      });
+      return existing;
     }),
 
   delete: protectedProcedure
@@ -132,6 +84,11 @@ export const attachmentRouter = {
         capability: "write",
       });
       const organizationId = space.organizationId;
+      // Drop the object first: if this fails the row survives and the delete can
+      // be retried, whereas the reverse order would orphan the bytes for good.
+      await getStorage()
+        ?.delete(existing.storageKey)
+        .catch(() => {});
       await context.db.transaction(async (tx) => {
         await tx.delete(attachment).where(eq(attachment.id, input.id));
         // The attachment row is hard-deleted, so keep identifying info in

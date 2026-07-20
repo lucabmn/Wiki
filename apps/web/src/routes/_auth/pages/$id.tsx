@@ -3,6 +3,7 @@ import { PageAside } from "@/components/editor/page-aside";
 import { PageContent } from "@/components/editor/page-content";
 import { PageEditor } from "@/components/editor/page-editor";
 import { PageAccessSheet } from "@/components/pages/page-access-sheet";
+import { PageAttachments } from "@/components/pages/page-attachments";
 import { PageTags } from "@/components/pages/page-tags";
 import { RevisionHistory } from "@/components/editor/revision-history";
 import { extractHeadings } from "@/components/editor/headings";
@@ -514,6 +515,10 @@ function RouteComponent() {
                   : "Diese Seite wurde noch nicht veröffentlicht."
               }
             />
+          </div>
+
+          <div className="mt-10">
+            <PageAttachments pageId={page.id} spaceId={page.spaceId} canEdit={canEdit} />
           </div>
 
           <section id="page-comments" className="mt-10 scroll-mt-6">

@@ -51,10 +51,10 @@ This means:
 ## Where authorization happens
 
 <Callout title="Server-side, always">
-  Reads are gated on **space visibility** (`packages/api/src/lib/access.ts`);
-  content writes on the **effective space/page role**; organization management on
-  **org RBAC** (`assertOrgPermission`). Every write runs in a transaction and
-  appends an audit row. The frontend mirrors these checks only to gate UI.
+  Reads are gated on **space visibility** (`packages/api/src/lib/access.ts`); content writes on the
+  **effective space/page role**; organization management on **org RBAC** (`assertOrgPermission`).
+  Every write runs in a transaction and appends an audit row. The frontend mirrors these checks only
+  to gate UI.
 </Callout>
 
 ## Explore each layer

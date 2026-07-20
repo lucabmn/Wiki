@@ -21,32 +21,31 @@ Because it is generated from the router, it is always in sync with the running
 server — there is no separately maintained spec to fall behind.
 
 <Callout type="info">
-  The reference is the **authoritative** endpoint list for your version. The tables
-  below illustrate the shape; browse `/api-reference` on your instance for the
-  complete, current surface.
+  The reference is the **authoritative** endpoint list for your version. The tables below illustrate
+  the shape; browse `/api-reference` on your instance for the complete, current surface.
 </Callout>
 
 ## Example: the `pages` resource
 
 A representative slice of the generated REST surface (tag: **Pages**):
 
-| Method   | Path                                     | Summary                       |
-| -------- | ---------------------------------------- | ----------------------------- |
-| `GET`    | `/pages`                                 | List pages in a space         |
-| `POST`   | `/pages`                                 | Create a page                 |
-| `GET`    | `/pages/{id}`                            | Get a page                    |
-| `PATCH`  | `/pages/{id}`                            | Update a page                 |
-| `DELETE` | `/pages/{id}`                            | Delete a page                 |
-| `POST`   | `/pages/{id}/publish`                    | Publish a page                |
-| `POST`   | `/pages/{id}/move`                       | Move a page in the tree       |
-| `POST`   | `/pages/{id}/archive`                    | Archive a page                |
-| `POST`   | `/pages/{id}/restore`                    | Restore an archived page      |
-| `GET`    | `/pages/{id}/revisions`                  | List revisions                |
-| `POST`   | `/pages/{id}/revisions/{version}/restore` | Restore a revision           |
-| `GET`    | `/pages/{id}/draft`                      | Get the draft                 |
-| `PUT`    | `/pages/{pageId}/draft`                  | Save the draft                |
-| `DELETE` | `/pages/{id}/draft`                      | Delete the draft              |
-| `POST`   | `/pages/{id}/collab-token`               | Mint a page-scoped collab token |
+| Method   | Path                                      | Summary                         |
+| -------- | ----------------------------------------- | ------------------------------- |
+| `GET`    | `/pages`                                  | List pages in a space           |
+| `POST`   | `/pages`                                  | Create a page                   |
+| `GET`    | `/pages/{id}`                             | Get a page                      |
+| `PATCH`  | `/pages/{id}`                             | Update a page                   |
+| `DELETE` | `/pages/{id}`                             | Delete a page                   |
+| `POST`   | `/pages/{id}/publish`                     | Publish a page                  |
+| `POST`   | `/pages/{id}/move`                        | Move a page in the tree         |
+| `POST`   | `/pages/{id}/archive`                     | Archive a page                  |
+| `POST`   | `/pages/{id}/restore`                     | Restore an archived page        |
+| `GET`    | `/pages/{id}/revisions`                   | List revisions                  |
+| `POST`   | `/pages/{id}/revisions/{version}/restore` | Restore a revision              |
+| `GET`    | `/pages/{id}/draft`                       | Get the draft                   |
+| `PUT`    | `/pages/{pageId}/draft`                   | Save the draft                  |
+| `DELETE` | `/pages/{id}/draft`                       | Delete the draft                |
+| `POST`   | `/pages/{id}/collab-token`                | Mint a page-scoped collab token |
 
 Other resources (`spaces`, `comments`, `tags`, `attachments`, `activity`,
 `search`, …) follow the same conventions under their own tags.

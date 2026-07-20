@@ -179,6 +179,13 @@ vi.mock("@/utils/orpc", () => ({
       detach: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
       create: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
     },
+    attachments: {
+      list: {
+        queryOptions: () => ({ queryKey: ["attachments"], queryFn: async () => [] }),
+        key: () => ["attachments"],
+      },
+      delete: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+    },
     links: {
       backlinks: {
         queryOptions: () => ({ queryKey: ["backlinks"], queryFn: async () => [] }),

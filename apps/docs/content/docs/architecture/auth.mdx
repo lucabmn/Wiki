@@ -29,10 +29,9 @@ Sessions are cookie-based and signed with **`BETTER_AUTH_SECRET`**:
   work without TLS.
 
 <Callout type="warn" title="One secret, several services">
-  `BETTER_AUTH_SECRET` signs sessions **and** the page-scoped collab tokens. The
-  collab service must be given the **same** secret so it can verify those tokens.
-  Keep it with your backups — a restore can't validate existing sessions without
-  it.
+  `BETTER_AUTH_SECRET` signs sessions **and** the page-scoped collab tokens. The collab service must
+  be given the **same** secret so it can verify those tokens. Keep it with your backups — a restore
+  can't validate existing sessions without it.
 </Callout>
 
 ## Rate limiting

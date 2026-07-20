@@ -46,11 +46,11 @@ and no way for the client and server to disagree.
 
 Routers are composed from a few base builders (in `packages/api/src/index.ts`):
 
-| Builder                  | Guarantees                                                        |
-| ------------------------ | ---------------------------------------------------------------- |
-| `publicProcedure`        | No auth required.                                                 |
-| `protectedProcedure`     | An authenticated session; `context.headers` available.           |
-| `requireOrgPermission()` | The caller holds a given org permission in the **active** org.    |
+| Builder                  | Guarantees                                                     |
+| ------------------------ | -------------------------------------------------------------- |
+| `publicProcedure`        | No auth required.                                              |
+| `protectedProcedure`     | An authenticated session; `context.headers` available.         |
+| `requireOrgPermission()` | The caller holds a given org permission in the **active** org. |
 
 Content routes additionally gate on **space/page capabilities** via the helpers in
 `packages/api/src/lib/authz.ts`. See [Permissions](/docs/permissions).
@@ -68,8 +68,8 @@ CORS and per-IP rate limiting (`RATE_LIMIT_MAX`, `RATE_LIMIT_AUTH_MAX`) are appl
 at this layer.
 
 <Callout type="info">
-  The generated REST surface uses `PATCH` / `PUT` / `DELETE`, so CORS is configured
-  to allow them — otherwise preflight would reject batched `/rpc` calls.
+  The generated REST surface uses `PATCH` / `PUT` / `DELETE`, so CORS is configured to allow them —
+  otherwise preflight would reject batched `/rpc` calls.
 </Callout>
 
 ## Consuming it

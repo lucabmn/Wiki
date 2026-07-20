@@ -49,6 +49,9 @@ export const env = createEnv({
       .enum(["true", "false"])
       .default("true")
       .transform((value) => value === "true"),
+    // Per-file upload ceiling. Uploads proxy through this process, so the limit
+    // also bounds how much one request can make the server buffer.
+    ATTACHMENT_MAX_MB: z.coerce.number().int().positive().default(25),
   },
   runtimeEnv: process.env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
