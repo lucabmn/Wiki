@@ -31,6 +31,8 @@
 # Environment & local files
 .env*
 !.env.example
+# Committed: vitest needs the client env to validate on a fresh clone.
+!.env.test
 .DS_Store
 *.pem
 *.local
