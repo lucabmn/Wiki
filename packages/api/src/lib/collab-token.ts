@@ -44,10 +44,13 @@ function toBase64Url(bytes: Uint8Array): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
-function fromBase64Url(value: string): Uint8Array {
+// The explicit `Uint8Array<ArrayBuffer>` matters: under the DOM lib (the web
+// app typechecks this file transitively) `crypto.subtle.verify` wants a
+// `BufferSource` backed by a real ArrayBuffer, not a possibly-shared one.
+function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
   const padded = value.replaceAll("-", "+").replaceAll("_", "/");
   const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
@@ -91,7 +94,7 @@ export async function verifyCollabToken(
   const payloadSegment = token.slice(0, dot);
   const signatureSegment = token.slice(dot + 1);
 
-  let signature: Uint8Array;
+  let signature: Uint8Array<ArrayBuffer>;
   try {
     signature = fromBase64Url(signatureSegment);
   } catch {
