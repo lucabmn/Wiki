@@ -21,10 +21,12 @@
     "better-auth": "catalog:",
     "better-auth-localization": "^3.0.0",
     "dotenv": "catalog:",
+    "nodemailer": "^9.0.3",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@nilovon-wiki/config": "workspace:*",
+    "@types/nodemailer": "^8.0.1",
     "typescript": "catalog:"
   }
 }

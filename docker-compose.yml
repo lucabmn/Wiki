@@ -80,6 +80,22 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env (see .env.example, or use the installer)}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example, or use the installer)}@postgres:5432/nilovon-wiki
+      # Mail. Unset SMTP_HOST disables delivery (mails are logged instead), so a
+      # single-user install boots without a mail server. Invitations and
+      # password resets only reach their recipient once this points somewhere.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-Nilovon Wiki <no-reply@localhost>}
+      # Object storage for attachments — defaults to the bundled RustFS.
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://rustfs:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-nilovon-wiki}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-rustfsadmin}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-rustfsadmin}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
     healthcheck:
       # /health verifies database connectivity, not just process liveness.
       test:
@@ -159,5 +175,42 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  # S3-compatible object storage for page attachments. Browsers upload straight
+  # to it with a presigned URL, so it must be reachable from the browser too —
+  # in production set S3_PUBLIC_ENDPOINT to a public hostname and front it with
+  # the Caddy overlay.
+  rustfs:
+    image: rustfs/rustfs:1.0.0-beta.10
+    container_name: nilovon-wiki-rustfs
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      RUSTFS_VOLUMES: /data/rustfs
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY_ID:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_ACCESS_KEY:-rustfsadmin}
+    ports:
+      # Loopback-only like Postgres: the compose network handles the server, and
+      # the prod overlay publishes it through Caddy when browsers need it.
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - nilovon-wiki_rustfs_data:/data
+    restart: unless-stopped
+    logging: *default-logging
+
+  # Dev-only mail catcher: `docker compose --profile dev up -d` starts it, then
+  # set SMTP_HOST=mailpit / SMTP_PORT=1025 and read the mails on :8025. Never
+  # enable this profile in production — it accepts mail and delivers none.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: nilovon-wiki-mailpit
+    profiles: ["dev"]
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+    logging: *default-logging
+
 volumes:
   nilovon-wiki_postgres_data:
+  nilovon-wiki_rustfs_data:

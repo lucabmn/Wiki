@@ -2,7 +2,7 @@ import { Button } from "@nilovon-wiki/ui/components/button";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import { Field, FieldGroup, FieldLabel, FieldError } from "@nilovon-wiki/ui/components/field";
 import { useForm } from "@tanstack/react-form";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import z from "zod";
 
@@ -111,7 +111,15 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
               const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>Passwort</FieldLabel>
+                  <div className="flex items-baseline justify-between">
+                    <FieldLabel htmlFor={field.name}>Passwort</FieldLabel>
+                    <Link
+                      to="/auth/forgot-password"
+                      className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                    >
+                      Passwort vergessen?
+                    </Link>
+                  </div>
                   <Input
                     id={field.name}
                     name={field.name}

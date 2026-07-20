@@ -5,6 +5,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, organization, twoFactor } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
+import { actionMail, sendMail } from "./mail";
 import { ac, roles } from "./permissions";
 import { localization } from "better-auth-localization";
 
@@ -37,6 +38,35 @@ export function createAuth() {
     trustedOrigins: [env.CORS_ORIGIN],
     emailAndPassword: {
       enabled: true,
+      sendResetPassword: async ({ user, url }) => {
+        await sendMail({
+          to: user.email,
+          subject: `${env.APP_NAME}: Passwort zurücksetzen`,
+          ...actionMail({
+            heading: "Passwort zurücksetzen",
+            body: `Für ${user.email} wurde ein neues Passwort angefordert. Der Link ist eine Stunde gültig. Wenn du das nicht warst, ignoriere diese E-Mail.`,
+            actionLabel: "Neues Passwort setzen",
+            url,
+          }),
+        });
+      },
+    },
+    // Verification is wired but not required: enforcing it on a self-host with
+    // no SMTP configured would lock every new account out. Operators who set
+    // SMTP_HOST can turn on `requireEmailVerification` above.
+    emailVerification: {
+      sendVerificationEmail: async ({ user, url }) => {
+        await sendMail({
+          to: user.email,
+          subject: `${env.APP_NAME}: E-Mail-Adresse bestätigen`,
+          ...actionMail({
+            heading: "E-Mail-Adresse bestätigen",
+            body: `Bestätige ${user.email}, um dein Konto vollständig zu aktivieren.`,
+            actionLabel: "Adresse bestätigen",
+            url,
+          }),
+        });
+      },
     },
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
@@ -54,6 +84,21 @@ export function createAuth() {
       organization({
         ac,
         roles,
+        // The invitation id is the whole handshake: the accept route reads it
+        // from the path and calls `organization.acceptInvitation`. CORS_ORIGIN
+        // is the web app's own origin, which is where that route lives.
+        sendInvitationEmail: async ({ id, email, inviter, organization: org }) => {
+          await sendMail({
+            to: email,
+            subject: `${inviter.user.name} lädt dich zu ${org.name} ein`,
+            ...actionMail({
+              heading: `Einladung zu ${org.name}`,
+              body: `${inviter.user.name} (${inviter.user.email}) hat dich in den Wissens-Hub ${org.name} eingeladen.`,
+              actionLabel: "Einladung annehmen",
+              url: new URL(`/accept-invitation/${id}`, env.CORS_ORIGIN).toString(),
+            }),
+          });
+        },
         dynamicAccessControl: {
           enabled: true,
         },
