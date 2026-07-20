@@ -12,5 +12,9 @@ pre-commit:
       stage_fixed: true
     - name: oxfmt
       glob: "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,md,css}"
+      # Skip files oxfmt itself ignores (generated route trees): passing only
+      # excluded paths makes it exit 2 and blocks the commit.
+      exclude:
+        - "**/routeTree.gen.ts"
       run: pnpm oxfmt --write {staged_files}
       stage_fixed: true
