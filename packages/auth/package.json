@@ -11,7 +11,8 @@
   },
   "scripts": {
     "auth:generate": "pnpm dlx auth generate --config ./src/index.ts --output ../db/src/schema/auth.ts",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.6.23",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@nilovon-wiki/config": "workspace:*",
     "@types/nodemailer": "^8.0.1",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

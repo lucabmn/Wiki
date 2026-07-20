@@ -36,11 +36,6 @@ function getTransporter(): Transporter | null {
   return transporter;
 }
 
-/** Reset the memoized transport — for tests that swap the env. */
-export function resetMailTransport() {
-  transporter = undefined;
-}
-
 export type Mail = {
   to: string;
   subject: string;
