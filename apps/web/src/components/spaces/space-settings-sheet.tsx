@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { Check, Globe, Lock, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { MemberAccessManager } from "@/components/access/member-access-manager";
@@ -21,7 +22,6 @@ import {
 } from "@nilovon-wiki/ui/components/alert-dialog";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Input } from "@nilovon-wiki/ui/components/input";
-import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
 import {
   Sheet,
   SheetContent,
@@ -31,13 +31,16 @@ import {
 } from "@nilovon-wiki/ui/components/sheet";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 
-const VISIBILITIES = ["public", "private", "restricted"] as const;
+// Ordered from open to closed, which is how the cards read top to bottom.
+const VISIBILITIES = ["public", "restricted", "private"] as const;
 
 const VISIBILITY_HINT: Record<string, string> = {
   public: "Jedes Organisationsmitglied kann lesen. Schreiben braucht eine Rolle.",
   private: "Nur explizite Mitglieder haben Zugriff.",
   restricted: "Ersteller und explizite Mitglieder haben Zugriff.",
 };
+
+const VISIBILITY_ICON = { public: Globe, restricted: Users, private: Lock } as const;
 
 // Preset accents matching the hex format the API validates.
 const SPACE_COLORS = [
@@ -88,12 +91,16 @@ export function SpaceSettingsSheet({
   // sheet opens (and after a save, when the fresh space props arrive).
   const [name, setName] = useState(space.name);
   const [color, setColor] = useState<string | null>(space.color);
+  // The visibility cards switch on click, before the mutation resolves —
+  // otherwise the selection appears stuck. Reverted in the mutation's onError.
+  const [visibility, setVisibility] = useState(space.visibility);
   useEffect(() => {
     if (open) {
       setName(space.name);
       setColor(space.color);
+      setVisibility(space.visibility);
     }
-  }, [open, space.name, space.color]);
+  }, [open, space.name, space.color, space.visibility]);
 
   const refresh = () => {
     invalidateMembers();
@@ -117,7 +124,10 @@ export function SpaceSettingsSheet({
         invalidateMyRole();
         toast.success("Sichtbarkeit aktualisiert");
       },
-      onError: toastError,
+      onError: (error) => {
+        setVisibility(space.visibility);
+        toastError(error);
+      },
     }),
   );
 
@@ -227,30 +237,62 @@ export function SpaceSettingsSheet({
             </div>
           </section>
 
-          <section className="space-y-2">
-            <h3 className="text-sm font-semibold">Sichtbarkeit</h3>
-            <NativeSelect
-              className="w-full"
-              value={space.visibility}
-              disabled={updateVisibility.isPending}
-              onChange={(event) =>
-                updateVisibility.mutate({
-                  id: space.id,
-                  visibility: event.target.value as "public",
-                })
-              }
-            >
-              {VISIBILITIES.map((v) => (
-                <NativeSelectOption key={v} value={v}>
-                  {VISIBILITY_LABEL[v] ?? v}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-            <p className="text-xs text-muted-foreground">{VISIBILITY_HINT[space.visibility]}</p>
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h3 className="text-sm font-semibold">Sichtbarkeit</h3>
+              <p className="text-xs text-muted-foreground">
+                Wer den Space grundsätzlich sehen darf.
+              </p>
+            </div>
+            <div role="radiogroup" aria-label="Sichtbarkeit" className="grid gap-2">
+              {VISIBILITIES.map((v) => {
+                const Icon = VISIBILITY_ICON[v];
+                const active = visibility === v;
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    disabled={updateVisibility.isPending}
+                    className={cn(
+                      "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors",
+                      "focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                      "disabled:cursor-not-allowed disabled:opacity-60",
+                      active
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-input hover:bg-muted/50",
+                    )}
+                    onClick={() => {
+                      if (active) return;
+                      setVisibility(v);
+                      updateVisibility.mutate({ id: space.id, visibility: v });
+                    }}
+                  >
+                    <Icon
+                      className={cn(
+                        "mt-0.5 size-4 shrink-0",
+                        active ? "text-primary" : "text-muted-foreground",
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium">{VISIBILITY_LABEL[v] ?? v}</div>
+                      <p className="text-xs text-muted-foreground">{VISIBILITY_HINT[v]}</p>
+                    </div>
+                    {active ? <Check className="mt-0.5 size-4 shrink-0 text-primary" /> : null}
+                  </button>
+                );
+              })}
+            </div>
           </section>
 
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Mitglieder & Gruppen</h3>
+            <div className="space-y-0.5">
+              <h3 className="text-sm font-semibold">Mitglieder & Gruppen</h3>
+              <p className="text-xs text-muted-foreground">
+                Explizite Zugriffe zusätzlich zur Sichtbarkeit.
+              </p>
+            </div>
             <MemberAccessManager
               members={members}
               isLoading={membersQuery.isPending}
