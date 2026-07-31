@@ -1,4 +1,5 @@
 import { createMiddleware } from "@tanstack/react-start";
+import { getResponse } from "@tanstack/react-start/server";
 import { redirect } from "@tanstack/react-router";
 
 import { authClient } from "@/lib/auth-client";
@@ -35,17 +36,48 @@ export const authMiddleware = createMiddleware().server(async ({ next, request }
     }
 
     let activeOrganizationId = session.session.activeOrganizationId;
+    // Distinguishes "activation failed" from "user belongs to no org at all" —
+    // only the latter belongs in onboarding.
+    let hasMembership = Boolean(activeOrganizationId);
 
     // 2. No active org → adopt the first org the user belongs to, if any.
+    //    Normally handled at session creation (see the `session.create.before`
+    //    hook in @nilovon-wiki/auth); this covers memberships gained mid-session.
     if (!activeOrganizationId) {
-      const { data: organizations } = await authClient.organization.list({ fetchOptions });
+      const { data: organizations, error: listError } = await authClient.organization.list({
+        fetchOptions,
+      });
+
+      // A failed lookup means "membership unknown", not "no orgs" — treating it
+      // as the latter would send an existing member to onboarding.
+      if (listError) {
+        hasMembership = true;
+      }
 
       if (organizations && organizations.length > 0) {
-        await authClient.organization.setActive({
+        hasMembership = true;
+        const { error } = await authClient.organization.setActive({
           organizationId: organizations[0].id,
-          fetchOptions,
+          fetchOptions: {
+            ...fetchOptions,
+            // `setActive` re-signs the session cookie (and its 5-minute cache).
+            // This call is server-to-server, so without forwarding its cookies
+            // the browser keeps a cached session with no active org and every
+            // subsequent RPC 400s with "No active organization".
+            onSuccess: (ctx) => {
+              const cookies = ctx.response.headers.getSetCookie();
+              for (const cookie of cookies) {
+                getResponse().headers.append("set-cookie", cookie);
+              }
+            },
+          },
         });
-        activeOrganizationId = organizations[0].id;
+
+        // A failed activation must not be reported as success — the page would
+        // render while every org-scoped RPC rejects.
+        if (!error) {
+          activeOrganizationId = organizations[0].id;
+        }
       }
     }
 
@@ -57,8 +89,10 @@ export const authMiddleware = createMiddleware().server(async ({ next, request }
       });
 
       organization = data;
-    } else if (pathname !== onboardingPath) {
-      // 4. No org at all → onboarding.
+    } else if (!hasMembership && pathname !== onboardingPath) {
+      // 4. No org at all → onboarding. A member whose activation failed renders
+      //    without an org instead, rather than being pushed into creating a
+      //    duplicate one.
       throw redirect({ to: onboardingPath });
     }
   }

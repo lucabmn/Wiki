@@ -35,6 +35,28 @@ export function createAuth() {
         maxAge: 5 * 60, // Cache session for 5 minutes
       },
     },
+    databaseHooks: {
+      session: {
+        create: {
+          // Stamp the active org onto the session *row at creation*, before the
+          // session cookie (and its 5-minute cache) is signed. Setting it later
+          // — e.g. the SSR middleware calling `organization.setActive` — updates
+          // the database but not the browser's cached session, so API calls kept
+          // seeing `activeOrganizationId: null` until the cache expired.
+          before: async (session) => {
+            const membership = await db.query.member.findFirst({
+              columns: { organizationId: true },
+              where: (member, { eq }) => eq(member.userId, session.userId),
+              orderBy: (member, { asc }) => asc(member.createdAt),
+            });
+
+            if (!membership) return;
+
+            return { data: { activeOrganizationId: membership.organizationId } };
+          },
+        },
+      },
+    },
     trustedOrigins: [env.CORS_ORIGIN],
     emailAndPassword: {
       enabled: true,
