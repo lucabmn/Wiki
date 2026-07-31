@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MoreHorizontal, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -16,6 +17,7 @@ import {
   useOrgRefresh,
 } from "@/lib/org-queries";
 import { InviteMemberDialog } from "@/components/settings/invite-member-dialog";
+import { PermissionGate } from "@/components/settings/permission-gate";
 import {
   MemberRolesDialog,
   type MemberRolesTarget,
@@ -52,8 +54,15 @@ import {
   TableRow,
 } from "@nilovon-wiki/ui/components/table";
 
+/** Managing people is `member:["update"]` — a group may grant it on its own. */
+const MEMBER_MANAGE: PermissionRequest[] = [{ member: ["update"] }];
+
 export const Route = createFileRoute("/_auth/settings/members")({
-  component: MembersSettings,
+  component: () => (
+    <PermissionGate permissions={MEMBER_MANAGE}>
+      <MembersSettings />
+    </PermissionGate>
+  ),
 });
 
 function RoleBadges({ roles }: { roles: string[] }) {

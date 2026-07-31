@@ -47,6 +47,12 @@ export const authClient = createAuthClient({
       dynamicAccessControl: {
         enabled: true,
       },
+      // Mirrors the server plugin. The client infers its action surface from
+      // these options, so without it `organization.createTeam` & friends simply
+      // do not exist on the typed client.
+      teams: {
+        enabled: true,
+      },
     }),
   ],
 });

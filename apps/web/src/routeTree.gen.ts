@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteRouteImport } from './routes/_auth/route'
 import { Route as AuthIndexRouteImport } from './routes/_auth/index'
+import { Route as AuthTwoFactorRouteImport } from './routes/auth/two-factor'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
 import { Route as AuthRegisterRouteImport } from './routes/auth/register'
 import { Route as AuthOnboardingRouteImport } from './routes/auth/onboarding'
@@ -22,8 +23,13 @@ import { Route as AuthSettingsRouteRouteImport } from './routes/_auth/settings/r
 import { Route as AuthSpacesIndexRouteImport } from './routes/_auth/spaces/index'
 import { Route as AuthSettingsIndexRouteImport } from './routes/_auth/settings/index'
 import { Route as AuthSpacesSlugRouteImport } from './routes/_auth/spaces/$slug'
+import { Route as AuthSettingsTeamsRouteImport } from './routes/_auth/settings/teams'
+import { Route as AuthSettingsSecurityRouteImport } from './routes/_auth/settings/security'
+import { Route as AuthSettingsProfileRouteImport } from './routes/_auth/settings/profile'
+import { Route as AuthSettingsOrganizationRouteImport } from './routes/_auth/settings/organization'
 import { Route as AuthSettingsMembersRouteImport } from './routes/_auth/settings/members'
 import { Route as AuthSettingsGroupsRouteImport } from './routes/_auth/settings/groups'
+import { Route as AuthSettingsAppearanceRouteImport } from './routes/_auth/settings/appearance'
 import { Route as AuthPagesIdRouteImport } from './routes/_auth/pages/$id'
 
 const AuthRouteRoute = AuthRouteRouteImport.update({
@@ -34,6 +40,11 @@ const AuthIndexRoute = AuthIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthTwoFactorRoute = AuthTwoFactorRouteImport.update({
+  id: '/auth/two-factor',
+  path: '/auth/two-factor',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
   id: '/auth/reset-password',
@@ -90,6 +101,27 @@ const AuthSpacesSlugRoute = AuthSpacesSlugRouteImport.update({
   path: '/spaces/$slug',
   getParentRoute: () => AuthRouteRoute,
 } as any)
+const AuthSettingsTeamsRoute = AuthSettingsTeamsRouteImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => AuthSettingsRouteRoute,
+} as any)
+const AuthSettingsSecurityRoute = AuthSettingsSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => AuthSettingsRouteRoute,
+} as any)
+const AuthSettingsProfileRoute = AuthSettingsProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthSettingsRouteRoute,
+} as any)
+const AuthSettingsOrganizationRoute =
+  AuthSettingsOrganizationRouteImport.update({
+    id: '/organization',
+    path: '/organization',
+    getParentRoute: () => AuthSettingsRouteRoute,
+  } as any)
 const AuthSettingsMembersRoute = AuthSettingsMembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -98,6 +130,11 @@ const AuthSettingsMembersRoute = AuthSettingsMembersRouteImport.update({
 const AuthSettingsGroupsRoute = AuthSettingsGroupsRouteImport.update({
   id: '/groups',
   path: '/groups',
+  getParentRoute: () => AuthSettingsRouteRoute,
+} as any)
+const AuthSettingsAppearanceRoute = AuthSettingsAppearanceRouteImport.update({
+  id: '/appearance',
+  path: '/appearance',
   getParentRoute: () => AuthSettingsRouteRoute,
 } as any)
 const AuthPagesIdRoute = AuthPagesIdRouteImport.update({
@@ -116,9 +153,15 @@ export interface FileRoutesByFullPath {
   '/auth/onboarding': typeof AuthOnboardingRoute
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/two-factor': typeof AuthTwoFactorRoute
   '/pages/$id': typeof AuthPagesIdRoute
+  '/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/settings/groups': typeof AuthSettingsGroupsRoute
   '/settings/members': typeof AuthSettingsMembersRoute
+  '/settings/organization': typeof AuthSettingsOrganizationRoute
+  '/settings/profile': typeof AuthSettingsProfileRoute
+  '/settings/security': typeof AuthSettingsSecurityRoute
+  '/settings/teams': typeof AuthSettingsTeamsRoute
   '/spaces/$slug': typeof AuthSpacesSlugRoute
   '/settings/': typeof AuthSettingsIndexRoute
   '/spaces/': typeof AuthSpacesIndexRoute
@@ -131,10 +174,16 @@ export interface FileRoutesByTo {
   '/auth/onboarding': typeof AuthOnboardingRoute
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/two-factor': typeof AuthTwoFactorRoute
   '/': typeof AuthIndexRoute
   '/pages/$id': typeof AuthPagesIdRoute
+  '/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/settings/groups': typeof AuthSettingsGroupsRoute
   '/settings/members': typeof AuthSettingsMembersRoute
+  '/settings/organization': typeof AuthSettingsOrganizationRoute
+  '/settings/profile': typeof AuthSettingsProfileRoute
+  '/settings/security': typeof AuthSettingsSecurityRoute
+  '/settings/teams': typeof AuthSettingsTeamsRoute
   '/spaces/$slug': typeof AuthSpacesSlugRoute
   '/settings': typeof AuthSettingsIndexRoute
   '/spaces': typeof AuthSpacesIndexRoute
@@ -150,10 +199,16 @@ export interface FileRoutesById {
   '/auth/onboarding': typeof AuthOnboardingRoute
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/two-factor': typeof AuthTwoFactorRoute
   '/_auth/': typeof AuthIndexRoute
   '/_auth/pages/$id': typeof AuthPagesIdRoute
+  '/_auth/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/_auth/settings/groups': typeof AuthSettingsGroupsRoute
   '/_auth/settings/members': typeof AuthSettingsMembersRoute
+  '/_auth/settings/organization': typeof AuthSettingsOrganizationRoute
+  '/_auth/settings/profile': typeof AuthSettingsProfileRoute
+  '/_auth/settings/security': typeof AuthSettingsSecurityRoute
+  '/_auth/settings/teams': typeof AuthSettingsTeamsRoute
   '/_auth/spaces/$slug': typeof AuthSpacesSlugRoute
   '/_auth/settings/': typeof AuthSettingsIndexRoute
   '/_auth/spaces/': typeof AuthSpacesIndexRoute
@@ -170,9 +225,15 @@ export interface FileRouteTypes {
     | '/auth/onboarding'
     | '/auth/register'
     | '/auth/reset-password'
+    | '/auth/two-factor'
     | '/pages/$id'
+    | '/settings/appearance'
     | '/settings/groups'
     | '/settings/members'
+    | '/settings/organization'
+    | '/settings/profile'
+    | '/settings/security'
+    | '/settings/teams'
     | '/spaces/$slug'
     | '/settings/'
     | '/spaces/'
@@ -185,10 +246,16 @@ export interface FileRouteTypes {
     | '/auth/onboarding'
     | '/auth/register'
     | '/auth/reset-password'
+    | '/auth/two-factor'
     | '/'
     | '/pages/$id'
+    | '/settings/appearance'
     | '/settings/groups'
     | '/settings/members'
+    | '/settings/organization'
+    | '/settings/profile'
+    | '/settings/security'
+    | '/settings/teams'
     | '/spaces/$slug'
     | '/settings'
     | '/spaces'
@@ -203,10 +270,16 @@ export interface FileRouteTypes {
     | '/auth/onboarding'
     | '/auth/register'
     | '/auth/reset-password'
+    | '/auth/two-factor'
     | '/_auth/'
     | '/_auth/pages/$id'
+    | '/_auth/settings/appearance'
     | '/_auth/settings/groups'
     | '/_auth/settings/members'
+    | '/_auth/settings/organization'
+    | '/_auth/settings/profile'
+    | '/_auth/settings/security'
+    | '/_auth/settings/teams'
     | '/_auth/spaces/$slug'
     | '/_auth/settings/'
     | '/_auth/spaces/'
@@ -220,6 +293,7 @@ export interface RootRouteChildren {
   AuthOnboardingRoute: typeof AuthOnboardingRoute
   AuthRegisterRoute: typeof AuthRegisterRoute
   AuthResetPasswordRoute: typeof AuthResetPasswordRoute
+  AuthTwoFactorRoute: typeof AuthTwoFactorRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -237,6 +311,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthIndexRouteImport
       parentRoute: typeof AuthRouteRoute
+    }
+    '/auth/two-factor': {
+      id: '/auth/two-factor'
+      path: '/auth/two-factor'
+      fullPath: '/auth/two-factor'
+      preLoaderRoute: typeof AuthTwoFactorRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/auth/reset-password': {
       id: '/auth/reset-password'
@@ -315,6 +396,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSpacesSlugRouteImport
       parentRoute: typeof AuthRouteRoute
     }
+    '/_auth/settings/teams': {
+      id: '/_auth/settings/teams'
+      path: '/teams'
+      fullPath: '/settings/teams'
+      preLoaderRoute: typeof AuthSettingsTeamsRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
+    '/_auth/settings/security': {
+      id: '/_auth/settings/security'
+      path: '/security'
+      fullPath: '/settings/security'
+      preLoaderRoute: typeof AuthSettingsSecurityRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
+    '/_auth/settings/profile': {
+      id: '/_auth/settings/profile'
+      path: '/profile'
+      fullPath: '/settings/profile'
+      preLoaderRoute: typeof AuthSettingsProfileRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
+    '/_auth/settings/organization': {
+      id: '/_auth/settings/organization'
+      path: '/organization'
+      fullPath: '/settings/organization'
+      preLoaderRoute: typeof AuthSettingsOrganizationRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
     '/_auth/settings/members': {
       id: '/_auth/settings/members'
       path: '/members'
@@ -329,6 +438,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSettingsGroupsRouteImport
       parentRoute: typeof AuthSettingsRouteRoute
     }
+    '/_auth/settings/appearance': {
+      id: '/_auth/settings/appearance'
+      path: '/appearance'
+      fullPath: '/settings/appearance'
+      preLoaderRoute: typeof AuthSettingsAppearanceRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
     '/_auth/pages/$id': {
       id: '/_auth/pages/$id'
       path: '/pages/$id'
@@ -340,14 +456,24 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthSettingsRouteRouteChildren {
+  AuthSettingsAppearanceRoute: typeof AuthSettingsAppearanceRoute
   AuthSettingsGroupsRoute: typeof AuthSettingsGroupsRoute
   AuthSettingsMembersRoute: typeof AuthSettingsMembersRoute
+  AuthSettingsOrganizationRoute: typeof AuthSettingsOrganizationRoute
+  AuthSettingsProfileRoute: typeof AuthSettingsProfileRoute
+  AuthSettingsSecurityRoute: typeof AuthSettingsSecurityRoute
+  AuthSettingsTeamsRoute: typeof AuthSettingsTeamsRoute
   AuthSettingsIndexRoute: typeof AuthSettingsIndexRoute
 }
 
 const AuthSettingsRouteRouteChildren: AuthSettingsRouteRouteChildren = {
+  AuthSettingsAppearanceRoute: AuthSettingsAppearanceRoute,
   AuthSettingsGroupsRoute: AuthSettingsGroupsRoute,
   AuthSettingsMembersRoute: AuthSettingsMembersRoute,
+  AuthSettingsOrganizationRoute: AuthSettingsOrganizationRoute,
+  AuthSettingsProfileRoute: AuthSettingsProfileRoute,
+  AuthSettingsSecurityRoute: AuthSettingsSecurityRoute,
+  AuthSettingsTeamsRoute: AuthSettingsTeamsRoute,
   AuthSettingsIndexRoute: AuthSettingsIndexRoute,
 }
 
@@ -384,6 +510,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthOnboardingRoute: AuthOnboardingRoute,
   AuthRegisterRoute: AuthRegisterRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
+  AuthTwoFactorRoute: AuthTwoFactorRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

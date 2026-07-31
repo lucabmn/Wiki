@@ -29,6 +29,12 @@ vi.mock("@/lib/org-queries", () => ({
   useOrgRefresh: () => async () => {},
 }));
 
+// The org-manage gate is covered in settings-guard.test.tsx; here it would only
+// add a permission round-trip in front of the table under test.
+vi.mock("@/components/settings/permission-gate", () => ({
+  PermissionGate: ({ children }: { children: ReactNode }) => children,
+}));
+
 // Dialogs pull their own better-auth wiring — out of scope for the table render.
 vi.mock("@/components/settings/invite-member-dialog", () => ({ InviteMemberDialog: () => null }));
 vi.mock("@/components/settings/member-roles-dialog", () => ({ MemberRolesDialog: () => null }));

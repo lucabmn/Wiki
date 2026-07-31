@@ -58,6 +58,28 @@ export function createAuth() {
       },
     },
     trustedOrigins: [env.CORS_ORIGIN],
+    user: {
+      changeEmail: {
+        enabled: true,
+        // Two paths, both needed on a self-host: an account whose address was
+        // never verified (the common case here — verification is wired but not
+        // required) changes directly, while a verified account must confirm from
+        // its *current* inbox so a hijacked session cannot walk off with it.
+        updateEmailWithoutVerification: true,
+        sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+          await sendMail({
+            to: user.email,
+            subject: `${env.APP_NAME}: E-Mail-Adresse ändern`,
+            ...actionMail({
+              heading: "Adressänderung bestätigen",
+              body: `Für dein Konto wurde ${newEmail} als neue E-Mail-Adresse angefordert. Bestätige die Änderung, um sie zu übernehmen. Wenn du das nicht warst, ignoriere diese E-Mail — deine Adresse bleibt dann unverändert.`,
+              actionLabel: "Änderung bestätigen",
+              url,
+            }),
+          });
+        },
+      },
+    },
     emailAndPassword: {
       enabled: true,
       sendResetPassword: async ({ user, url }) => {

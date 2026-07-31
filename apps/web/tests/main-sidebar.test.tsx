@@ -119,6 +119,23 @@ describe("MainSidebar", () => {
     expect(navigateSpy).toHaveBeenCalledWith({ to: "/pages/$id", params: { id: "p1" } });
   });
 
+  // Base UI throws "MenuGroupContext is missing" when a GroupLabel mounts
+  // outside a Menu.Group, and only once the menu content actually mounts.
+  it("mounts the org switcher menu content", async () => {
+    renderSidebar();
+    fireEvent.click(await screen.findByText("Acme"));
+    expect(await screen.findByText("Organisation wechseln")).toBeDefined();
+    expect(screen.getByText("Org Eins")).toBeDefined();
+  });
+
+  it("mounts the user menu content", async () => {
+    renderSidebar();
+    fireEvent.click((await screen.findAllByText("Luca"))[0]);
+    expect(await screen.findByText("Abmelden")).toBeDefined();
+    // Once open the email shows twice: the trigger and the menu's group label.
+    expect(screen.getAllByText("luca@acme.io")).toHaveLength(2);
+  });
+
   it("does not crash when a collapse toggle is clicked", async () => {
     renderSidebar();
     await screen.findByText("Operations");

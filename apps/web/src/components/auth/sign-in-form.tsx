@@ -3,6 +3,8 @@ import { Input } from "@nilovon-wiki/ui/components/input";
 import { Field, FieldGroup, FieldLabel, FieldError } from "@nilovon-wiki/ui/components/field";
 import { useForm } from "@tanstack/react-form";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import z from "zod";
 
@@ -28,27 +30,30 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
       password: "",
     },
     onSubmit: async ({ value }) => {
-      await authClient.signIn.email(
-        {
-          email: value.email,
-          password: value.password,
-        },
-        {
-          onSuccess: () => {
-            navigate({
-              to: "/",
-            });
-            toast.success("Erfolgreich angemeldet");
-          },
-          onError: (error) => {
-            toast.error(
-              error.error.status === 401
-                ? "E-Mail oder Passwort ist falsch."
-                : "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
-            );
-          },
-        },
-      );
+      const { data, error } = await authClient.signIn.email({
+        email: value.email,
+        password: value.password,
+      });
+
+      if (error) {
+        toast.error(
+          error.status === 401
+            ? "E-Mail oder Passwort ist falsch."
+            : "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+        );
+        return;
+      }
+
+      // With 2FA enabled the credentials alone create no session — better-auth
+      // answers with a redirect marker and a short-lived two-factor cookie, and
+      // the challenge route finishes the sign-in.
+      if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
+        navigate({ to: "/auth/two-factor" });
+        return;
+      }
+
+      navigate({ to: "/" });
+      toast.success("Erfolgreich angemeldet");
     },
     validators: {
       onSubmit: formSchema,
@@ -154,6 +159,56 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
           )}
         </form.Subscribe>
       </form>
+
+      <PasskeySignIn />
     </AuthLayout>
+  );
+}
+
+/**
+ * WebAuthn exists only on secure origins (HTTPS, or localhost), and a user who
+ * never registered a passkey has nothing to pick — so the button appears only
+ * where it can actually work, and a cancelled prompt stays silent.
+ */
+function PasskeySignIn() {
+  const navigate = useNavigate();
+  const [pending, setPending] = useState(false);
+
+  const supported =
+    typeof window !== "undefined" && Boolean(window.PublicKeyCredential) && window.isSecureContext;
+  if (!supported) return null;
+
+  const signIn = async () => {
+    setPending(true);
+    const result = await authClient.signIn.passkey();
+    setPending(false);
+
+    if (result?.error) {
+      toast.error("Anmeldung mit Passkey fehlgeschlagen.");
+      return;
+    }
+    navigate({ to: "/" });
+    toast.success("Erfolgreich angemeldet");
+  };
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        oder
+        <span className="h-px flex-1 bg-border" />
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        className="mt-4 w-full"
+        disabled={pending}
+        onClick={signIn}
+      >
+        <KeyRound className="size-4" />
+        {pending ? "Warte auf Gerät …" : "Mit Passkey anmelden"}
+      </Button>
+    </div>
   );
 }

@@ -56,6 +56,44 @@ export function usePermission(permissions: PermissionRequest): {
 }
 
 /**
+ * Server-backed "any of these" check — the OR of several permission requests,
+ * resolved in one query so a gate that admits several distinct rights (e.g. the
+ * settings area: manage members *or* manage groups *or* manage the org) settles
+ * as a single unit instead of flickering between per-check pending states.
+ *
+ * Same fail-closed contract as `usePermission`, and it hangs off the same
+ * `PERMISSION_QUERY_KEY` prefix so role changes invalidate it too.
+ */
+export function useAnyPermission(requests: PermissionRequest[]): {
+  allowed: boolean;
+  isPending: boolean;
+} {
+  const { data: session } = authClient.useSession();
+  const activeOrgId = session?.session.activeOrganizationId ?? null;
+
+  const query = useQuery({
+    queryKey: [...PERMISSION_QUERY_KEY, activeOrgId, "any", requests],
+    enabled: Boolean(activeOrgId),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const results = await Promise.all(
+        requests.map(async (permissions) => {
+          const { data, error } = await authClient.organization.hasPermission({ permissions });
+          if (error) return false;
+          return data?.success ?? false;
+        }),
+      );
+      return results.some(Boolean);
+    },
+  });
+
+  return {
+    allowed: query.data ?? false,
+    isPending: Boolean(activeOrgId) && query.isPending,
+  };
+}
+
+/**
  * Synchronous, static-only permission check. No network call, so it **cannot**
  * see dynamic roles (groups) — a member whose access comes solely from a group
  * evaluates to `false` here. Use only when you already hold the caller's static

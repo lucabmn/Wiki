@@ -1,6 +1,6 @@
 import { authClient } from "@/lib/auth-client";
 import { initials } from "@/lib/format";
-import { checkStaticRolePermission, usePermission } from "@/lib/permissions";
+import { usePermission } from "@/lib/permissions";
 import { orpc } from "@/utils/orpc";
 import { PageTree } from "./page-tree/page-tree";
 import { CommandPalette } from "./command-palette";
@@ -17,6 +17,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -68,7 +69,7 @@ const baseNav = linkOptions([
 ]);
 
 const settingsNavItem = {
-  to: "/settings/members",
+  to: "/settings/profile",
   label: "Einstellungen",
   icon: Settings,
 } as const;
@@ -193,15 +194,9 @@ export default function MainSidebar() {
   const { auth } = useRouteContext({ from: "/_auth" });
   const { theme, setTheme } = useTheme();
 
-  // Show the settings entry only to members who can manage people or roles. The
-  // static role suffices here (owner/admin hold these grants); the settings
-  // route re-guards and the server enforces every mutation regardless.
-  const myRole =
-    auth.organization.members.find((member) => member.user.id === auth.session.user.id)?.role ?? "";
-  const canManageOrg =
-    checkStaticRolePermission({ member: ["update"] }, myRole) ||
-    checkStaticRolePermission({ ac: ["create"] }, myRole);
-  const nav = canManageOrg ? [...baseNav, settingsNavItem] : baseNav;
+  // Settings is open to everyone: it starts on the personal tabs (profile,
+  // security, appearance). The organization tabs inside it are gated separately.
+  const nav = [...baseNav, settingsNavItem];
 
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -254,16 +249,18 @@ export default function MainSidebar() {
             }
           />
           <DropdownMenuContent align="start" className="w-60">
-            <DropdownMenuLabel>Organisation wechseln</DropdownMenuLabel>
-            {(organizations ?? [auth.organization]).map((org) => (
-              <DropdownMenuItem key={org.id} onClick={() => switchOrganization(org.id)}>
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
-                  {org.name.charAt(0).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1 truncate">{org.name}</span>
-                {org.id === auth.organization.id ? <Check className="size-4" /> : null}
-              </DropdownMenuItem>
-            ))}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Organisation wechseln</DropdownMenuLabel>
+              {(organizations ?? [auth.organization]).map((org) => (
+                <DropdownMenuItem key={org.id} onClick={() => switchOrganization(org.id)}>
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+                    {org.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{org.name}</span>
+                  {org.id === auth.organization.id ? <Check className="size-4" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               render={
@@ -347,7 +344,9 @@ export default function MainSidebar() {
             }
           />
           <DropdownMenuContent align="start" side="top" className="w-56">
-            <DropdownMenuLabel className="truncate">{auth.session.user.email}</DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="truncate">{auth.session.user.email}</DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={signOut}>
               <LogOut className="size-4" />
