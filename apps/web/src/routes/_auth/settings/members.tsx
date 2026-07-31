@@ -42,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@nilovon-wiki/ui/components/dropdown-menu";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
+import { cn } from "@nilovon-wiki/ui/lib/utils";
 import {
   Table,
   TableBody,
@@ -151,10 +152,22 @@ function MembersSettings() {
             </TableHeader>
             <TableBody>
               {membersQuery.isPending ? (
-                [0, 1, 2].map((row) => (
-                  <TableRow key={row}>
-                    <TableCell colSpan={4}>
-                      <Skeleton className="h-7 w-full" />
+                ["w-24", "w-32", "w-20"].map((nameWidth) => (
+                  <TableRow key={nameWidth} className="hover:bg-transparent">
+                    <TableCell>
+                      <div className="flex items-center gap-2.5">
+                        <Skeleton className="size-7 shrink-0 rounded-full" />
+                        <Skeleton className={cn("h-3.5", nameWidth)} />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-3.5 w-40" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="size-7 rounded-md" />
                     </TableCell>
                   </TableRow>
                 ))

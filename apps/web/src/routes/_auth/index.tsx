@@ -55,10 +55,19 @@ function RecentActivity() {
       </div>
       {isPending ? (
         <Card className="gap-0 py-0">
-          <Skeleton className="h-22 items-center border-b" />
-          <Skeleton className="h-22 items-center border-b" />
-          <Skeleton className="h-22 items-center border-b" />
-          <Skeleton className="h-22 items-center border-b" />
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="flex w-full items-center gap-3 border-b border-border px-4 py-3.5 last:border-0"
+            >
+              <Skeleton className="size-9 shrink-0 rounded-lg" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-2/5" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
+              <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+            </div>
+          ))}
         </Card>
       ) : isError ? (
         <QueryError error={error} onRetry={() => refetch()} />
@@ -121,7 +130,12 @@ function Favorites() {
       <Card>
         <CardContent className="space-y-1.5">
           {isPending ? (
-            [0, 1, 2].map((i) => <Skeleton key={i} className="h-5 w-3/4" />)
+            ["w-3/5", "w-4/5", "w-2/5"].map((width) => (
+              <div key={width} className="flex h-5 items-center gap-2">
+                <Skeleton className="size-4 shrink-0 rounded" />
+                <Skeleton className={cn("h-3.5", width)} />
+              </div>
+            ))
           ) : isError ? (
             <QueryError error={error} onRetry={() => refetch()} />
           ) : !data?.length ? (
@@ -208,10 +222,12 @@ function HeroCard() {
         {stats.map(([label, value, delta]) => (
           <Card key={label} className="px-4 py-3">
             <div className="text-[13px] text-muted-foreground">{label}</div>
-            <div className="text-2xl font-semibold tracking-tight">
-              {isPending && label !== "Mitglieder" ? <Skeleton className="h-8 w-10" /> : value}
+            <div className="flex h-8 items-center text-2xl font-semibold tracking-tight">
+              {isPending && label !== "Mitglieder" ? <Skeleton className="h-6 w-8" /> : value}
             </div>
-            <div className="text-[11.5px] text-muted-foreground">{delta}</div>
+            <div className="flex h-[17px] items-center text-[11.5px] text-muted-foreground">
+              {isPending ? <Skeleton className="h-3 w-28" /> : delta}
+            </div>
           </Card>
         ))}
       </div>
