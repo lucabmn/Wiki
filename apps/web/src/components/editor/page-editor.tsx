@@ -1,17 +1,19 @@
 import { authClient } from "@/lib/auth-client";
+import { STATUS_LABEL } from "@/lib/labels";
 import { toastError, useInvalidate } from "@/lib/query";
 import { client, orpc } from "@/utils/orpc";
 import { HocuspocusProvider, WebSocketStatus } from "@hocuspocus/provider";
 import { collabDocName } from "@nilovon-wiki/api/lib/collab-token";
 import type { Page } from "@nilovon-wiki/api/schemas/page";
 import { env } from "@nilovon-wiki/env/web";
+import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import type { Editor } from "@tiptap/core";
 import { useMutation } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
-import { Check, History, Loader2, Send, Users, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, FileText, History, Loader2, Send, Users, X } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import * as Y from "yjs";
 
@@ -24,6 +26,12 @@ import { RevisionHistory } from "./revision-history";
  * caller confirms `page: ["update"]`, and it re-checks `page: ["publish"]` for
  * the publish action — mirroring the server's authorization so the UI never
  * offers an action the API would reject.
+ *
+ * Layout: this renders *inside* the read view's content column and mirrors its
+ * header structure (icon · title · action slot, then the meta line) so switching
+ * modes swaps affordances in place instead of re-flowing the page. The route
+ * keeps the same shell — width, tag row, attachments, comments and right rail —
+ * around it; see `routes/_auth/pages/$id.tsx`.
  *
  * Publish model: the page body lives in a shared Yjs document synced by
  * `apps/collab` (see `RichTextEditor`), which persists it as the private working
@@ -42,11 +50,21 @@ export function PageEditor({
   page,
   onDone,
   canPublish,
+  belowHeader,
+  historyOpen,
+  onHistoryOpenChange,
 }: {
   page: Page;
   onDone: () => void;
   // Passed from the page view, which resolves the caller's effective page role.
   canPublish: boolean;
+  // Rendered between header and body, where the read view puts its tag row —
+  // passed in rather than mounted here so the editor keeps its narrow deps.
+  belowHeader?: ReactNode;
+  // The right rail (route-owned) opens the same history sheet the header button
+  // does; pass these to share one open state. Uncontrolled works standalone.
+  historyOpen?: boolean;
+  onHistoryOpenChange?: (open: boolean) => void;
 }) {
   const { data: session } = authClient.useSession();
   const user = useMemo(
@@ -57,7 +75,17 @@ export function PageEditor({
     [session?.user.name, session?.user.email, session?.user.id],
   );
 
-  return <PageEditorForm page={page} onDone={onDone} canPublish={canPublish} user={user} />;
+  return (
+    <PageEditorForm
+      page={page}
+      onDone={onDone}
+      canPublish={canPublish}
+      user={user}
+      belowHeader={belowHeader}
+      historyOpen={historyOpen}
+      onHistoryOpenChange={onHistoryOpenChange}
+    />
+  );
 }
 
 function PageEditorForm({
@@ -65,15 +93,24 @@ function PageEditorForm({
   onDone,
   canPublish,
   user,
+  belowHeader,
+  historyOpen,
+  onHistoryOpenChange,
 }: {
   page: Page;
   onDone: () => void;
   canPublish: boolean;
   user: { name: string; color: string };
+  belowHeader?: ReactNode;
+  historyOpen?: boolean;
+  onHistoryOpenChange?: (open: boolean) => void;
 }) {
   const [title, setTitle] = useState(page.title);
   const [status, setStatus] = useState<WebSocketStatus>(WebSocketStatus.Connecting);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // Controlled by the route when it also drives the right rail's entry point;
+  // otherwise the editor keeps the sheet's open state itself.
+  const [ownHistoryOpen, setOwnHistoryOpen] = useState(false);
+  const setHistoryOpen = onHistoryOpenChange ?? setOwnHistoryOpen;
   const editorRef = useRef<Editor | null>(null);
 
   const invalidatePage = useInvalidate(orpc.pages.get.key());
@@ -150,21 +187,47 @@ function PageEditorForm({
   });
 
   return (
-    <div>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <ConnectionIndicator status={status} saving={update.isPending} />
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>
-            <History className="size-4" /> Verlauf
+    <>
+      {/* Mirrors the read view's header row exactly — same spacing, same icon
+          slot, same action rail — so nothing shifts when modes switch. */}
+      <div className="mt-3 flex items-start gap-3">
+        <span className="mt-1 text-2xl leading-none">
+          {page.icon ?? <FileText className="size-6 text-muted-foreground" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Seitentitel"
+            aria-label="Seitentitel"
+            maxLength={300}
+            className="h-auto rounded-none border-0 bg-transparent p-0 text-[30px] leading-tight font-semibold tracking-tight shadow-none focus-visible:border-0 focus-visible:ring-0 md:text-[30px] dark:bg-transparent"
+          />
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
+            <ConnectionIndicator status={status} saving={update.isPending} />
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* The right rail's history entry is `xl`-only, so keep a trigger in
+              the header — same icon-only idiom as the read view's actions. */}
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Versionsverlauf"
+            title="Versionsverlauf"
+            onClick={() => setHistoryOpen(true)}
+          >
+            <History className="size-4" />
           </Button>
           <Button variant="outline" size="sm" disabled={busy} onClick={onDone}>
             <X className="size-4" /> Schließen
           </Button>
-          <Button size="sm" disabled={busy} onClick={handleSave}>
+          <Button variant="outline" size="sm" disabled={busy} onClick={handleSave}>
             <Check className="size-4" /> {update.isPending ? "Speichern …" : "Speichern"}
           </Button>
           {canPublish ? (
-            <Button size="sm" variant="default" disabled={busy} onClick={handlePublish}>
+            <Button size="sm" disabled={busy} onClick={handlePublish}>
               <Send className="size-4" />{" "}
               {publish.isPending ? "Veröffentlichen …" : "Veröffentlichen"}
             </Button>
@@ -172,33 +235,29 @@ function PageEditorForm({
         </div>
       </div>
 
-      <p className="mb-3 text-xs text-muted-foreground">
+      {belowHeader ? <div className="mt-3 pl-9">{belowHeader}</div> : null}
+
+      <p className="mt-3 pl-9 text-xs text-muted-foreground">
         {page.status === "published"
           ? "Änderungen sind erst nach „Veröffentlichen“ für andere sichtbar — bis dahin sehen Leser die zuletzt veröffentlichte Fassung."
           : "Änderungen sind erst nach „Veröffentlichen“ für andere sichtbar."}
       </p>
 
-      <Input
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        placeholder="Seitentitel"
-        maxLength={300}
-        className="mb-3 border border-border bg-card/40"
-      />
-
-      <RichTextEditor
-        spaceId={page.spaceId}
-        doc={doc}
-        provider={provider}
-        user={user}
-        onEditor={(editor) => {
-          editorRef.current = editor;
-        }}
-      />
+      <div className="mt-6">
+        <RichTextEditor
+          spaceId={page.spaceId}
+          doc={doc}
+          provider={provider}
+          user={user}
+          onEditor={(editor) => {
+            editorRef.current = editor;
+          }}
+        />
+      </div>
 
       <RevisionHistory
         pageId={page.id}
-        open={historyOpen}
+        open={historyOpen ?? ownHistoryOpen}
         onOpenChange={setHistoryOpen}
         canRestore
         onRestore={(revision) => {
@@ -209,7 +268,7 @@ function PageEditorForm({
           editorRef.current?.commands.setContent(revision.content ?? { type: "doc", content: [] });
         }}
       />
-    </div>
+    </>
   );
 }
 

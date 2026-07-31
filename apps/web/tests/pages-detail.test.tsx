@@ -430,8 +430,12 @@ describe("page view route", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Bearbeiten" }));
     expect(await screen.findByText("EDITOR AKTIV")).toBeDefined();
-    // View chrome (comment box) is replaced by the editor surface.
-    expect(screen.queryByPlaceholderText("Kommentar schreiben …")).toBeNull();
+    // Only the header + body swap: the surrounding view chrome (comment box,
+    // right rail) stays put so the page does not re-flow around the editor.
+    expect(screen.getByPlaceholderText("Kommentar schreiben …")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Versionsverlauf" })).toBeDefined();
+    // The read body is gone — the editor owns that slot now.
+    expect(screen.queryByText("body")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Editor schließen" }));
     expect(await screen.findByText("body")).toBeDefined();

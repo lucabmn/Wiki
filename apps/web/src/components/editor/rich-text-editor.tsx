@@ -50,7 +50,9 @@ export function RichTextEditor({
     ],
     editorProps: {
       attributes: {
-        class: "tiptap min-h-[320px] px-4 py-3 focus:outline-none",
+        // No padding: the body must sit flush at the content column's left edge,
+        // exactly where the read view renders it.
+        class: "tiptap min-h-[320px] py-3 focus:outline-none",
       },
     },
   });
@@ -61,7 +63,9 @@ export function RichTextEditor({
   }, [editor, onEditor]);
 
   return (
-    <div className="rounded-xl border border-border bg-card/40">
+    // Frameless: the editing surface is the read surface, only the sticky
+    // toolbar marks it as editable.
+    <div>
       {editor ? <EditorToolbar editor={editor} spaceId={spaceId} /> : null}
       <EditorContent editor={editor} />
     </div>

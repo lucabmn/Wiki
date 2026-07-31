@@ -223,7 +223,7 @@ export function EditorToolbar({ editor, spaceId }: { editor: Editor; spaceId: st
   const inTable = editor.isActive("table");
 
   return (
-    <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 rounded-t-xl border-b border-border bg-card/80 px-1.5 py-1 backdrop-blur">
+    <div className="sticky top-0 z-10 -mx-1.5 flex flex-wrap items-center gap-0.5 border-b border-border bg-background/85 px-1.5 py-1 backdrop-blur">
       <ToolButton
         icon={Undo2}
         label="Rückgängig"
