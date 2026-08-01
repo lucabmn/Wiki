@@ -227,6 +227,8 @@ describe("page view route", () => {
     data.subscriptions = [];
     data.canEdit = false;
     data.error = false;
+    vi.restoreAllMocks();
+    document.body.replaceChildren();
   });
 
   // Published so its body renders — these fixtures exercise edit/archive/subscribe
@@ -322,6 +324,55 @@ describe("page view route", () => {
     data.error = true;
     renderView();
     expect(await screen.findByText("Seite nicht gefunden")).toBeDefined();
+  });
+
+  it("jumps to comments by scrolling the page container instead of the viewport", async () => {
+    data.page = somePage;
+    data.comments = [
+      { id: "c1", body: "Q", resolvedAt: null, deletedAt: null, createdAt: new Date() },
+      { id: "c2", body: "A", resolvedAt: null, deletedAt: null, createdAt: new Date() },
+      { id: "c3", body: "Note", resolvedAt: null, deletedAt: null, createdAt: new Date() },
+    ];
+
+    const pageScroll = document.createElement("div");
+    pageScroll.setAttribute("data-page-scroll", "");
+    pageScroll.scrollTop = 700;
+    pageScroll.scrollTo = vi.fn();
+    vi.spyOn(pageScroll, "getBoundingClientRect").mockReturnValue({
+      top: 20,
+      left: 0,
+      right: 1000,
+      bottom: 820,
+      width: 1000,
+      height: 800,
+      x: 0,
+      y: 20,
+      toJSON: () => ({}),
+    });
+    document.body.append(pageScroll);
+
+    renderView();
+    const commentsSection = await screen.findByRole("heading", { name: "Kommentare (3)" });
+    const section = commentsSection.closest("section") as HTMLElement;
+    section.style.scrollMarginTop = "24px";
+    const scrollIntoView = vi.fn();
+    section.scrollIntoView = scrollIntoView;
+    vi.spyOn(section, "getBoundingClientRect").mockReturnValue({
+      top: 1220,
+      left: 0,
+      right: 700,
+      bottom: 1500,
+      width: 700,
+      height: 280,
+      x: 0,
+      y: 1220,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "3 Kommentare" }));
+
+    expect(pageScroll.scrollTo).toHaveBeenCalledWith({ behavior: "smooth", top: 1876 });
+    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
   it("submits a new comment", async () => {

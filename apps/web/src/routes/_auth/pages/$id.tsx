@@ -9,6 +9,7 @@ import { RevisionHistory } from "@/components/editor/revision-history";
 import { extractHeadings } from "@/components/editor/headings";
 import { STATUS_LABEL } from "@/lib/labels";
 import { toastError, useInvalidate, useOptimisticListToggle } from "@/lib/query";
+import { scrollIntoPageView } from "@/lib/scroll";
 import { orpc } from "@/utils/orpc";
 import type { Page } from "@nilovon-wiki/api/schemas/page";
 import {
@@ -550,11 +551,10 @@ function RouteComponent() {
               nameOf={nameOf}
               commentCount={openComments.length}
               onOpenHistory={() => setHistoryOpen(true)}
-              onJumpToComments={() =>
-                document
-                  .getElementById("page-comments")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
-              }
+              onJumpToComments={() => {
+                const comments = document.getElementById("page-comments");
+                if (comments) scrollIntoPageView(comments);
+              }}
             />
           </div>
         </aside>

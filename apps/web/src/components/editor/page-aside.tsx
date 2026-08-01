@@ -1,4 +1,5 @@
 import { STATUS_LABEL } from "@/lib/labels";
+import { scrollIntoPageView } from "@/lib/scroll";
 import { orpc } from "@/utils/orpc";
 import type { Page } from "@nilovon-wiki/api/schemas/page";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
@@ -44,8 +45,10 @@ export function PageAside({
   const toc = headings.filter((h) => h.text.length > 0);
   const activeId = useScrollSpy(toc.map((h) => h.id));
 
-  const scrollTo = (id: string) =>
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const scrollTo = (id: string) => {
+    const heading = document.getElementById(id);
+    if (heading) scrollIntoPageView(heading);
+  };
 
   return (
     <div className="space-y-4 text-[13px]">
