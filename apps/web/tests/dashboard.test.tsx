@@ -6,7 +6,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { data } = vi.hoisted(() => ({
   data: {
     overview: undefined as Record<string, number> | undefined,
+    spaces: [] as unknown[],
+    // The org-wide feed and the caller's own feed are separate queries; the
+    // mock below routes by `actorId`, like the real endpoint does.
     activity: [] as unknown[],
+    myActivity: [] as unknown[],
     favorites: [] as unknown[],
   },
 }));
@@ -24,12 +28,25 @@ vi.mock("@tanstack/react-router", () => ({
     useRouteContext: () => ({
       auth: {
         organization: { name: "Acme", members: [{}, {}] },
-        session: { user: { name: "Luca" } },
+        session: { user: { id: "u1", name: "Luca" } },
       },
     }),
     ...opts,
   }),
-  Link: ({ children, ...props }: { children: ReactNode }) => <a {...props}>{children}</a>,
+  Link: ({
+    children,
+    to,
+    params: _params,
+    ...props
+  }: {
+    children: ReactNode;
+    to: string;
+    params?: Record<string, string>;
+  }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
   useNavigate: () => vi.fn(),
 }));
 
@@ -42,29 +59,21 @@ vi.mock("@/utils/orpc", () => ({
     },
     activity: {
       list: {
-        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
-          queryKey: ["activity"],
-          queryFn: async () => data.activity,
-          enabled,
+        // Key on the input so the two activity queries don't share a cache entry.
+        queryOptions: ({ input }: { input: { actorId?: string; limit: number } }) => ({
+          queryKey: ["activity", input],
+          queryFn: async () => (input.actorId ? data.myActivity : data.activity),
         }),
       },
     },
     me: {
       listFavorites: {
-        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
-          queryKey: ["favs"],
-          queryFn: async () => data.favorites,
-          enabled,
-        }),
+        queryOptions: () => ({ queryKey: ["favs"], queryFn: async () => data.favorites }),
       },
     },
     spaces: {
       list: {
-        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
-          queryKey: ["spaces"],
-          queryFn: async () => [],
-          enabled,
-        }),
+        queryOptions: () => ({ queryKey: ["spaces"], queryFn: async () => data.spaces }),
       },
     },
     pages: {
@@ -92,14 +101,37 @@ function renderDashboard() {
   );
 }
 
+const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+
+function activityRow(overrides: Record<string, unknown>) {
+  return {
+    id: "a1",
+    action: "page.updated",
+    pageId: "p1",
+    metadata: { title: "Onboarding" },
+    createdAt: minutesAgo(30),
+    actor: { name: "Luca" },
+    space: { name: "Handbuch", color: "#2563eb" },
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
-  data.overview = undefined;
+  data.overview = {
+    pageCount: 0,
+    pagesCreatedThisWeek: 0,
+    openComments: 0,
+    commentsResolvedThisWeek: 0,
+    activeMembersThisWeek: 0,
+  };
+  data.spaces = [];
   data.activity = [];
+  data.myActivity = [];
   data.favorites = [];
 });
 
-describe("dashboard hero", () => {
-  it("renders the real stats and their weekly deltas", async () => {
+describe("dashboard header", () => {
+  it("names the organization and sums up its content", async () => {
     data.overview = {
       pageCount: 12,
       pagesCreatedThisWeek: 3,
@@ -107,33 +139,96 @@ describe("dashboard hero", () => {
       commentsResolvedThisWeek: 5,
       activeMembersThisWeek: 6,
     };
+    data.spaces = [{ id: "s1" }, { id: "s2" }];
     renderDashboard();
 
-    // Headline counts (members total = 2 comes from the auth context).
-    expect(await screen.findByText("12")).toBeDefined();
-    expect(screen.getByText("4")).toBeDefined();
-    expect(screen.getByText("2")).toBeDefined();
-    // Weekly deltas built from the companion counts.
-    expect(screen.getByText("+3 diese Woche")).toBeDefined();
-    expect(screen.getByText("6 aktiv diese Woche")).toBeDefined();
-    expect(screen.getByText("5 gelöst diese Woche")).toBeDefined();
-    // Greeting line carries the user's name.
-    expect(screen.getByText(/, Luca\./)).toBeDefined();
-    // Prose summary uses real numbers.
-    expect(
-      screen.getByText("Du hast 4 offene Kommentare und 3 neue Seiten diese Woche."),
-    ).toBeDefined();
+    expect(screen.getByText("Acme")).toBeDefined();
+    expect(await screen.findByText("12 Seiten · 2 Spaces · 4 offene Kommentare")).toBeDefined();
   });
 
-  it("shows empty states for activity and favorites", async () => {
+  it("uses singular wording for single counts", async () => {
     data.overview = {
-      pageCount: 0,
+      pageCount: 1,
       pagesCreatedThisWeek: 0,
-      openComments: 0,
+      openComments: 1,
       commentsResolvedThisWeek: 0,
       activeMembersThisWeek: 0,
     };
+    data.spaces = [{ id: "s1" }];
     renderDashboard();
-    expect(await screen.findByText("Noch keine Favoriten.")).toBeDefined();
+
+    expect(await screen.findByText("1 Seite · 1 Space · 1 offener Kommentar")).toBeDefined();
+  });
+});
+
+describe("activity feed", () => {
+  it("shows what changed, who changed it and when, grouped by day", async () => {
+    data.activity = [
+      activityRow({ id: "a1", metadata: { title: "Onboarding" } }),
+      activityRow({
+        id: "a2",
+        action: "comment.created",
+        pageId: "p2",
+        metadata: { commentId: "c1" },
+        actor: { name: "Mara" },
+      }),
+    ];
+    renderDashboard();
+
+    // The page title is the headline — not the bare action label.
+    expect(await screen.findByText("Onboarding")).toBeDefined();
+    expect(screen.getByText(/^Luca · Seite bearbeitet · /)).toBeDefined();
+    // A row without a subject falls back to the action label.
+    expect(screen.getByText("Kommentar hinzugefügt")).toBeDefined();
+    expect(screen.getByText("Heute")).toBeDefined();
+    // Rows link to their page.
+    expect(screen.getAllByRole("link").some((a) => a.getAttribute("href") === "/pages/$id")).toBe(
+      true,
+    );
+  });
+
+  it("shows an empty state when nothing has happened yet", async () => {
+    renderDashboard();
+    expect(await screen.findByText("Noch nichts passiert")).toBeDefined();
+  });
+});
+
+describe("weiter bearbeiten", () => {
+  it("lists the caller's most recent pages, one card per page", async () => {
+    data.myActivity = [
+      activityRow({ id: "m1", pageId: "p1", metadata: { title: "Onboarding" } }),
+      // Same page again — must not produce a second card.
+      activityRow({ id: "m2", pageId: "p1", metadata: { title: "Onboarding" } }),
+      activityRow({
+        id: "m3",
+        pageId: "p2",
+        action: "page.created",
+        metadata: { title: "Urlaubsantrag" },
+      }),
+    ];
+    renderDashboard();
+
+    expect(await screen.findByText("Urlaubsantrag")).toBeDefined();
+    expect(screen.getByText("Weiter bearbeiten")).toBeDefined();
+    expect(screen.getAllByText("Onboarding")).toHaveLength(1);
+  });
+
+  it("is hidden entirely when the caller has not edited anything", async () => {
+    renderDashboard();
+    expect(await screen.findByText("Keine Favoriten")).toBeDefined();
+    expect(screen.queryByText("Weiter bearbeiten")).toBeNull();
+  });
+});
+
+describe("favorites", () => {
+  it("links each favorite page", async () => {
+    data.favorites = [{ id: "p9", title: "Reisekosten", icon: null }];
+    renderDashboard();
+    expect(await screen.findByText("Reisekosten")).toBeDefined();
+  });
+
+  it("explains how to add one when there are none", async () => {
+    renderDashboard();
+    expect(await screen.findByText(/Markiere eine Seite mit dem Stern/)).toBeDefined();
   });
 });
