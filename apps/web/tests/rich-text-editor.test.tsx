@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type { Editor } from "@tiptap/core";
 import { describe, expect, it, vi } from "vitest";
@@ -79,14 +79,19 @@ describe("RichTextEditor (real TipTap mount)", () => {
     // Toolbar controls come from the real component, so a mount/config failure
     // (bad StarterKit option, collab misconfiguration, SSR crash) surfaces here.
     expect(await screen.findByRole("button", { name: "Fett" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Seite verknüpfen" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Unterstrichen" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Hochgestellt" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Tiefgestellt" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Code-Block" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Trennlinie" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Formatierung entfernen" })).toBeDefined();
     // Grouped controls surface as dropdown/popover triggers.
     expect(screen.getByRole("button", { name: "Listen" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Ausrichtung" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Tabelle" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Farbe" })).toBeDefined();
+    // Internal and external linking share one menu.
+    expect(screen.getByRole("button", { name: "Verlinken" })).toBeDefined();
 
     // Content lives in the shared Yjs doc; without a collab server the doc
     // starts empty, so drive the live instance the way a sync/restore would.
@@ -98,5 +103,44 @@ describe("RichTextEditor (real TipTap mount)", () => {
       });
     });
     await waitFor(() => expect(screen.getByText("hello")).toBeDefined());
+  });
+
+  it("opens the external-link dialog from the slash menu and inserts the link", async () => {
+    const { getEditor } = renderEditor();
+    await waitFor(() => expect(getEditor()).not.toBeNull());
+
+    // Drive the real suggestion plugin: typing "/" opens the menu.
+    act(() => {
+      getEditor()?.commands.insertContent("/");
+    });
+    const entry = await screen.findByRole("option", { name: /Externer Link/ });
+    act(() => {
+      entry.click();
+    });
+
+    // The trigger text is gone and the dialog took over.
+    expect(getEditor()?.getText()).toBe("");
+    const url = await screen.findByLabelText("URL");
+    fireEvent.change(url, { target: { value: "example.com/docs" } });
+    fireEvent.click(screen.getByText("Einfügen"));
+
+    // Nothing was selected, so the link carries the host as its text — and the
+    // href is the normalizer's output, not the raw input.
+    await waitFor(() => expect(getEditor()?.getText()).toBe("example.com"));
+    expect(getEditor()?.getHTML()).toContain('href="https://example.com/docs"');
+  });
+
+  it("reports a live word and character count", async () => {
+    const { getEditor } = renderEditor();
+    await waitFor(() => expect(getEditor()).not.toBeNull());
+    act(() => {
+      getEditor()?.commands.setContent({
+        type: "doc",
+        content: [{ type: "paragraph", content: [{ type: "text", text: "zwei wörter" }] }],
+      });
+    });
+    // CharacterCount is editor-only — it adds no nodes or marks, so the collab
+    // server and the read-only renderer keep the identical shared schema.
+    await waitFor(() => expect(screen.getByText("2 Wörter · 11 Zeichen")).toBeDefined());
   });
 });

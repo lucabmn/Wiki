@@ -2,7 +2,14 @@ import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
 
 import type { Database } from "@nilovon-wiki/db";
-import { attachment, comment, page, space, tag } from "@nilovon-wiki/db/schema/index";
+import {
+  attachment,
+  comment,
+  page,
+  pageExternalLink,
+  space,
+  tag,
+} from "@nilovon-wiki/db/schema/index";
 
 type Row<T> = NonNullable<Awaited<T>>;
 
@@ -47,6 +54,17 @@ export async function loadAttachment(db: Database, id: string) {
   const row = await db.query.attachment.findFirst({ where: eq(attachment.id, id) });
   if (!row) {
     throw new ORPCError("NOT_FOUND", { message: "Attachment not found" });
+  }
+  return row;
+}
+
+/** Loads a page's external link or throws NOT_FOUND. */
+export async function loadExternalLink(db: Database, id: string) {
+  const row = await db.query.pageExternalLink.findFirst({
+    where: eq(pageExternalLink.id, id),
+  });
+  if (!row) {
+    throw new ORPCError("NOT_FOUND", { message: "External link not found" });
   }
   return row;
 }

@@ -46,6 +46,56 @@ describe("PageContent", () => {
     expect(screen.getByText("Diese Seite hat noch keinen Inhalt.")).toBeDefined();
   });
 
+  it("opens an external link in a new tab with a safe rel", () => {
+    const withExternal = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "the spec",
+              marks: [{ type: "link", attrs: { href: "https://example.com/spec" } }],
+            },
+          ],
+        },
+      ],
+    };
+    render(<PageContent content={withExternal} fallbackText="" />);
+    const link = screen.getByText("the spec");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("leaves internal links navigable in place", () => {
+    render(<PageContent content={doc} fallbackText="" />);
+    // No new tab: the click handler routes these client-side.
+    expect(screen.getByText("the runbook").getAttribute("target")).toBeNull();
+  });
+
+  it("strips the href of a non-http scheme instead of rendering it", () => {
+    // Document JSON can reach the database through the API as well as through
+    // the editor, so the renderer is the last line of defence here.
+    const hostile = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "click me",
+              marks: [{ type: "link", attrs: { href: "javascript:alert(1)" } }],
+            },
+          ],
+        },
+      ],
+    };
+    render(<PageContent content={hostile} fallbackText="" />);
+    expect(screen.getByText("click me").hasAttribute("href")).toBe(false);
+  });
+
   it("injects positional ids into headings so the TOC can target them", () => {
     const withHeadings = {
       type: "doc",

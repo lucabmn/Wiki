@@ -6,6 +6,7 @@ import { page, pageRevision, pageMember } from "./pages";
 import { comment } from "./comments";
 import { attachment } from "./attachments";
 import { tag, pageTag } from "./tags";
+import { pageExternalLink } from "./external-links";
 import { pageLink } from "./links";
 import { activity } from "./activity";
 import { favorite, pageSubscription } from "./user-state";
@@ -43,6 +44,12 @@ export const pageRelations = relations(page, ({ one, many }) => ({
   members: many(pageMember),
   outgoingLinks: many(pageLink, { relationName: "page_outgoing" }),
   backlinks: many(pageLink, { relationName: "page_incoming" }),
+  externalLinks: many(pageExternalLink),
+}));
+
+export const pageExternalLinkRelations = relations(pageExternalLink, ({ one }) => ({
+  page: one(page, { fields: [pageExternalLink.pageId], references: [page.id] }),
+  creator: one(user, { fields: [pageExternalLink.createdBy], references: [user.id] }),
 }));
 
 export const pageMemberRelations = relations(pageMember, ({ one }) => ({

@@ -5,6 +5,7 @@ import { activityRouter } from "./activity";
 import { attachmentRouter } from "./attachment";
 import { commentRouter } from "./comment";
 import { dashboardRouter } from "./dashboard";
+import { externalLinkRouter } from "./external-link";
 import { linkRouter } from "./link";
 import { onboardingRouter } from "./onboarding";
 import { pageRouter } from "./page";
@@ -35,6 +36,7 @@ export const appRouter = {
   tags: tagRouter,
   attachments: attachmentRouter,
   links: linkRouter,
+  externalLinks: externalLinkRouter,
   activity: activityRouter,
   search: searchRouter,
   users: userRouter,

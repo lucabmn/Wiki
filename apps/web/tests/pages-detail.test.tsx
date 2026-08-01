@@ -194,6 +194,15 @@ vi.mock("@/utils/orpc", () => ({
         queryOptions: () => ({ queryKey: ["outgoing"], queryFn: async () => [] }),
       },
     },
+    externalLinks: {
+      list: {
+        queryOptions: () => ({ queryKey: ["external-links"], queryFn: async () => [] }),
+      },
+      create: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+      update: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+      move: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+      delete: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+    },
     pageAccess: {
       myRole: {
         queryOptions: () => ({

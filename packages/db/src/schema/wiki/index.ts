@@ -4,6 +4,7 @@ export * from "./activity";
 export * from "./attachments";
 export * from "./comments";
 export * from "./enums";
+export * from "./external-links";
 export * from "./links";
 export * from "./pages";
 export * from "./spaces";

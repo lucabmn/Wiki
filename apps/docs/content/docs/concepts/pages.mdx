@@ -55,9 +55,33 @@ links are **tracked**, so each page knows what points at it — its **backlinks*
 The relationship stays consistent because rich-text content, the extracted search
 text, and internal links are all derived from the same page document.
 
+## External links
+
+Alongside the body, a page keeps a **curated list of external links** — the
+specs, tickets and vendor docs that belong next to an article without living
+inside it. They are metadata: editable without touching the document, visible
+while the page is still a draft, and unaffected by a body rewrite. Editors add,
+edit, reorder and remove them (`externalLinks.*`); anyone who can read the page
+sees the list.
+
+Every URL — whether it enters through this list or through the editor's
+"Externer Link" dialog — passes the same normalizer:
+
+- only `http:` and `https:` are accepted (an allowlist, so no `javascript:`,
+  `data:` or `file:` URL can ever become a rendered `href`),
+- a hand-typed `example.com/docs` is completed to `https://example.com/docs`,
+- embedded credentials (`https://user:pw@host`) are stripped.
+
+The read view enforces the same rule a second time when it serializes a stored
+document, because page content can also be written straight through the API.
+External links there render with `target="_blank"` and
+`rel="noopener noreferrer"`, marked with an ↗ arrow; internal `/pages/<id>`
+links keep navigating in place.
+
 ## Enrichment
 
 - **Tags** — categorize pages; filter and group by them.
+- **External links** — a curated list of references outside the wiki.
 - **Attachments** — attach files to a page.
 - **Comments** — discuss inline; resolve and moderate.
 - **Favorites** — a personal pin.

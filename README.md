@@ -25,6 +25,7 @@ The codebase is a pnpm + Turborepo monorepo with a strict boundary between the H
 - **Pages** — draft → published → archived lifecycle, hierarchical nesting with fractional (LexoRank) ordering, per-space auto-deduplicated slugs, and backlink tracking surfaced in the page rail.
 - **Comments** — create, resolve, and moderate; author-or-permission authorization.
 - **Tags** — space-scoped labels, created and applied inline from the page header.
+- **External links** — a curated, reorderable list of references outside the wiki per page; URLs are normalized and scheme-allowlisted to `http(s)` on the server, so a stored link can never become a `javascript:` href.
 - **Attachments** — files stored in any S3-compatible object store (a RustFS service ships with the compose stack); uploads and downloads are proxied by the API so the bucket never faces the internet.
 - **Email** — invitations, password reset and address verification over SMTP; optional, and mails are logged instead of sent when no SMTP host is configured.
 - **Favorites & subscriptions** — personal pins and per-page watch lists.

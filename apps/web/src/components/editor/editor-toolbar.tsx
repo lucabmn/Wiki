@@ -1,4 +1,3 @@
-import { pageHref } from "@nilovon-wiki/api/lib/page-href";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import {
   DropdownMenu,
@@ -11,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@nilovon-wiki/ui/compon
 import { Separator } from "@nilovon-wiki/ui/components/separator";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import type { Editor } from "@tiptap/react";
+import { useEditorState } from "@tiptap/react";
 import type { ComponentProps } from "react";
 import {
   AlignCenter,
@@ -21,27 +21,34 @@ import {
   Bold,
   ChevronDown,
   Code,
+  Eraser,
+  ExternalLink,
+  FileText,
   Heading1,
   Heading2,
   Heading3,
   Highlighter,
   Italic,
   Link2,
+  Link2Off,
   List,
   ListChecks,
   ListOrdered,
   type LucideIcon,
+  Minus,
   Quote,
   Redo2,
+  SquareCode,
   Strikethrough,
   Subscript,
   Superscript,
   Table as TableIcon,
+  Underline as UnderlineIcon,
   Undo2,
 } from "lucide-react";
 import { useState } from "react";
 
-import { LinkPageDialog } from "./link-page-dialog";
+import { removeLink } from "./link-commands";
 
 /** One toolbar control: reflects and toggles a mark/node on the editor. */
 function ToolButton({
@@ -121,7 +128,7 @@ const HIGHLIGHTS = [
   { label: "Pink", value: "#fbcfe8" },
 ];
 
-function ColorPopover({ editor }: { editor: Editor }) {
+function ColorPopover({ editor, active }: { editor: Editor; active: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -134,11 +141,7 @@ function ColorPopover({ editor }: { editor: Editor }) {
             title="Farbe"
             aria-label="Farbe"
             onMouseDown={(event) => event.preventDefault()}
-            className={cn(
-              "gap-0.5 px-1.5",
-              (editor.isActive("textStyle") || editor.isActive("highlight")) &&
-                "bg-primary/10 text-primary",
-            )}
+            className={cn("gap-0.5 px-1.5", active && "bg-primary/10 text-primary")}
           >
             <Baseline className="size-4" />
             <ChevronDown className="size-3 opacity-60" />
@@ -213,86 +216,146 @@ const ALIGNMENTS = [
   { value: "justify", label: "Blocksatz", icon: AlignJustify },
 ] as const;
 
-function currentAlignIcon(editor: Editor): LucideIcon {
-  const active = ALIGNMENTS.find((a) => editor.isActive({ textAlign: a.value }));
-  return active?.icon ?? AlignLeft;
+type Alignment = (typeof ALIGNMENTS)[number]["value"];
+
+/**
+ * Everything the toolbar displays, derived from the editor in one pass.
+ *
+ * This has to go through `useEditorState`: `useEditor` does NOT re-render on
+ * transactions by default, so a toolbar reading `editor.isActive(…)` during
+ * render would freeze on whatever the document looked like when it mounted.
+ * `useEditorState` subscribes to the editor and re-renders only when this
+ * derived object actually changes (deep-compared), which is also why the flags
+ * are primitives rather than the editor instance.
+ */
+function useToolbarState(editor: Editor) {
+  return useEditorState({
+    editor,
+    selector: ({ editor }) => ({
+      canUndo: editor.can().undo(),
+      canRedo: editor.can().redo(),
+      heading1: editor.isActive("heading", { level: 1 }),
+      heading2: editor.isActive("heading", { level: 2 }),
+      heading3: editor.isActive("heading", { level: 3 }),
+      bold: editor.isActive("bold"),
+      italic: editor.isActive("italic"),
+      underline: editor.isActive("underline"),
+      strike: editor.isActive("strike"),
+      code: editor.isActive("code"),
+      superscript: editor.isActive("superscript"),
+      subscript: editor.isActive("subscript"),
+      colored: editor.isActive("textStyle") || editor.isActive("highlight"),
+      bulletList: editor.isActive("bulletList"),
+      orderedList: editor.isActive("orderedList"),
+      taskList: editor.isActive("taskList"),
+      blockquote: editor.isActive("blockquote"),
+      codeBlock: editor.isActive("codeBlock"),
+      inTable: editor.isActive("table"),
+      align: (ALIGNMENTS.find((a) => editor.isActive({ textAlign: a.value }))?.value ??
+        null) as Alignment | null,
+      // The href drives both the "on a link" highlight and pre-filling the
+      // external-link dialog when the caret sits inside an existing link.
+      linkHref: (editor.getAttributes("link").href as string | undefined) ?? null,
+      selectionEmpty: editor.state.selection.empty,
+    }),
+  });
 }
 
-export function EditorToolbar({ editor, spaceId }: { editor: Editor; spaceId: string }) {
-  const [linkOpen, setLinkOpen] = useState(false);
-  const inTable = editor.isActive("table");
+/**
+ * The editing surface's control strip. Owns no dialogs: linking needs a picker
+ * that the slash menu opens too, so both dialogs live in `RichTextEditor` and
+ * this component only asks for them via `onLinkPage` / `onLinkExternal`.
+ */
+export function EditorToolbar({
+  editor,
+  onLinkPage,
+  onLinkExternal,
+}: {
+  editor: Editor;
+  onLinkPage: () => void;
+  onLinkExternal: () => void;
+}) {
+  const state = useToolbarState(editor);
+  const onLink = state.linkHref !== null;
+  const currentAlignIcon = ALIGNMENTS.find((a) => a.value === state.align)?.icon ?? AlignLeft;
 
   return (
     <div className="sticky top-0 z-10 -mx-1.5 flex flex-wrap items-center gap-0.5 border-b border-border bg-background/85 px-1.5 py-1 backdrop-blur">
       <ToolButton
         icon={Undo2}
         label="Rückgängig"
-        disabled={!editor.can().undo()}
+        disabled={!state.canUndo}
         onClick={() => editor.chain().focus().undo().run()}
       />
       <ToolButton
         icon={Redo2}
         label="Wiederholen"
-        disabled={!editor.can().redo()}
+        disabled={!state.canRedo}
         onClick={() => editor.chain().focus().redo().run()}
       />
       <Separator orientation="vertical" className="mx-1 h-5" />
       <ToolButton
         icon={Heading1}
         label="Überschrift 1"
-        active={editor.isActive("heading", { level: 1 })}
+        active={state.heading1}
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
       />
       <ToolButton
         icon={Heading2}
         label="Überschrift 2"
-        active={editor.isActive("heading", { level: 2 })}
+        active={state.heading2}
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
       />
       <ToolButton
         icon={Heading3}
         label="Überschrift 3"
-        active={editor.isActive("heading", { level: 3 })}
+        active={state.heading3}
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
       />
       <Separator orientation="vertical" className="mx-1 h-5" />
       <ToolButton
         icon={Bold}
         label="Fett"
-        active={editor.isActive("bold")}
+        active={state.bold}
         onClick={() => editor.chain().focus().toggleBold().run()}
       />
       <ToolButton
         icon={Italic}
         label="Kursiv"
-        active={editor.isActive("italic")}
+        active={state.italic}
         onClick={() => editor.chain().focus().toggleItalic().run()}
+      />
+      <ToolButton
+        icon={UnderlineIcon}
+        label="Unterstrichen"
+        active={state.underline}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
       />
       <ToolButton
         icon={Strikethrough}
         label="Durchgestrichen"
-        active={editor.isActive("strike")}
+        active={state.strike}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       />
       <ToolButton
         icon={Code}
         label="Code"
-        active={editor.isActive("code")}
+        active={state.code}
         onClick={() => editor.chain().focus().toggleCode().run()}
       />
       <ToolButton
         icon={Superscript}
         label="Hochgestellt"
-        active={editor.isActive("superscript")}
+        active={state.superscript}
         onClick={() => editor.chain().focus().toggleSuperscript().run()}
       />
       <ToolButton
         icon={Subscript}
         label="Tiefgestellt"
-        active={editor.isActive("subscript")}
+        active={state.subscript}
         onClick={() => editor.chain().focus().toggleSubscript().run()}
       />
-      <ColorPopover editor={editor} />
+      <ColorPopover editor={editor} active={state.colored} />
       <Separator orientation="vertical" className="mx-1 h-5" />
 
       {/* Lists — consolidated into one dropdown. */}
@@ -302,11 +365,7 @@ export function EditorToolbar({ editor, spaceId }: { editor: Editor; spaceId: st
             <MenuTrigger
               icon={List}
               label="Listen"
-              active={
-                editor.isActive("bulletList") ||
-                editor.isActive("orderedList") ||
-                editor.isActive("taskList")
-              }
+              active={state.bulletList || state.orderedList || state.taskList}
             />
           }
         />
@@ -328,11 +387,9 @@ export function EditorToolbar({ editor, spaceId }: { editor: Editor; spaceId: st
         <DropdownMenuTrigger
           render={
             <MenuTrigger
-              icon={currentAlignIcon(editor)}
+              icon={currentAlignIcon}
               label="Ausrichtung"
-              active={ALIGNMENTS.some(
-                (a) => a.value !== "left" && editor.isActive({ textAlign: a.value }),
-              )}
+              active={state.align !== null && state.align !== "left"}
             />
           }
         />
@@ -351,14 +408,25 @@ export function EditorToolbar({ editor, spaceId }: { editor: Editor; spaceId: st
       <ToolButton
         icon={Quote}
         label="Zitat"
-        active={editor.isActive("blockquote")}
+        active={state.blockquote}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      />
+      <ToolButton
+        icon={SquareCode}
+        label="Code-Block"
+        active={state.codeBlock}
+        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+      />
+      <ToolButton
+        icon={Minus}
+        label="Trennlinie"
+        onClick={() => editor.chain().focus().setHorizontalRule().run()}
       />
 
       {/* Table. */}
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={<MenuTrigger icon={TableIcon} label="Tabelle" active={inTable} />}
+          render={<MenuTrigger icon={TableIcon} label="Tabelle" active={state.inTable} />}
         />
         <DropdownMenuContent align="start">
           <DropdownMenuItem
@@ -368,7 +436,7 @@ export function EditorToolbar({ editor, spaceId }: { editor: Editor; spaceId: st
           >
             <TableIcon className="size-4" /> Tabelle einfügen
           </DropdownMenuItem>
-          {inTable ? (
+          {state.inTable ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => editor.chain().focus().addColumnAfter().run()}>
@@ -399,33 +467,37 @@ export function EditorToolbar({ editor, spaceId }: { editor: Editor; spaceId: st
       </DropdownMenu>
 
       <Separator orientation="vertical" className="mx-1 h-5" />
+
+      {/* Links — one menu for both kinds, so "verlinken" is a single affordance
+          whether the target is a wiki page or an address on the web. */}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<MenuTrigger icon={Link2} label="Verlinken" active={onLink} />}
+        />
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onClick={onLinkPage}>
+            <FileText className="size-4" /> Seite verknüpfen …
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onLinkExternal}>
+            <ExternalLink className="size-4" /> Externer Link …
+          </DropdownMenuItem>
+          {onLink ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => removeLink(editor)}>
+                <Link2Off className="size-4" /> Link entfernen
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
       <ToolButton
-        icon={Link2}
-        label="Seite verknüpfen"
-        active={editor.isActive("link")}
-        onClick={() => setLinkOpen(true)}
-      />
-      <LinkPageDialog
-        spaceId={spaceId}
-        open={linkOpen}
-        onOpenChange={setLinkOpen}
-        onPick={({ id, title }) => {
-          const href = pageHref(id);
-          const { empty } = editor.state.selection;
-          if (empty) {
-            editor
-              .chain()
-              .focus()
-              .insertContent({
-                type: "text",
-                text: title,
-                marks: [{ type: "link", attrs: { href } }],
-              })
-              .run();
-          } else {
-            editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
-          }
-        }}
+        icon={Eraser}
+        label="Formatierung entfernen"
+        // Both halves: `unsetAllMarks` drops bold/color/…, `clearNodes` turns
+        // headings, quotes and list items back into plain paragraphs.
+        onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
       />
     </div>
   );

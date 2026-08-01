@@ -4,6 +4,7 @@ import { PageContent } from "@/components/editor/page-content";
 import { PageEditor } from "@/components/editor/page-editor";
 import { PageAccessSheet } from "@/components/pages/page-access-sheet";
 import { PageAttachments } from "@/components/pages/page-attachments";
+import { PageExternalLinks } from "@/components/pages/page-external-links";
 import { PageTags } from "@/components/pages/page-tags";
 import { RevisionHistory } from "@/components/editor/revision-history";
 import { extractHeadings } from "@/components/editor/headings";
@@ -521,6 +522,10 @@ function RouteComponent() {
               </div>
             </>
           )}
+
+          <div className="mt-10">
+            <PageExternalLinks pageId={page.id} canEdit={canEdit} />
+          </div>
 
           <div className="mt-10">
             <PageAttachments pageId={page.id} spaceId={page.spaceId} canEdit={canEdit} />
