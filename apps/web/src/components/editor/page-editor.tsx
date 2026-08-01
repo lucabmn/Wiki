@@ -43,8 +43,18 @@ import { RevisionHistory } from "./revision-history";
  *  - "Speichern" persists the (non-collaborative) title as a draft and closes;
  *    the body is already autosaved by collab.
  *  - "Veröffentlichen" promotes body + title into the published projection.
- * The title is local React state, so a `useBlocker` guards against losing an
- * unsaved title on navigation or reload.
+ *
+ * Which of those apply depends on status, because `title` has no draft/published
+ * split the way the body does (one `page.title` column vs. `content` + the
+ * collab-owned `yjsState`). Saving a title on a *published* page therefore goes
+ * live immediately — a publish wearing a draft's label. So "Speichern" only
+ * shows while the page is still a draft, and a published page offers exactly
+ * two exits: leave, or publish the changes. That also makes the hint below the
+ * header honest: on a published page nothing an editor does reaches readers
+ * until they publish.
+ *
+ * The title is local React state, so every exit — "Schließen", navigation,
+ * reload — confirms before discarding an unsaved one.
  */
 export function PageEditor({
   page,
@@ -165,24 +175,49 @@ function PageEditorForm({
       title: title.trim() || "Ohne Titel",
       ...(editor ? { content: editor.getJSON(), textContent: editor.getText() } : {}),
     });
-    toast.success("Seite veröffentlicht");
+    toast.success(
+      page.status === "published" ? "Änderungen veröffentlicht" : "Seite veröffentlicht",
+    );
     finish();
   };
 
   const busy = update.isPending || publish.isPending;
 
+  // Publishing an already-published page doesn't publish it *again* — it
+  // promotes the working copy into the projection readers see. Naming that
+  // keeps the button from reading as a no-op next to the "Veröffentlicht" badge.
+  const published = page.status === "published";
+  const publishLabel = published ? "Änderungen veröffentlichen" : "Veröffentlichen";
+
+  // "Speichern" only earns a slot while a draft can still be *kept* a draft. On
+  // a published page it would write the title straight into the reader-facing
+  // column — a publish in all but name — so publishing is the only save there.
+  // (The `!canPublish` arm is unreachable today: `update` and `publish` are
+  // gated on the same `write` capability; it stands in case they ever split.)
+  const showSave = !published || !canPublish;
+
   // The title is not part of the collaborative doc, so unsaved title edits would
-  // be lost silently on navigation/reload. Guard both, but stand down while a
-  // save/publish is in flight (which is itself persisting the title).
+  // be lost silently. Everything that leaves the editor has to ask first — but
+  // stand down while a save/publish is in flight (which persists the title).
   const titleDirty = title !== page.title;
+  const confirmDiscardTitle = () =>
+    !titleDirty ||
+    window.confirm(
+      showSave
+        ? "Der Seitentitel hat ungespeicherte Änderungen. Ohne Speichern verlassen?"
+        : "Der Seitentitel hat ungespeicherte Änderungen. Ohne Veröffentlichen verlassen?",
+    );
+
+  // "Schließen" is a local mode flip, not a navigation, so `useBlocker` never
+  // sees it — it needs the same guard explicitly.
+  const handleClose = () => {
+    if (!confirmDiscardTitle()) return;
+    onDone();
+  };
+
   useBlocker({
     disabled: busy,
-    shouldBlockFn: () => {
-      if (!titleDirty) return false;
-      return !window.confirm(
-        "Der Seitentitel hat ungespeicherte Änderungen. Ohne Speichern verlassen?",
-      );
-    },
+    shouldBlockFn: () => !confirmDiscardTitle(),
     enableBeforeUnload: () => titleDirty && !busy,
   });
 
@@ -220,16 +255,17 @@ function PageEditorForm({
           >
             <History className="size-4" />
           </Button>
-          <Button variant="outline" size="sm" disabled={busy} onClick={onDone}>
+          <Button variant="outline" size="sm" disabled={busy} onClick={handleClose}>
             <X className="size-4" /> Schließen
           </Button>
-          <Button variant="outline" size="sm" disabled={busy} onClick={handleSave}>
-            <Check className="size-4" /> {update.isPending ? "Speichern …" : "Speichern"}
-          </Button>
+          {showSave ? (
+            <Button variant="outline" size="sm" disabled={busy} onClick={handleSave}>
+              <Check className="size-4" /> {update.isPending ? "Speichern …" : "Speichern"}
+            </Button>
+          ) : null}
           {canPublish ? (
             <Button size="sm" disabled={busy} onClick={handlePublish}>
-              <Send className="size-4" />{" "}
-              {publish.isPending ? "Veröffentlichen …" : "Veröffentlichen"}
+              <Send className="size-4" /> {publish.isPending ? `${publishLabel} …` : publishLabel}
             </Button>
           ) : null}
         </div>
