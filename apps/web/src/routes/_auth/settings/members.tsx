@@ -16,6 +16,7 @@ import {
   rolesQueryOptions,
   useOrgRefresh,
 } from "@/lib/org-queries";
+import { UserLink } from "@/components/user-link";
 import { InviteMemberDialog } from "@/components/settings/invite-member-dialog";
 import { PermissionGate } from "@/components/settings/permission-gate";
 import {
@@ -200,7 +201,11 @@ function MembersSettings() {
                               {initials(member.user.name)}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">{member.user.name}</span>
+                          <UserLink
+                            userId={member.user.id}
+                            name={member.user.name}
+                            className="font-medium"
+                          />
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{member.user.email}</TableCell>

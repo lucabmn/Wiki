@@ -13,6 +13,7 @@ import { searchRouter } from "./search";
 import { spaceRouter } from "./space";
 import { spaceMemberRouter } from "./space-member";
 import { tagRouter } from "./tag";
+import { userRouter } from "./user";
 import { userStateRouter } from "./user-state";
 
 /**
@@ -36,6 +37,7 @@ export const appRouter = {
   links: linkRouter,
   activity: activityRouter,
   search: searchRouter,
+  users: userRouter,
   me: userStateRouter,
   onboarding: onboardingRouter,
   dashboard: dashboardRouter,

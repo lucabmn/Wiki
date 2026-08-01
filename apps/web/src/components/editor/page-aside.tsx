@@ -1,3 +1,4 @@
+import { UserLink } from "@/components/user-link";
 import { STATUS_LABEL } from "@/lib/labels";
 import { scrollIntoPageView } from "@/lib/scroll";
 import { orpc } from "@/utils/orpc";
@@ -107,8 +108,12 @@ export function PageAside({
         ) : null}
         <MetaRow label="Zuletzt geändert">{dateFormat.format(page.updatedAt)}</MetaRow>
         <MetaRow label="Erstellt am">{dayFormat.format(page.createdAt)}</MetaRow>
-        <MetaRow label="Erstellt von">{nameOf(page.createdBy)}</MetaRow>
-        <MetaRow label="Bearbeitet von">{nameOf(page.lastEditedBy)}</MetaRow>
+        <MetaRow label="Erstellt von">
+          <UserLink userId={page.createdBy} name={nameOf(page.createdBy)} />
+        </MetaRow>
+        <MetaRow label="Bearbeitet von">
+          <UserLink userId={page.lastEditedBy} name={nameOf(page.lastEditedBy)} />
+        </MetaRow>
       </dl>
     </div>
   );
