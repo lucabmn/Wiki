@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SidebarProvider } from "@nilovon-wiki/ui/components/sidebar";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -95,6 +95,7 @@ beforeEach(() => {
     { id: "s2", slug: "hr", name: "People", color: null, icon: null },
   ];
   data.pages = [{ id: "p1", parentId: null, title: "Deploy", icon: null }];
+  window.localStorage.clear();
 });
 
 describe("MainSidebar", () => {
@@ -134,6 +135,31 @@ describe("MainSidebar", () => {
     expect(await screen.findByText("Abmelden")).toBeDefined();
     // Once open the email shows twice: the trigger and the menu's group label.
     expect(screen.getAllByText("luca@acme.io")).toHaveLength(2);
+  });
+
+  it("persists collapsed spaces before rendering the tree", async () => {
+    window.localStorage.setItem(
+      "nilovon-wiki:sidebar:space-open-state:o1",
+      JSON.stringify({ s1: false }),
+    );
+
+    renderSidebar();
+
+    await screen.findByText("Operations");
+    expect(screen.queryByText("Deploy")).toBeNull();
+  });
+
+  it("stores collapse changes per organization", async () => {
+    renderSidebar();
+    await screen.findByText("Operations");
+
+    fireEvent.click(screen.getAllByTitle("Ein-/ausklappen")[0]);
+
+    await waitFor(() => {
+      expect(window.localStorage.getItem("nilovon-wiki:sidebar:space-open-state:o1")).toBe(
+        JSON.stringify({ s1: false }),
+      );
+    });
   });
 
   it("does not crash when a collapse toggle is clicked", async () => {

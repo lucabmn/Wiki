@@ -47,32 +47,81 @@ import {
   Home,
   LayoutGrid,
   LogOut,
+  Tags,
   Moon,
   Plus,
   Search,
   Settings,
   Sun,
+  User,
+  UsersRound,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "./theme-provider";
-import {
-  Link,
-  linkOptions,
-  useMatchRoute,
-  useNavigate,
-  useRouteContext,
-} from "@tanstack/react-router";
+import { Link, useMatchRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
 
-const baseNav = linkOptions([
+const baseNav = [
   { to: "/", label: "Übersicht", icon: Home },
   { to: "/spaces", label: "Alle Spaces", icon: LayoutGrid },
-]);
+  { to: "/tags", label: "Tags", icon: Tags },
+  { to: "/users", label: "Personen", icon: UsersRound },
+] as const;
 
 const settingsNavItem = {
   to: "/settings/profile",
   label: "Einstellungen",
   icon: Settings,
 } as const;
+
+const SPACE_OPEN_STATE_STORAGE_PREFIX = "nilovon-wiki:sidebar:space-open-state";
+
+type SpaceOpenState = {
+  organizationId: string | null;
+  openBySpaceId: Map<string, boolean>;
+};
+
+function spaceOpenStateStorageKey(organizationId: string) {
+  return `${SPACE_OPEN_STATE_STORAGE_PREFIX}:${organizationId}`;
+}
+
+function readSpaceOpenState(organizationId: string | null): SpaceOpenState {
+  if (!organizationId || typeof window === "undefined") {
+    return { organizationId, openBySpaceId: new Map() };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(spaceOpenStateStorageKey(organizationId));
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { organizationId, openBySpaceId: new Map() };
+    }
+
+    return {
+      organizationId,
+      openBySpaceId: new Map(
+        Object.entries(parsed).filter(
+          (entry): entry is [string, boolean] => typeof entry[1] === "boolean",
+        ),
+      ),
+    };
+  } catch {
+    return { organizationId, openBySpaceId: new Map() };
+  }
+}
+
+function writeSpaceOpenState(organizationId: string, openBySpaceId: Map<string, boolean>) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      spaceOpenStateStorageKey(organizationId),
+      JSON.stringify(Object.fromEntries(openBySpaceId)),
+    );
+  } catch {
+    // Storage can be unavailable (for example in private browsing). The current
+    // render state still updates; it just will not survive a refresh.
+  }
+}
 
 /** The space list for the active organization; each space expands to its pages. */
 function SpacesTree({
@@ -86,6 +135,13 @@ function SpacesTree({
   const activeOrgId = session?.session.activeOrganizationId ?? null;
   const { allowed: canReorder } = usePermission({ page: ["move"] });
   const [createPageSpaceId, setCreatePageSpaceId] = useState<string | null>(null);
+  const [spaceOpenState, setSpaceOpenState] = useState<SpaceOpenState>(() =>
+    readSpaceOpenState(activeOrgId),
+  );
+  const effectiveSpaceOpenState =
+    spaceOpenState.organizationId === activeOrgId
+      ? spaceOpenState
+      : readSpaceOpenState(activeOrgId);
 
   const {
     data: spaces,
@@ -133,7 +189,25 @@ function SpacesTree({
   return (
     <SidebarMenu className="gap-0.5">
       {spaces.map((space, index) => (
-        <Collapsible key={space.id} defaultOpen={index === 0} className="group/collapsible">
+        <Collapsible
+          key={space.id}
+          open={effectiveSpaceOpenState.openBySpaceId.get(space.id) ?? index === 0}
+          onOpenChange={(open) => {
+            if (!activeOrgId) return;
+
+            setSpaceOpenState((current) => {
+              const currentOpenBySpaceId =
+                current.organizationId === activeOrgId
+                  ? current.openBySpaceId
+                  : new Map<string, boolean>();
+              const openBySpaceId = new Map(currentOpenBySpaceId);
+              openBySpaceId.set(space.id, open);
+              writeSpaceOpenState(activeOrgId, openBySpaceId);
+              return { organizationId: activeOrgId, openBySpaceId };
+            });
+          }}
+          className="group/collapsible"
+        >
           <SidebarMenuItem>
             {/* Chevron toggles the page tree; the rest of the row navigates to
                 the space — kept as siblings so neither nests inside the other. */}
@@ -346,6 +420,14 @@ export default function MainSidebar() {
           <DropdownMenuContent align="start" side="top" className="w-56">
             <DropdownMenuGroup>
               <DropdownMenuLabel className="truncate">{auth.session.user.email}</DropdownMenuLabel>
+              <DropdownMenuItem
+                render={
+                  <Link to="/users/$id" params={{ id: auth.session.user.id }}>
+                    <User className="size-4" />
+                    <span>Mein Profil</span>
+                  </Link>
+                }
+              />
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={signOut}>
