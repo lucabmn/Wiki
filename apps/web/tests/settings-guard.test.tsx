@@ -3,13 +3,22 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 const { state } = vi.hoisted(() => ({
-  state: { allowed: false, isPending: false },
+  // `role` is the caller's *static* member role, which is separate from
+  // `allowed`: a dynamic group can make the permission check pass while the
+  // role stays `member`.
+  state: { allowed: false, isPending: false, role: "member" },
 }));
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (opts: Record<string, unknown>) => opts,
   Link: ({ children }: { children: ReactNode }) => <span>{children}</span>,
   Outlet: () => <div>outlet</div>,
+  useRouteContext: () => ({
+    auth: {
+      session: { user: { id: "user-1" } },
+      organization: { members: [{ userId: "user-1", role: state.role }] },
+    },
+  }),
 }));
 
 // Mirror useAnyPermission's contract: it resolves several requests as one OR,
@@ -27,9 +36,10 @@ import { Route } from "@/routes/_auth/settings/route";
 
 const Settings = (Route as unknown as { component: () => ReactNode }).component;
 
-const settle = (allowed: boolean) => {
+const settle = (allowed: boolean, role = "member") => {
   state.allowed = allowed;
   state.isPending = false;
+  state.role = role;
 };
 
 describe("settings layout", () => {
@@ -60,6 +70,24 @@ describe("settings layout", () => {
     expect(screen.getByText("Mitglieder")).toBeDefined();
     expect(screen.getByText("Gruppen")).toBeDefined();
     expect(screen.getByText("Teams")).toBeDefined();
+  });
+
+  // The SSO/SCIM plugins carry their own authorization and only honour the
+  // static owner/admin roles, so this tab must not follow the wider check that
+  // reveals the rest of the section — it would 403 on submit.
+  it("withholds the single sign-on tab from a manager whose right comes from a group", () => {
+    settle(true, "redakteure");
+    render(<Settings />);
+
+    expect(screen.getByText("Mitglieder")).toBeDefined();
+    expect(screen.queryByText("Single Sign-On")).toBeNull();
+  });
+
+  it("shows the single sign-on tab to an admin, including alongside other roles", () => {
+    settle(true, "redakteure,admin");
+    render(<Settings />);
+
+    expect(screen.getByText("Single Sign-On")).toBeDefined();
   });
 
   it("does not reveal the organization tabs while the check is still pending", () => {

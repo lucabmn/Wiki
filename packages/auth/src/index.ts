@@ -5,8 +5,11 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, organization, twoFactor } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
+import { scim } from "@better-auth/scim";
+import { sso } from "@better-auth/sso";
 import { actionMail, sendMail } from "./mail";
 import { ac, roles } from "./permissions";
+import { SSO_DOMAIN_TOKEN_PREFIX } from "./sso-domain";
 import { localization } from "better-auth-localization";
 
 export function createAuth() {
@@ -149,6 +152,48 @@ export function createAuth() {
         teams: {
           enabled: true,
         },
+      }),
+      // Enterprise sign-in. Providers are registered per organization from
+      // /settings/sso — never from env — so a self-host can onboard an IdP
+      // without a redeploy.
+      sso({
+        // The domain is what `signIn.sso({ email })` matches on, so an
+        // unverified one is a hijacking primitive: an admin of *any*
+        // organization could claim `gmail.com` and catch every Gmail address
+        // that tries to sign in. Requiring a DNS TXT record first also makes a
+        // provider trusted enough to adopt an existing local account instead of
+        // creating a second one for the same person.
+        //
+        // Note for operators: verifying calls `dns.resolveTxt` from this
+        // process, so it must be able to resolve the email domain — see
+        // docs/sso.md.
+        domainVerification: {
+          enabled: true,
+          // Pinned rather than left to the plugin's default: the settings UI
+          // prints the record name from the same constant, and a drift would
+          // fail silently — the operator publishes a record nobody queries.
+          tokenPrefix: SSO_DOMAIN_TOKEN_PREFIX,
+        },
+        // A provider belongs to an organization, so signing in through it is
+        // also how you join: the IdP owns the member list, and revoking access
+        // there is what keeps someone out. New members land as `member`;
+        // elevating them stays a deliberate act in /settings/members.
+        organizationProvisioning: {
+          defaultRole: "member",
+        },
+      }),
+      // Directory sync. The IdP pushes users to /api/auth/scim/v2/* with a
+      // bearer token minted in /settings/sso.
+      scim({
+        // Only the hash is stored, so the token exists in cleartext exactly
+        // once: in the dialog that created it. Same contract as the two-factor
+        // backup codes.
+        storeSCIMToken: "hashed",
+        // A SCIM token can create and delete users, and the plugin's own
+        // list endpoint shows *personal* (org-less) connections to every
+        // signed-in user. This wiki has no use for one — every connection
+        // belongs to an organization, where the owner/admin check applies.
+        canGenerateToken: ({ organizationId }) => Boolean(organizationId),
       }),
       localization({
         defaultLocale: "de-DE-informal",

@@ -18,12 +18,16 @@ import { Route as AuthOnboardingRouteImport } from './routes/auth/onboarding'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
+import { Route as AuthTagsRouteImport } from './routes/_auth/tags'
 import { Route as AuthSearchRouteImport } from './routes/_auth/search'
 import { Route as AuthSettingsRouteRouteImport } from './routes/_auth/settings/route'
+import { Route as AuthUsersIndexRouteImport } from './routes/_auth/users/index'
 import { Route as AuthSpacesIndexRouteImport } from './routes/_auth/spaces/index'
 import { Route as AuthSettingsIndexRouteImport } from './routes/_auth/settings/index'
+import { Route as AuthUsersIdRouteImport } from './routes/_auth/users/$id'
 import { Route as AuthSpacesSlugRouteImport } from './routes/_auth/spaces/$slug'
 import { Route as AuthSettingsTeamsRouteImport } from './routes/_auth/settings/teams'
+import { Route as AuthSettingsSsoRouteImport } from './routes/_auth/settings/sso'
 import { Route as AuthSettingsSecurityRouteImport } from './routes/_auth/settings/security'
 import { Route as AuthSettingsProfileRouteImport } from './routes/_auth/settings/profile'
 import { Route as AuthSettingsOrganizationRouteImport } from './routes/_auth/settings/organization'
@@ -76,6 +80,11 @@ const AcceptInvitationIdRoute = AcceptInvitationIdRouteImport.update({
   path: '/accept-invitation/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthTagsRoute = AuthTagsRouteImport.update({
+  id: '/tags',
+  path: '/tags',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
 const AuthSearchRoute = AuthSearchRouteImport.update({
   id: '/search',
   path: '/search',
@@ -84,6 +93,11 @@ const AuthSearchRoute = AuthSearchRouteImport.update({
 const AuthSettingsRouteRoute = AuthSettingsRouteRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthUsersIndexRoute = AuthUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
   getParentRoute: () => AuthRouteRoute,
 } as any)
 const AuthSpacesIndexRoute = AuthSpacesIndexRouteImport.update({
@@ -96,6 +110,11 @@ const AuthSettingsIndexRoute = AuthSettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthSettingsRouteRoute,
 } as any)
+const AuthUsersIdRoute = AuthUsersIdRouteImport.update({
+  id: '/users/$id',
+  path: '/users/$id',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
 const AuthSpacesSlugRoute = AuthSpacesSlugRouteImport.update({
   id: '/spaces/$slug',
   path: '/spaces/$slug',
@@ -104,6 +123,11 @@ const AuthSpacesSlugRoute = AuthSpacesSlugRouteImport.update({
 const AuthSettingsTeamsRoute = AuthSettingsTeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
+  getParentRoute: () => AuthSettingsRouteRoute,
+} as any)
+const AuthSettingsSsoRoute = AuthSettingsSsoRouteImport.update({
+  id: '/sso',
+  path: '/sso',
   getParentRoute: () => AuthSettingsRouteRoute,
 } as any)
 const AuthSettingsSecurityRoute = AuthSettingsSecurityRouteImport.update({
@@ -147,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthIndexRoute
   '/settings': typeof AuthSettingsRouteRouteWithChildren
   '/search': typeof AuthSearchRoute
+  '/tags': typeof AuthTagsRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -161,13 +186,17 @@ export interface FileRoutesByFullPath {
   '/settings/organization': typeof AuthSettingsOrganizationRoute
   '/settings/profile': typeof AuthSettingsProfileRoute
   '/settings/security': typeof AuthSettingsSecurityRoute
+  '/settings/sso': typeof AuthSettingsSsoRoute
   '/settings/teams': typeof AuthSettingsTeamsRoute
   '/spaces/$slug': typeof AuthSpacesSlugRoute
+  '/users/$id': typeof AuthUsersIdRoute
   '/settings/': typeof AuthSettingsIndexRoute
   '/spaces/': typeof AuthSpacesIndexRoute
+  '/users/': typeof AuthUsersIndexRoute
 }
 export interface FileRoutesByTo {
   '/search': typeof AuthSearchRoute
+  '/tags': typeof AuthTagsRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -183,16 +212,20 @@ export interface FileRoutesByTo {
   '/settings/organization': typeof AuthSettingsOrganizationRoute
   '/settings/profile': typeof AuthSettingsProfileRoute
   '/settings/security': typeof AuthSettingsSecurityRoute
+  '/settings/sso': typeof AuthSettingsSsoRoute
   '/settings/teams': typeof AuthSettingsTeamsRoute
   '/spaces/$slug': typeof AuthSpacesSlugRoute
+  '/users/$id': typeof AuthUsersIdRoute
   '/settings': typeof AuthSettingsIndexRoute
   '/spaces': typeof AuthSpacesIndexRoute
+  '/users': typeof AuthUsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_auth': typeof AuthRouteRouteWithChildren
   '/_auth/settings': typeof AuthSettingsRouteRouteWithChildren
   '/_auth/search': typeof AuthSearchRoute
+  '/_auth/tags': typeof AuthTagsRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -208,10 +241,13 @@ export interface FileRoutesById {
   '/_auth/settings/organization': typeof AuthSettingsOrganizationRoute
   '/_auth/settings/profile': typeof AuthSettingsProfileRoute
   '/_auth/settings/security': typeof AuthSettingsSecurityRoute
+  '/_auth/settings/sso': typeof AuthSettingsSsoRoute
   '/_auth/settings/teams': typeof AuthSettingsTeamsRoute
   '/_auth/spaces/$slug': typeof AuthSpacesSlugRoute
+  '/_auth/users/$id': typeof AuthUsersIdRoute
   '/_auth/settings/': typeof AuthSettingsIndexRoute
   '/_auth/spaces/': typeof AuthSpacesIndexRoute
+  '/_auth/users/': typeof AuthUsersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -219,6 +255,7 @@ export interface FileRouteTypes {
     | '/'
     | '/settings'
     | '/search'
+    | '/tags'
     | '/accept-invitation/$id'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -233,13 +270,17 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/settings/profile'
     | '/settings/security'
+    | '/settings/sso'
     | '/settings/teams'
     | '/spaces/$slug'
+    | '/users/$id'
     | '/settings/'
     | '/spaces/'
+    | '/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/search'
+    | '/tags'
     | '/accept-invitation/$id'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -255,15 +296,19 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/settings/profile'
     | '/settings/security'
+    | '/settings/sso'
     | '/settings/teams'
     | '/spaces/$slug'
+    | '/users/$id'
     | '/settings'
     | '/spaces'
+    | '/users'
   id:
     | '__root__'
     | '/_auth'
     | '/_auth/settings'
     | '/_auth/search'
+    | '/_auth/tags'
     | '/accept-invitation/$id'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -279,10 +324,13 @@ export interface FileRouteTypes {
     | '/_auth/settings/organization'
     | '/_auth/settings/profile'
     | '/_auth/settings/security'
+    | '/_auth/settings/sso'
     | '/_auth/settings/teams'
     | '/_auth/spaces/$slug'
+    | '/_auth/users/$id'
     | '/_auth/settings/'
     | '/_auth/spaces/'
+    | '/_auth/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -361,6 +409,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AcceptInvitationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_auth/tags': {
+      id: '/_auth/tags'
+      path: '/tags'
+      fullPath: '/tags'
+      preLoaderRoute: typeof AuthTagsRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
     '/_auth/search': {
       id: '/_auth/search'
       path: '/search'
@@ -373,6 +428,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthSettingsRouteRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/_auth/users/': {
+      id: '/_auth/users/'
+      path: '/users'
+      fullPath: '/users/'
+      preLoaderRoute: typeof AuthUsersIndexRouteImport
       parentRoute: typeof AuthRouteRoute
     }
     '/_auth/spaces/': {
@@ -389,6 +451,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSettingsIndexRouteImport
       parentRoute: typeof AuthSettingsRouteRoute
     }
+    '/_auth/users/$id': {
+      id: '/_auth/users/$id'
+      path: '/users/$id'
+      fullPath: '/users/$id'
+      preLoaderRoute: typeof AuthUsersIdRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
     '/_auth/spaces/$slug': {
       id: '/_auth/spaces/$slug'
       path: '/spaces/$slug'
@@ -401,6 +470,13 @@ declare module '@tanstack/react-router' {
       path: '/teams'
       fullPath: '/settings/teams'
       preLoaderRoute: typeof AuthSettingsTeamsRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
+    '/_auth/settings/sso': {
+      id: '/_auth/settings/sso'
+      path: '/sso'
+      fullPath: '/settings/sso'
+      preLoaderRoute: typeof AuthSettingsSsoRouteImport
       parentRoute: typeof AuthSettingsRouteRoute
     }
     '/_auth/settings/security': {
@@ -462,6 +538,7 @@ interface AuthSettingsRouteRouteChildren {
   AuthSettingsOrganizationRoute: typeof AuthSettingsOrganizationRoute
   AuthSettingsProfileRoute: typeof AuthSettingsProfileRoute
   AuthSettingsSecurityRoute: typeof AuthSettingsSecurityRoute
+  AuthSettingsSsoRoute: typeof AuthSettingsSsoRoute
   AuthSettingsTeamsRoute: typeof AuthSettingsTeamsRoute
   AuthSettingsIndexRoute: typeof AuthSettingsIndexRoute
 }
@@ -473,6 +550,7 @@ const AuthSettingsRouteRouteChildren: AuthSettingsRouteRouteChildren = {
   AuthSettingsOrganizationRoute: AuthSettingsOrganizationRoute,
   AuthSettingsProfileRoute: AuthSettingsProfileRoute,
   AuthSettingsSecurityRoute: AuthSettingsSecurityRoute,
+  AuthSettingsSsoRoute: AuthSettingsSsoRoute,
   AuthSettingsTeamsRoute: AuthSettingsTeamsRoute,
   AuthSettingsIndexRoute: AuthSettingsIndexRoute,
 }
@@ -483,19 +561,25 @@ const AuthSettingsRouteRouteWithChildren =
 interface AuthRouteRouteChildren {
   AuthSettingsRouteRoute: typeof AuthSettingsRouteRouteWithChildren
   AuthSearchRoute: typeof AuthSearchRoute
+  AuthTagsRoute: typeof AuthTagsRoute
   AuthIndexRoute: typeof AuthIndexRoute
   AuthPagesIdRoute: typeof AuthPagesIdRoute
   AuthSpacesSlugRoute: typeof AuthSpacesSlugRoute
+  AuthUsersIdRoute: typeof AuthUsersIdRoute
   AuthSpacesIndexRoute: typeof AuthSpacesIndexRoute
+  AuthUsersIndexRoute: typeof AuthUsersIndexRoute
 }
 
 const AuthRouteRouteChildren: AuthRouteRouteChildren = {
   AuthSettingsRouteRoute: AuthSettingsRouteRouteWithChildren,
   AuthSearchRoute: AuthSearchRoute,
+  AuthTagsRoute: AuthTagsRoute,
   AuthIndexRoute: AuthIndexRoute,
   AuthPagesIdRoute: AuthPagesIdRoute,
   AuthSpacesSlugRoute: AuthSpacesSlugRoute,
+  AuthUsersIdRoute: AuthUsersIdRoute,
   AuthSpacesIndexRoute: AuthSpacesIndexRoute,
+  AuthUsersIndexRoute: AuthUsersIndexRoute,
 }
 
 const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(

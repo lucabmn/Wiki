@@ -1,7 +1,17 @@
 import { Link, Outlet, createFileRoute } from "@tanstack/react-router";
-import { Building2, KeyRound, Palette, ShieldCheck, User, Users, UsersRound } from "lucide-react";
+import {
+  Building2,
+  Fingerprint,
+  KeyRound,
+  Palette,
+  ShieldCheck,
+  User,
+  Users,
+  UsersRound,
+} from "lucide-react";
 
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { useIsOrgAdmin } from "@/components/settings/org-admin-gate";
 import { ORG_MANAGE_PERMISSIONS } from "@/components/settings/permission-gate";
 import { useAnyPermission } from "@/lib/permissions";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
@@ -24,6 +34,15 @@ const ORGANIZATION_TABS = [
 ] as const;
 
 /**
+ * Listed apart because it is the one tab a dynamic group cannot unlock: Better
+ * Auth's SSO and SCIM plugins only honour the static `owner`/`admin` roles. It is
+ * therefore hidden — rather than shown and then refused — for everyone else.
+ */
+const ORG_ADMIN_TABS = [
+  { to: "/settings/sso", label: "Single Sign-On", icon: Fingerprint },
+] as const;
+
+/**
  * Two-section settings shell: personal settings every signed-in user may open,
  * and organization settings only managers see.
  *
@@ -34,6 +53,7 @@ const ORGANIZATION_TABS = [
  */
 function SettingsLayout() {
   const { allowed: canManageOrg, isPending } = useAnyPermission(ORG_MANAGE_PERMISSIONS);
+  const isOrgAdmin = useIsOrgAdmin();
 
   return (
     <DashboardLayout className="gap-0 p-7">
@@ -55,7 +75,10 @@ function SettingsLayout() {
             </div>
           ) : canManageOrg ? (
             <div className="mt-6">
-              <NavSection title="Organisation" tabs={ORGANIZATION_TABS} />
+              <NavSection
+                title="Organisation"
+                tabs={isOrgAdmin ? [...ORGANIZATION_TABS, ...ORG_ADMIN_TABS] : ORGANIZATION_TABS}
+              />
             </div>
           ) : null}
         </nav>

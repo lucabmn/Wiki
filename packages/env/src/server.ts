@@ -20,6 +20,10 @@ export const env = createEnv({
     // credential stuffing. Set high enough that normal usage never hits them.
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(600),
     RATE_LIMIT_AUTH_MAX: z.coerce.number().int().positive().default(60),
+    // SCIM (/api/auth/scim/**) is an identity provider syncing its directory,
+    // not a person signing in: one request per user, all from one IP. It needs
+    // a ceiling sized for a full directory push, not for credential stuffing.
+    RATE_LIMIT_SCIM_MAX: z.coerce.number().int().positive().default(1200),
 
     // ── SMTP ────────────────────────────────────────────────────────────────
     // Optional as a whole: with SMTP_HOST unset the app still boots and mail is

@@ -33,6 +33,30 @@ describe("auth client action surface", () => {
     expect(typeof authClient.revokeOtherSessions).toBe("function");
   });
 
+  it("exposes the SSO actions the identity settings drive", () => {
+    expect(typeof authClient.sso.register).toBe("function");
+    expect(typeof authClient.sso.providers).toBe("function");
+    expect(typeof authClient.sso.updateProvider).toBe("function");
+    expect(typeof authClient.sso.deleteProvider).toBe("function");
+    expect(typeof authClient.signIn.sso).toBe("function");
+  });
+
+  it("exposes the domain-verification actions, which only exist because it is enabled", () => {
+    // These two are gated on `domainVerification.enabled` on *both* sides: the
+    // server only registers the endpoints when it is on, and the client only
+    // types them when `ssoClient` is configured the same way. Sign-in through a
+    // provider is refused until the domain is verified, so if this pair ever
+    // stops existing, SSO is unusable rather than merely unverified.
+    expect(typeof authClient.sso.requestDomainVerification).toBe("function");
+    expect(typeof authClient.sso.verifyDomain).toBe("function");
+  });
+
+  it("exposes the SCIM actions the directory settings drive", () => {
+    expect(typeof authClient.scim.generateToken).toBe("function");
+    expect(typeof authClient.scim.listProviderConnections).toBe("function");
+    expect(typeof authClient.scim.deleteProviderConnection).toBe("function");
+  });
+
   it("exposes the team actions, which only exist because teams are enabled", () => {
     expect(typeof authClient.organization.createTeam).toBe("function");
     expect(typeof authClient.organization.updateTeam).toBe("function");

@@ -238,6 +238,70 @@ export const invitation = authSchema.table(
   ],
 );
 
+/**
+ * An enterprise identity provider (OIDC or SAML) an organization signs in with.
+ *
+ * `oidcConfig` / `samlConfig` are JSON blobs owned by the SSO plugin — one of
+ * the two is set. They hold the client secret, which is why nothing outside
+ * Better Auth reads this table: its own endpoints return a masked projection.
+ *
+ * The `organization` cascade is load-bearing. A provider left behind by a
+ * deleted organization would keep authenticating people into an org that no
+ * longer exists, and its `domain` would keep matching those e-mail addresses on
+ * every sign-in attempt.
+ */
+export const ssoProvider = authSchema.table(
+  "sso_provider",
+  {
+    id: text("id").primaryKey(),
+    issuer: text("issuer").notNull(),
+    oidcConfig: text("oidc_config"),
+    samlConfig: text("saml_config"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").notNull().unique(),
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+    domain: text("domain").notNull(),
+    // Set by the DNS TXT check. Sign-in is refused until it is true, so this
+    // column — not the row's existence — is what makes a provider live.
+    domainVerified: boolean("domain_verified").default(false),
+  },
+  (table) => [
+    index("ssoProvider_userId_idx").on(table.userId),
+    index("ssoProvider_organizationId_idx").on(table.organizationId),
+    // `signIn.sso({ email })` resolves the provider by the address' domain.
+    index("ssoProvider_domain_idx").on(table.domain),
+    uniqueIndex("ssoProvider_providerId_uidx").on(table.providerId),
+  ],
+);
+
+/**
+ * A directory-sync connection: the bearer token an IdP presents to
+ * `/api/auth/scim/v2/*` to provision users into `organizationId`.
+ *
+ * `scimToken` holds a hash, never the token itself (`storeSCIMToken: "hashed"`
+ * in `@nilovon-wiki/auth`) — the cleartext exists only in the dialog that
+ * created it.
+ */
+export const scimProvider = authSchema.table(
+  "scim_provider",
+  {
+    id: text("id").primaryKey(),
+    providerId: text("provider_id").notNull().unique(),
+    scimToken: text("scim_token").notNull().unique(),
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+  },
+  (table) => [
+    index("scimProvider_organizationId_idx").on(table.organizationId),
+    uniqueIndex("scimProvider_providerId_uidx").on(table.providerId),
+  ],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
@@ -246,6 +310,7 @@ export const userRelations = relations(user, ({ many }) => ({
   teamMembers: many(teamMember),
   members: many(member),
   invitations: many(invitation),
+  ssoProviders: many(ssoProvider),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -281,6 +346,8 @@ export const organizationRelations = relations(organization, ({ many }) => ({
   teams: many(team),
   members: many(member),
   invitations: many(invitation),
+  ssoProviders: many(ssoProvider),
+  scimProviders: many(scimProvider),
 }));
 
 export const organizationRoleRelations = relations(organizationRole, ({ one }) => ({
@@ -328,5 +395,23 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
   user: one(user, {
     fields: [invitation.inviterId],
     references: [user.id],
+  }),
+}));
+
+export const ssoProviderRelations = relations(ssoProvider, ({ one }) => ({
+  organization: one(organization, {
+    fields: [ssoProvider.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [ssoProvider.userId],
+    references: [user.id],
+  }),
+}));
+
+export const scimProviderRelations = relations(scimProvider, ({ one }) => ({
+  organization: one(organization, {
+    fields: [scimProvider.organizationId],
+    references: [organization.id],
   }),
 }));

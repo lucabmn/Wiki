@@ -15,6 +15,7 @@ It is split in two: **Konto** (personal, open to every signed-in user) and **Org
 | `/settings/members`      | Organisation | `member:["update"]`                                  | Members, roles/groups per member, invitations                   |
 | `/settings/groups`       | Organisation | `ac:["create"]`                                      | Dynamic roles ("groups") and their permission matrix            |
 | `/settings/teams`        | Organisation | `team:["create"]`                                    | Teams and their membership                                      |
+| `/settings/sso`          | Organisation | static role `owner`/`admin` (see below)              | OIDC identity providers, SCIM directory-sync connections        |
 
 The sidebar entry points at `/settings/profile` and is visible to everyone; `/settings` redirects there. The nav only renders the **Organisation** group when [`useAnyPermission`](../apps/web/src/lib/permissions.ts) settles as allowed for any of `member:update` / `ac:create` / `organization:update`.
 
@@ -32,6 +33,10 @@ Sign-in with 2FA does **not** create a session: `signIn.email` answers `{ twoFac
 
 **Session freshness.** `changeEmail` and `twoFactor.disable` sit behind Better Auth's `sensitiveSessionMiddleware`: a session older than `session.freshAge` (24 h by default, not overridden here) is rejected on those two actions and the user has to sign in again. Everything else in the settings area is happy with any valid session.
 
+**Single Sign-On.** The only organization tab **not** gated by [`<PermissionGate>`](../apps/web/src/components/settings/permission-gate.tsx). Better Auth's SSO and SCIM plugins carry their own authorization (`hasOrgAdminRole` / `hasRequiredRole`), and it only understands the static `owner`/`admin` roles — a dynamic group granting `organization:["update"]` does not pass it. Gating on the wider `hasPermission` check would hand such a member a form the server rejects on submit, so the tab uses [`<OrgAdminGate>`](../apps/web/src/components/settings/org-admin-gate.tsx), which mirrors what is actually enforced (including the comma-separated multi-role string).
+
+A provider is inert until its e-mail domain is verified by DNS TXT record — sign-in through it is refused, and only a verified domain lets an SSO login adopt a pre-existing local account. Removing a provider deletes every `account` row linked to it, so it carries the same type-to-confirm as deleting the organization. SCIM tokens are stored hashed and shown once, like the two-factor backup codes. Full setup flow: [SSO & SCIM](../apps/docs/content/docs/concepts/sso.mdx).
+
 **Teams.** Teams carry no permissions. They exist so a whole group of people can be granted space or page access in one row (`spaceMember.teamId` / `pageMember.teamId`) — rights still come from roles and groups.
 
 ## Not included (v1)
@@ -39,3 +44,5 @@ Sign-in with 2FA does **not** create a session: `signIn.email` answers `{ twoFac
 - **Account deletion.** `user.deleteUser` is left disabled: an owner deleting their account would orphan their organizations, and the ownership-transfer flow that would make it safe does not exist yet.
 - **Avatar/logo uploads.** Both take a URL. The attachment storage is space-scoped, so it does not fit a user- or org-level image without a separate bucket path.
 - **The `admin()` plugin surface** (app-wide user administration: ban, impersonate, list all users) has no UI. It is distinct from org RBAC.
+- **SAML.** The SSO plugin supports it server-side, but `/settings/sso` registers OIDC providers only — SAML needs certificates and assertion mappings that do not fit a dialog, and OIDC covers Entra ID, Okta, Keycloak, Authentik and Google Workspace. IdP-initiated flows are likewise not wired up.
+- **SCIM `Groups`.** Only the `Users` resource is implemented by the plugin; teams and groups stay managed here.

@@ -4,7 +4,7 @@ import { Field, FieldGroup, FieldLabel, FieldError } from "@nilovon-wiki/ui/comp
 import { useForm } from "@tanstack/react-form";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { KeyRound } from "lucide-react";
+import { Building2, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import z from "zod";
 
@@ -160,8 +160,86 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
         </form.Subscribe>
       </form>
 
+      <div className="mt-6 flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        oder
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <form.Subscribe selector={(state) => state.values.email}>
+        {(email) => <SSOSignIn email={email} />}
+      </form.Subscribe>
+
       <PasskeySignIn />
     </AuthLayout>
+  );
+}
+
+/**
+ * The two failures a person can actually hit here, told apart.
+ *
+ * `401` is the one worth spelling out: it means an administrator connected the
+ * provider but has not finished the DNS domain check yet, so sign-in is refused
+ * on purpose. Reported as a generic failure it looks like a broken password.
+ */
+function ssoErrorMessage(status: number | undefined, domain: string | undefined): string {
+  const forDomain = domain ? `die Domain ${domain}` : "diese Adresse";
+  if (status === 404) return `Für ${forDomain} ist kein Single Sign-On eingerichtet.`;
+  if (status === 401) {
+    return `Single Sign-On für ${forDomain} ist noch nicht freigeschaltet — die Domain wurde noch nicht bestätigt. Wende dich an eure IT.`;
+  }
+  return "Anmeldung über Single Sign-On fehlgeschlagen.";
+}
+
+/**
+ * Sign in through the organization's identity provider.
+ *
+ * The provider is resolved from the address' domain, so this reuses the e-mail
+ * already typed above rather than asking for it a second time — but it does not
+ * *require* a valid-looking address up front: an empty field gets a nudge to the
+ * field, and an unknown domain gets told exactly that instead of a generic
+ * failure, because "my company uses SSO but this says login failed" is the worst
+ * possible dead end here.
+ */
+function SSOSignIn({ email }: { email: string }) {
+  const [pending, setPending] = useState(false);
+
+  const signIn = async () => {
+    const address = email.trim();
+    if (!address) {
+      toast.error("Bitte zuerst die E-Mail-Adresse eintragen.");
+      document.getElementById("email")?.focus();
+      return;
+    }
+
+    setPending(true);
+    // On success the browser is redirected to the identity provider, so this
+    // promise only ever resolves on failure — no success branch to write.
+    const result = await authClient.signIn.sso({
+      email: address,
+      callbackURL: `${window.location.origin}/`,
+      errorCallbackURL: `${window.location.origin}/auth/login`,
+    });
+    setPending(false);
+
+    if (result?.error) {
+      const domain = address.split("@")[1];
+      toast.error(ssoErrorMessage(result.error.status, domain));
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="lg"
+      className="mt-4 w-full"
+      disabled={pending}
+      onClick={signIn}
+    >
+      <Building2 className="size-4" />
+      {pending ? "Weiterleitung …" : "Mit Firmenkonto anmelden"}
+    </Button>
   );
 }
 
@@ -192,23 +270,16 @@ function PasskeySignIn() {
   };
 
   return (
-    <div className="mt-6">
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />
-        oder
-        <span className="h-px flex-1 bg-border" />
-      </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="lg"
-        className="mt-4 w-full"
-        disabled={pending}
-        onClick={signIn}
-      >
-        <KeyRound className="size-4" />
-        {pending ? "Warte auf Gerät …" : "Mit Passkey anmelden"}
-      </Button>
-    </div>
+    <Button
+      type="button"
+      variant="outline"
+      size="lg"
+      className="mt-3 w-full"
+      disabled={pending}
+      onClick={signIn}
+    >
+      <KeyRound className="size-4" />
+      {pending ? "Warte auf Gerät …" : "Mit Passkey anmelden"}
+    </Button>
   );
 }

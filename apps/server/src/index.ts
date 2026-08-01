@@ -62,7 +62,26 @@ app.use("/*", async (c, next) => {
 // pinned so the batch handler and the rate limiter agree on the ceiling.
 const RPC_BATCH_MAX = 10;
 
-app.use("/api/auth/*", rateLimit({ max: env.RATE_LIMIT_AUTH_MAX, keyPrefix: "auth" }));
+// The SCIM 2.0 resource routes are machine traffic: an identity provider's
+// initial sync pushes one request per directory user from a single IP, which the
+// credential-stuffing ceiling below would 429 within seconds. They get their own,
+// far wider bucket — and the auth limiter has to step aside for them, because
+// Hono runs *every* matching middleware and would otherwise still apply the
+// tighter limit on top.
+//
+// Deliberately only `/v2/`: the SCIM *management* routes (minting and listing
+// tokens) are session-authenticated and belong under the auth ceiling.
+const SCIM_RESOURCE_PREFIX = "/api/auth/scim/v2/";
+
+// Built once: each limiter owns a bucket map and a sweep timer, so building one
+// per request would leak both.
+const authRateLimit = rateLimit({ max: env.RATE_LIMIT_AUTH_MAX, keyPrefix: "auth" });
+
+app.use("/api/auth/*", async (c, next) => {
+  if (c.req.path.startsWith(SCIM_RESOURCE_PREFIX)) return next();
+  return authRateLimit(c, next);
+});
+app.use(`${SCIM_RESOURCE_PREFIX}*`, rateLimit({ max: env.RATE_LIMIT_SCIM_MAX, keyPrefix: "scim" }));
 app.use(
   "/rpc/*",
   rateLimit({
@@ -77,7 +96,10 @@ app.use("/api-reference/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api
 
 app.use("/attachments/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
-app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+// PUT/PATCH/DELETE are not optional here: SCIM 2.0 replaces (`PUT`), patches
+// (`PATCH`) and deprovisions (`DELETE`) users over these very routes, and
+// without them an identity provider's sync silently 404s.
+app.on(["POST", "GET", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 // Binary transfer for attachments; the metadata lives on the oRPC router.
 app.route("/attachments", attachmentRoutes);
