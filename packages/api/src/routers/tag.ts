@@ -1,21 +1,28 @@
 import { ORPCError } from "@orpc/server";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@nilovon-wiki/db";
-import { pageTag, tag } from "@nilovon-wiki/db/schema/index";
+import { page, pageTag, tag } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure } from "../index";
 import { assertSpaceRead } from "../lib/access";
-import { requirePageCapability, requireSpaceCapabilityById } from "../lib/authz";
+import {
+  filterReadablePagesAcrossSpaces,
+  requirePageCapability,
+  requireSpaceCapabilityById,
+} from "../lib/authz";
 import { loadPage, loadSpace, loadTag } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import { IdSchema } from "../schemas/shared";
 import {
   CreateTagInputSchema,
+  ListPagesByTagInputSchema,
   ListTagsInputSchema,
   PageTagInputSchema,
+  TaggedPageSchema,
   TagSchema,
+  TagWithCountSchema,
   UpdateTagInputSchema,
 } from "../schemas/tag";
 
@@ -32,6 +39,99 @@ export const tagRouter = {
         where: eq(tag.spaceId, input.spaceId),
         orderBy: [asc(tag.name)],
       });
+    }),
+
+  listWithCounts: protectedProcedure
+    .route({
+      method: "GET",
+      path: "/tags/with-counts",
+      tags: TAGS,
+      summary: "List tags with readable page counts",
+    })
+    .input(ListTagsInputSchema)
+    .output(z.array(TagWithCountSchema))
+    .handler(async ({ input, context }) => {
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, input.spaceId));
+
+      const tags = await context.db.query.tag.findMany({
+        where: eq(tag.spaceId, input.spaceId),
+        orderBy: [asc(tag.name)],
+      });
+      if (tags.length === 0) return [];
+
+      const spacePages = await context.db
+        .select({
+          id: page.id,
+          spaceId: page.spaceId,
+          visibility: page.visibility,
+          createdBy: page.createdBy,
+        })
+        .from(page)
+        .where(
+          and(
+            eq(page.spaceId, input.spaceId),
+            isNull(page.archivedAt),
+            eq(page.status, "published"),
+          ),
+        );
+      const readablePages = await filterReadablePagesAcrossSpaces(
+        context.db,
+        context,
+        context.headers,
+        spacePages,
+      );
+      const readablePageIds = readablePages.map((page) => page.id);
+      if (readablePageIds.length === 0) {
+        return tags.map((tag) => ({ ...tag, pageCount: 0 }));
+      }
+
+      const tagRows = await context.db
+        .select({ tagId: pageTag.tagId })
+        .from(pageTag)
+        .where(inArray(pageTag.pageId, readablePageIds));
+      const counts = new Map<string, number>();
+      for (const row of tagRows) counts.set(row.tagId, (counts.get(row.tagId) ?? 0) + 1);
+      return tags.map((tag) => ({ ...tag, pageCount: counts.get(tag.id) ?? 0 }));
+    }),
+
+  listPages: protectedProcedure
+    .route({
+      method: "GET",
+      path: "/tags/{tagId}/pages",
+      tags: TAGS,
+      summary: "List readable pages for a tag",
+    })
+    .input(ListPagesByTagInputSchema)
+    .output(z.array(TaggedPageSchema))
+    .handler(async ({ input, context }) => {
+      const existing = await loadTag(context.db, input.tagId);
+      await assertSpaceRead(context.db, context, await loadSpace(context.db, existing.spaceId));
+
+      const rows = await context.db
+        .select({
+          pageId: page.id,
+          spaceId: page.spaceId,
+          title: page.title,
+          slug: page.slug,
+          icon: page.icon,
+          updatedAt: page.updatedAt,
+          id: page.id,
+          visibility: page.visibility,
+          createdBy: page.createdBy,
+        })
+        .from(pageTag)
+        .innerJoin(page, eq(pageTag.pageId, page.id))
+        .where(
+          and(
+            eq(pageTag.tagId, input.tagId),
+            isNull(page.archivedAt),
+            eq(page.status, "published"),
+          ),
+        )
+        .orderBy(desc(page.updatedAt))
+        .limit(input.limit);
+
+      return filterReadablePagesAcrossSpaces(context.db, context, context.headers, rows);
     }),
 
   create: protectedProcedure

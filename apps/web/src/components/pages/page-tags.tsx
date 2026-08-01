@@ -83,7 +83,12 @@ export function PageTags({
           className="gap-1 pr-1"
           style={tag.color ? { backgroundColor: `${tag.color}20`, color: tag.color } : undefined}
         >
-          {tag.name}
+          <a
+            href={`/tags?space=${encodeURIComponent(spaceId)}&tag=${encodeURIComponent(tag.id)}`}
+            className="rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {tag.name}
+          </a>
           {canEdit ? (
             <button
               type="button"
