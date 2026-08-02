@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { getTableColumns } from "drizzle-orm";
-import { scimProvider, ssoProvider } from "@nilovon-wiki/db/schema/auth";
+import {
+  scimGroup,
+  scimGroupMember,
+  scimGroupRole,
+  scimGroupRoleGrant,
+  scimProvider,
+  ssoProvider,
+} from "@nilovon-wiki/db/schema/auth";
 
 import { auth } from "../src/index";
 
@@ -48,10 +55,14 @@ describe("plugin tables match the hand-written Drizzle schema", () => {
     );
   });
 
-  it("covers scimProvider", () => {
-    expect(Object.keys(getTableColumns(scimProvider)).sort()).toEqual(
-      pluginFields("scim", "scimProvider"),
-    );
+  it.each([
+    ["scimProvider", scimProvider],
+    ["scimGroup", scimGroup],
+    ["scimGroupMember", scimGroupMember],
+    ["scimGroupRole", scimGroupRole],
+    ["scimGroupRoleGrant", scimGroupRoleGrant],
+  ] as const)("covers %s", (model, table) => {
+    expect(Object.keys(getTableColumns(table)).sort()).toEqual(pluginFields("scim", model));
   });
 });
 
@@ -65,16 +76,26 @@ describe("identity plugin configuration", () => {
     expect(options.domainVerification?.enabled).toBe(true);
   });
 
-  it("stores SCIM tokens hashed and refuses org-less ones", () => {
+  it("stores SCIM tokens hashed and refuses personal connections", async () => {
     const options = findPlugin("scim").options as {
       storeSCIMToken?: string;
-      canGenerateToken?: (payload: { organizationId?: string }) => boolean;
+      beforeSCIMTokenGenerated?: (payload: {
+        user: unknown;
+        member: unknown | null;
+        scimToken: string;
+      }) => Promise<void>;
     };
 
     expect(options.storeSCIMToken).toBe("hashed");
-    // An org-less token is visible to every signed-in user in the plugin's own
-    // list endpoint and can provision users app-wide.
-    expect(options.canGenerateToken?.({ organizationId: undefined })).toBe(false);
-    expect(options.canGenerateToken?.({ organizationId: "org_1" })).toBe(true);
+    await expect(
+      options.beforeSCIMTokenGenerated?.({ user: {}, member: null, scimToken: "token" }),
+    ).rejects.toThrow("Organisation");
+    await expect(
+      options.beforeSCIMTokenGenerated?.({
+        user: {},
+        member: { role: "admin" },
+        scimToken: "token",
+      }),
+    ).resolves.toBeUndefined();
   });
 });

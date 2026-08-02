@@ -59,7 +59,7 @@ function MarketingHeader() {
   const nav = [
     { label: "Documentation", to: "" },
     { label: "Self-hosting", to: "self-hosting/docker" },
-    { label: "API", to: "api-reference/overview" },
+    { label: "API v1", to: "v1/overview" },
   ];
   return (
     <header className="sticky top-0 z-40 border-b border-fd-border bg-fd-background/80 backdrop-blur">

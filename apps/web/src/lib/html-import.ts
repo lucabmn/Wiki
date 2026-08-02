@@ -521,7 +521,7 @@ export async function prepareHtmlMigration(files: File[]): Promise<HtmlMigration
 
   const missingPlaceholders = new Set<string>();
   for (const asset of assets.values()) {
-    if (!asset.file && !asset.remoteUrl) {
+    if (!asset.file) {
       missingPlaceholders.add(asset.placeholder);
       for (const reference of asset.references) {
         const page = pages.find((item) => item.key === reference.pageKey);
@@ -555,7 +555,7 @@ export async function prepareHtmlMigration(files: File[]): Promise<HtmlMigration
 
   return {
     pages,
-    assets: [...assets.values()].filter((asset) => asset.file || asset.remoteUrl),
+    assets: [...assets.values()].filter((asset) => asset.file),
     ignoredFiles,
   };
 }

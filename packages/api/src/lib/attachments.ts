@@ -23,6 +23,7 @@ export async function createAttachment(
   input: {
     spaceId: string;
     pageId?: string | null;
+    draft?: boolean;
     file: { name: string; type: string; size: number; body: Blob };
   },
 ): Promise<Attachment> {
@@ -39,6 +40,8 @@ export async function createAttachment(
   // to one page would allow planting rows in a foreign space.
   let organizationId: string;
   let spaceId: string;
+  let isDraft = false;
+  let publishOnNextPublish = false;
   if (input.pageId) {
     const target = await loadPage(context.db, input.pageId);
     ({ organizationId } = await requirePageCapability(
@@ -49,6 +52,11 @@ export async function createAttachment(
       "write",
     ));
     spaceId = target.spaceId;
+    // A client cannot make bytes on a never-published page reader-visible.
+    // Sidebar uploads queue for first publication; editor/import assets stay
+    // private unless the published document actually references them.
+    isDraft = Boolean(input.draft) || target.publishedAt === null;
+    publishOnNextPublish = !input.draft && target.publishedAt === null;
   } else {
     ({ organizationId } = await requireSpaceCapabilityById(
       context.db,
@@ -75,6 +83,8 @@ export async function createAttachment(
           size: input.file.size,
           storageKey,
           uploadedBy: context.session.user.id,
+          isDraft,
+          publishOnNextPublish,
         })
         .returning();
       const row = firstRow(rows);

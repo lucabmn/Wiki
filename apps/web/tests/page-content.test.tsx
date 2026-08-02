@@ -117,6 +117,28 @@ describe("PageContent", () => {
     expect(screen.getByAltText("Unsafe").hasAttribute("src")).toBe(false);
   });
 
+  it("drops injected CSS while preserving supported alignment", () => {
+    const withStyles = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          attrs: { textAlign: "left;background-image:url(https://attacker.invalid/pixel)" },
+          content: [{ type: "text", text: "Hostile style" }],
+        },
+        {
+          type: "paragraph",
+          attrs: { textAlign: "center" },
+          content: [{ type: "text", text: "Centered" }],
+        },
+      ],
+    };
+    render(<PageContent content={withStyles} fallbackText="" />);
+    expect(screen.getByText("Hostile style").getAttribute("style")).toBe("text-align: left;");
+    expect(screen.getByText("Hostile style").getAttribute("style")).not.toContain("background");
+    expect(screen.getByText("Centered").getAttribute("style")).toBe("text-align: center;");
+  });
+
   it("injects positional ids into headings so the TOC can target them", () => {
     const withHeadings = {
       type: "doc",

@@ -9,6 +9,7 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Image as ImageIcon,
   List,
   ListChecks,
   ListOrdered,
@@ -38,6 +39,8 @@ export type SlashActions = {
   linkPage: (editor: Editor) => void;
   /** Opens the external-URL prompt. */
   linkExternal: (editor: Editor) => void;
+  /** Opens the image file picker. */
+  image?: () => void;
 };
 
 const BLOCK_COMMANDS: SlashCommand[] = [
@@ -127,6 +130,19 @@ const BLOCK_COMMANDS: SlashCommand[] = [
 function buildCommands(actions: SlashActions): SlashCommand[] {
   return [
     ...BLOCK_COMMANDS,
+    ...(actions.image
+      ? [
+          {
+            title: "Bild einfügen",
+            icon: ImageIcon,
+            keywords: ["bild", "image", "foto", "upload"],
+            run: ({ editor, range }: { editor: Editor; range: Range }) => {
+              editor.chain().focus().deleteRange(range).run();
+              actions.image?.();
+            },
+          },
+        ]
+      : []),
     {
       title: "Seite verknüpfen",
       icon: FileText,

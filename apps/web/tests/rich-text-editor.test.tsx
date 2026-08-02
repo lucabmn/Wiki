@@ -52,7 +52,7 @@ class AwarenessStub {
   destroy() {}
 }
 
-function renderEditor() {
+function renderEditor(pageId?: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const doc = new Y.Doc();
   const provider = { awareness: new AwarenessStub(doc) } as unknown as HocuspocusProvider;
@@ -60,6 +60,7 @@ function renderEditor() {
   const view = render(
     <QueryClientProvider client={client}>
       <RichTextEditor
+        pageId={pageId}
         spaceId="s1"
         doc={doc}
         provider={provider}
@@ -103,6 +104,32 @@ describe("RichTextEditor (real TipTap mount)", () => {
       });
     });
     await waitFor(() => expect(screen.getByText("hello")).toBeDefined());
+  });
+
+  it("uploads a safe image and inserts its protected inline URL", async () => {
+    const fetchSpy = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ id: "attachment-1" }), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+    const { getEditor } = renderEditor("p1");
+    await waitFor(() => expect(getEditor()).not.toBeNull());
+
+    fireEvent.change(screen.getByLabelText("Bild hochladen"), {
+      target: { files: [new File(["png"], "diagram.png", { type: "image/png" })] },
+    });
+
+    await waitFor(() =>
+      expect(getEditor()?.getHTML()).toContain("/attachments/attachment-1/inline"),
+    );
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining("/attachments/upload"),
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
+    vi.unstubAllGlobals();
   });
 
   it("opens the external-link dialog from the slash menu and inserts the link", async () => {

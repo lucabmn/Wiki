@@ -47,6 +47,28 @@ function hardenLinks(root: DocumentFragment): void {
   });
 }
 
+function safeStoredColor(value: string): boolean {
+  return (
+    /^#[0-9a-f]{3,8}$/i.test(value) ||
+    /^rgba?\([\d\s.,%]+\)$/i.test(value) ||
+    /^hsla?\([\d\s.,%]+\)$/i.test(value)
+  );
+}
+
+/** Keep the editor's formatting properties, but drop arbitrary CSS declarations. */
+function hardenStyles(root: DocumentFragment): void {
+  root.querySelectorAll<HTMLElement>("[style]").forEach((element) => {
+    const { textAlign, color, backgroundColor } = element.style;
+    element.removeAttribute("style");
+    if (["left", "center", "right", "justify"].includes(textAlign)) {
+      element.style.textAlign = textAlign;
+    }
+    if (safeStoredColor(color)) element.style.color = color;
+    if (safeStoredColor(backgroundColor)) element.style.backgroundColor = backgroundColor;
+    if (!element.getAttribute("style")) element.removeAttribute("style");
+  });
+}
+
 function hardenImages(root: DocumentFragment): void {
   root.querySelectorAll("img").forEach((image) => {
     const src = image.getAttribute("src");
@@ -94,6 +116,7 @@ export function PageContent({
       });
       hardenLinks(template.content);
       hardenImages(template.content);
+      hardenStyles(template.content);
       return template.innerHTML;
     } catch {
       return null;
@@ -121,8 +144,8 @@ export function PageContent({
 
   // Safe: the HTML is produced by TipTap's serializer from a fixed schema —
   // unknown nodes/marks are dropped, so no user-authored markup survives — and
-  // `hardenLinks` has already vetted the one attribute the schema does carry
-  // over verbatim, the link mark's href.
+  // `hardenLinks`, `hardenImages`, and `hardenStyles` validate the attributes
+  // the schema can carry into HTML.
   return (
     <div className="tiptap" onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />
   );

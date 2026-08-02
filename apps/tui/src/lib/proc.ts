@@ -24,18 +24,20 @@ export async function spawnStream(
   });
 
   const pump = async (stream: ReadableStream<Uint8Array>) => {
-    const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
     let buf = "";
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      buf += value;
+      buf += decoder.decode(value, { stream: true });
       let nl: number;
       while ((nl = buf.indexOf("\n")) !== -1) {
         onLine?.(buf.slice(0, nl));
         buf = buf.slice(nl + 1);
       }
     }
+    buf += decoder.decode();
     if (buf.length) onLine?.(buf);
   };
 

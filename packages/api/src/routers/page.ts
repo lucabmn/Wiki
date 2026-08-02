@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, asc, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@nilovon-wiki/db";
@@ -165,7 +165,86 @@ const IMPORT_MARK_TYPES = new Set([
   "superscript",
 ]);
 
-/** Imported JSON never contains raw HTML. This guard also rejects unsafe link schemes. */
+function assertImportKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  message: string,
+): void {
+  if (Object.keys(value).some((key) => !allowed.includes(key))) {
+    throw new ORPCError("BAD_REQUEST", { message });
+  }
+}
+
+function importAttrs(node: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (node.attrs === undefined) return undefined;
+  if (!node.attrs || typeof node.attrs !== "object" || Array.isArray(node.attrs)) {
+    throw new ORPCError("BAD_REQUEST", { message: "Invalid imported attributes" });
+  }
+  return node.attrs as Record<string, unknown>;
+}
+
+function assertSafeImportNodeAttrs(node: Record<string, unknown>): void {
+  const attrs = importAttrs(node);
+  if (!attrs) return;
+  switch (node.type) {
+    case "image": {
+      assertImportKeys(attrs, ["src", "alt", "title"], "Unsupported image attribute");
+      if (
+        typeof attrs.src !== "string" ||
+        !attrs.src.startsWith("migration-asset:") ||
+        (attrs.alt !== undefined && attrs.alt !== null && typeof attrs.alt !== "string") ||
+        (attrs.title !== undefined && attrs.title !== null && typeof attrs.title !== "string")
+      ) {
+        throw new ORPCError("BAD_REQUEST", { message: "Imported image attributes are invalid" });
+      }
+      return;
+    }
+    case "heading":
+      assertImportKeys(attrs, ["level"], "Unsupported heading attribute");
+      if (!Number.isInteger(attrs.level) || Number(attrs.level) < 1 || Number(attrs.level) > 6) {
+        throw new ORPCError("BAD_REQUEST", { message: "Imported heading level is invalid" });
+      }
+      return;
+    case "orderedList":
+      assertImportKeys(attrs, ["start", "type"], "Unsupported ordered-list attribute");
+      if (!Number.isInteger(attrs.start) || Number(attrs.start) < 1 || attrs.type !== null) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Imported ordered-list attributes are invalid",
+        });
+      }
+      return;
+    case "codeBlock":
+      assertImportKeys(attrs, ["language"], "Unsupported code-block attribute");
+      if (
+        attrs.language !== null &&
+        (typeof attrs.language !== "string" || !/^[A-Za-z0-9_+-]{1,40}$/.test(attrs.language))
+      ) {
+        throw new ORPCError("BAD_REQUEST", { message: "Imported code language is invalid" });
+      }
+      return;
+    case "tableCell":
+    case "tableHeader":
+      assertImportKeys(attrs, ["colspan", "rowspan", "colwidth"], "Unsupported table attribute");
+      if (
+        !Number.isInteger(attrs.colspan) ||
+        Number(attrs.colspan) < 1 ||
+        Number(attrs.colspan) > 100 ||
+        !Number.isInteger(attrs.rowspan) ||
+        Number(attrs.rowspan) < 1 ||
+        Number(attrs.rowspan) > 100 ||
+        attrs.colwidth !== null
+      ) {
+        throw new ORPCError("BAD_REQUEST", { message: "Imported table attributes are invalid" });
+      }
+      return;
+    default:
+      if (Object.keys(attrs).length) {
+        throw new ORPCError("BAD_REQUEST", { message: "Unsupported imported node attributes" });
+      }
+  }
+}
+
+/** Imported JSON never contains raw HTML or unchecked style-bearing attributes. */
 function assertSafeImportDocument(value: unknown): void {
   const visit = (candidate: unknown, depth: number): void => {
     if (depth > 100 || !candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
@@ -177,32 +256,42 @@ function assertSafeImportDocument(value: unknown): void {
         message: `Unsupported imported node: ${String(node.type)}`,
       });
     }
+    assertImportKeys(node, ["type", "text", "attrs", "marks", "content"], "Invalid node field");
+    assertSafeImportNodeAttrs(node);
     if (node.type === "text" && typeof node.text !== "string") {
       throw new ORPCError("BAD_REQUEST", { message: "Imported text node is invalid" });
     }
-    if (node.type === "image") {
-      const src = (node.attrs as Record<string, unknown> | undefined)?.src;
-      if (typeof src !== "string" || !src.startsWith("migration-asset:")) {
-        throw new ORPCError("BAD_REQUEST", { message: "Imported image source is invalid" });
-      }
-    }
     if (node.marks !== undefined) {
-      if (!Array.isArray(node.marks)) {
+      if (!Array.isArray(node.marks))
         throw new ORPCError("BAD_REQUEST", { message: "Invalid marks" });
-      }
       for (const candidateMark of node.marks) {
         if (!candidateMark || typeof candidateMark !== "object") {
           throw new ORPCError("BAD_REQUEST", { message: "Invalid mark" });
         }
         const mark = candidateMark as Record<string, unknown>;
+        assertImportKeys(mark, ["type", "attrs"], "Invalid imported mark field");
         if (typeof mark.type !== "string" || !IMPORT_MARK_TYPES.has(mark.type)) {
           throw new ORPCError("BAD_REQUEST", { message: "Unsupported imported mark" });
         }
+        const attrs = importAttrs(mark);
         if (mark.type === "link") {
-          const href = (mark.attrs as Record<string, unknown> | undefined)?.href;
+          if (!attrs) throw new ORPCError("BAD_REQUEST", { message: "Imported link has no URL" });
+          assertImportKeys(attrs, ["href"], "Unsupported link attribute");
+          const href = attrs.href;
           if (typeof href !== "string" || !/^(https?:|mailto:|\/|#|migration-asset:)/i.test(href)) {
             throw new ORPCError("BAD_REQUEST", { message: "Imported link has an unsafe URL" });
           }
+        } else if (mark.type === "highlight") {
+          if (attrs) {
+            assertImportKeys(attrs, ["color"], "Unsupported highlight attribute");
+            if (attrs.color !== null && !/^#[0-9a-f]{3,8}$/i.test(String(attrs.color))) {
+              throw new ORPCError("BAD_REQUEST", {
+                message: "Imported highlight color is invalid",
+              });
+            }
+          }
+        } else if (attrs && Object.keys(attrs).length) {
+          throw new ORPCError("BAD_REQUEST", { message: "Unsupported imported mark attributes" });
         }
       }
     }
@@ -214,6 +303,41 @@ function assertSafeImportDocument(value: unknown): void {
     }
   };
   visit(value, 0);
+}
+
+function attachmentIdsInDocument(value: unknown): string[] {
+  const ids = new Set<string>();
+  const visit = (candidate: unknown): void => {
+    if (Array.isArray(candidate)) {
+      candidate.forEach(visit);
+      return;
+    }
+    if (!candidate || typeof candidate !== "object") return;
+    const object = candidate as Record<string, unknown>;
+    const attrs = object.attrs;
+    if (attrs && typeof attrs === "object" && !Array.isArray(attrs)) {
+      for (const key of ["src", "href"] as const) {
+        const value = (attrs as Record<string, unknown>)[key];
+        if (typeof value !== "string") continue;
+        const match = /\/attachments\/([^/]+)\/(?:inline|download)(?:[?#]|$)/.exec(value);
+        if (match?.[1]) ids.add(match[1]);
+      }
+    }
+    visit(object.content);
+    visit(object.marks);
+  };
+  visit(value);
+  return [...ids];
+}
+
+function redactDraftBody<
+  T extends { status: string; publishedAt: Date | null; content: unknown; textContent: string },
+>(row: T): T {
+  // Archiving changes status, so publishedAt is the durable signal that a body
+  // has ever crossed the publication boundary.
+  return row.status === "draft" || row.publishedAt === null
+    ? { ...row, content: null, textContent: "" }
+    : row;
 }
 
 function replaceImportAssetUrls(
@@ -270,7 +394,9 @@ export const pageRouter = {
         orderBy: [asc(page.position)],
       });
       // Drop pages restricted by a per-page override the caller can't read.
-      return filterReadablePages(context.db, context, rows, spaceRole);
+      // Draft bodies live in the working copy and never cross reader APIs.
+      const readable = await filterReadablePages(context.db, context, rows, spaceRole);
+      return readable.map(redactDraftBody);
     }),
 
   get: protectedProcedure
@@ -280,7 +406,7 @@ export const pageRouter = {
     .handler(async ({ input, context }) => {
       const row = await loadPage(context.db, input.id);
       await requirePageCapability(context.db, context, context.headers, row, "read");
-      return row;
+      return redactDraftBody(row);
     }),
 
   import: protectedProcedure
@@ -462,6 +588,11 @@ export const pageRouter = {
           row,
           "write",
         );
+        if (row.status !== "draft") {
+          throw new ORPCError("CONFLICT", {
+            message: "Only unpublished imported pages can have assets finalized.",
+          });
+        }
         if (row.yjsState) {
           throw new ORPCError("CONFLICT", {
             message:
@@ -685,6 +816,25 @@ export const pageRouter = {
           .where(eq(page.id, existing.id))
           .returning();
         const row = firstRow(rows);
+        // Promote queued sidebar attachments and only editor/import assets that
+        // the published document actually references. Removed draft images stay
+        // private instead of becoming enumerable merely because Publish ran.
+        const referencedAttachmentIds = attachmentIdsInDocument(nextContent);
+        await tx
+          .update(attachment)
+          .set({ isDraft: false, publishOnNextPublish: false })
+          .where(
+            and(
+              eq(attachment.pageId, row.id),
+              eq(attachment.isDraft, true),
+              or(
+                eq(attachment.publishOnNextPublish, true),
+                referencedAttachmentIds.length
+                  ? inArray(attachment.id, referencedAttachmentIds)
+                  : undefined,
+              ),
+            ),
+          );
         // Backlinks reflect published content only — resynced here, never by the
         // collab store.
         await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(nextContent));

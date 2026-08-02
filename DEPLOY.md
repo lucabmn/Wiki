@@ -31,12 +31,28 @@ From a checkout with the dev toolchain, `pnpm dev:tui` runs the same wizard.
 Manual equivalent, without the script:
 
 ```sh
-cp .env.example .env    # fill in POSTGRES_PASSWORD + BETTER_AUTH_SECRET
+cp .env.example .env    # fill in every required secret (DB, auth, and S3)
                         # (generate each with: openssl rand -base64 48)
 docker compose up -d --build
 ```
 
 Placeholder or low-entropy secrets are rejected at startup by design.
+
+### Pull a tagged release instead of building
+
+Tagged releases publish `linux/amd64` and `linux/arm64` images as
+`ghcr.io/nilovon/wiki-{web,server,collab}`. For a localhost install:
+
+```sh
+cp .env.example .env    # fill all required secrets
+WIKI_VERSION=1.0.0 docker compose pull
+WIKI_VERSION=1.0.0 docker compose up -d
+```
+
+`latest` points to the newest tagged release. Custom-domain deployments still
+build the web image locally because `VITE_SERVER_URL` and `VITE_COLLAB_URL` are
+compiled into its bundle; the production overlay enforces that with
+`pull_policy: build`.
 
 ## Production (public domain, HTTPS)
 
@@ -128,20 +144,23 @@ bytes themselves). A database dump alone restores a wiki whose attachments all 4
 docker compose --profile backup up -d backup
 ```
 
-Dumps the database nightly into the `nilovon-wiki_backups` volume and prunes
-anything older than `BACKUP_KEEP_DAYS` (default 14). Copy that volume — and the
-`nilovon-wiki_rustfs_data` volume — off the host; a backup that only exists on
-the machine it protects is not a backup.
+Dumps the database nightly into the `nilovon-wiki_nilovon-wiki_backups` volume and prunes
+anything older than `BACKUP_KEEP_DAYS` (default 14). This does not snapshot the
+object store. Copy database dumps off-host and use the quiesced object-store
+procedure below; never archive a live RustFS data volume.
 
 ### Manual
 
-Postgres holds everything except attachment bytes. Back it up:
+Postgres holds everything except attachment bytes. For a consistent recovery
+set, first stop application writers, then dump Postgres:
 
 ```sh
+docker compose stop web server collab
 docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki | gzip > backup-$(date +%F).sql.gz
 ```
 
-Restore into a fresh stack (empty database):
+Restore into a fresh stack (empty database) only after restoring the matching
+attachment backup below:
 
 ```sh
 gunzip -c backup-2026-07-09.sql.gz | docker exec -i nilovon-wiki-postgres psql -U postgres nilovon-wiki
@@ -154,16 +173,37 @@ Automate it with cron, e.g. daily at 03:00 with 14 days retention:
 ```
 
 Attachment bytes live in the object store, not in Postgres. With the bundled
-RustFS service that is the `nilovon-wiki_rustfs_data` volume:
+RustFS service that is the `nilovon-wiki_nilovon-wiki_rustfs_data` volume. Stop RustFS before
+reading its raw volume, then restart the stack after the archive completes:
 
 ```sh
-docker run --rm -v nilovon-wiki_rustfs_data:/data -v "$PWD":/out alpine \
+docker compose stop rustfs
+docker run --rm -v nilovon-wiki_nilovon-wiki_rustfs_data:/data -v "$PWD":/out alpine \
   tar czf /out/attachments-$(date +%F).tar.gz -C /data .
+docker compose up -d
 ```
 
-Keep the `.env` file (or at least `BETTER_AUTH_SECRET` and
-`POSTGRES_PASSWORD`) with your backups — sessions and collab tokens are signed
-with it.
+Restore the bundled object store only into a stopped, empty RustFS volume. Put
+the original `.env` in place first, then:
+
+```sh
+docker compose down
+docker volume rm nilovon-wiki_nilovon-wiki_postgres_data nilovon-wiki_nilovon-wiki_rustfs_data
+docker volume create nilovon-wiki_nilovon-wiki_rustfs_data
+docker run --rm \
+  -v nilovon-wiki_nilovon-wiki_rustfs_data:/data \
+  -v "$PWD":/out \
+  alpine sh -c 'cd /data && tar xzf /out/attachments-2026-07-09.tar.gz'
+docker compose up -d postgres rustfs rustfs-init
+```
+
+Then restore the matching database dump and start the remaining services. Do
+not extract over a live or non-empty volume. Treat the database dump and object
+archive as one recovery set and verify attachment downloads after restoring.
+
+Keep the `.env` file (especially `BETTER_AUTH_SECRET`, `POSTGRES_PASSWORD`,
+`S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`) with your backups — sessions and
+collab tokens are signed with it, and RustFS needs the original credentials.
 
 ## Health & monitoring
 

@@ -1,39 +1,84 @@
 ---
 title: Backups
-description: Postgres holds everything — dump it, restore it, automate it.
+description: Back up PostgreSQL, attachment storage, and installation secrets as one recovery set.
 icon: DatabaseBackup
 ---
 
-PostgreSQL holds **everything**: pages, Yjs collaboration snapshots, users, and
-audit history. Backing up the database backs up the whole instance.
+A complete backup has **three parts**:
 
-## Take a backup
+1. PostgreSQL: pages, revisions, collaboration snapshots, users, metadata, and audit history.
+2. The object store: the attachment bytes. A database-only restore leaves attachment links broken.
+3. The `.env` file: database, auth, and S3 credentials.
+
+Take all parts close together and keep them as one recovery set. For a consistent raw-volume
+snapshot, use a short maintenance window and stop application writers first:
+
+```sh
+docker compose stop web server collab
+```
+
+## Take a database backup
 
 ```sh
 docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki \
-  | gzip > backup-$(date +%F).sql.gz
+  | gzip > database-$(date +%F).sql.gz
 ```
+
+## Take an attachment backup
+
+With the bundled RustFS service, stop it before archiving its raw data volume, then restart the
+stack after both backup parts are complete:
+
+```sh
+docker compose stop rustfs
+docker run --rm \
+  -v nilovon-wiki_nilovon-wiki_rustfs_data:/data:ro \
+  -v "$PWD":/backup \
+  alpine tar czf /backup/attachments-$(date +%F).tar.gz -C /data .
+docker compose up -d
+```
+
+For an external S3 service, use that provider's versioned backup or object-copy tooling instead.
+Copy the backup set off the wiki host; a backup on the same machine is not disaster recovery.
 
 ## Restore
 
-Into a fresh stack with an empty database:
+Restore into a fresh stack. Never extract an archive over a running or non-empty RustFS volume.
+Put the original `.env` in place first, then restore attachment storage:
 
 ```sh
-gunzip -c backup-2026-07-09.sql.gz \
+docker compose down
+docker volume rm nilovon-wiki_nilovon-wiki_postgres_data nilovon-wiki_nilovon-wiki_rustfs_data
+docker volume create nilovon-wiki_nilovon-wiki_rustfs_data
+docker run --rm \
+  -v nilovon-wiki_nilovon-wiki_rustfs_data:/data \
+  -v "$PWD":/backup \
+  alpine sh -c 'cd /data && tar xzf /backup/attachments-2026-07-09.tar.gz'
+docker compose up -d postgres rustfs rustfs-init
+```
+
+Restore PostgreSQL after it is healthy:
+
+```sh
+gunzip -c database-2026-07-09.sql.gz \
   | docker exec -i nilovon-wiki-postgres psql -U postgres nilovon-wiki
+docker compose up -d
 ```
 
-## Automate with cron
+Verify several attachment downloads after the restore, not only the database health endpoint.
 
-Daily at 03:00, keeping 14 days of history:
+## Automatic database dumps
 
-```bash
-0 3 * * * cd /path/to/Wiki && docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki | gzip > /var/backups/wiki-$(date +\%F).sql.gz && find /var/backups -name 'wiki-*.sql.gz' -mtime +14 -delete
+```sh
+docker compose --profile backup up -d backup
 ```
 
-<Callout type="warn" title="Keep your secret with your backups">
-  Sessions and collab tokens are signed with `BETTER_AUTH_SECRET`, and the database is
-  encrypted-at-rest only as far as your host is. Keep the `.env` file — or at least
-  `BETTER_AUTH_SECRET` and `POSTGRES_PASSWORD` — alongside your backups, or a restore won't be able
-  to validate existing sessions.
+This writes nightly database dumps to `nilovon-wiki_nilovon-wiki_backups` and applies
+`BACKUP_KEEP_DAYS` retention. It does **not** copy attachment bytes or move either volume
+off-host; schedule those separately.
+
+<Callout type="warn" title="Keep credentials with the backup set">
+  Preserve `.env`, especially `BETTER_AUTH_SECRET`, `POSTGRES_PASSWORD`, `S3_ACCESS_KEY_ID`, and
+  `S3_SECRET_ACCESS_KEY`. Without the original values, sessions may be invalid and the restored
+  object store may not start.
 </Callout>

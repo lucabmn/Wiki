@@ -1,4 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { attachment } from "@nilovon-wiki/db/schema/index";
@@ -41,21 +42,29 @@ export const attachmentRouter = {
     .output(z.array(AttachmentSchema))
     .handler(async ({ input, context }) => {
       let spaceId: string;
+      let canReadDrafts = false;
       if (input.pageId) {
         const target = await loadPage(context.db, input.pageId);
         await requirePageCapability(context.db, context, context.headers, target, "read");
         spaceId = target.spaceId;
+        try {
+          await requirePageCapability(context.db, context, context.headers, target, "write");
+          canReadDrafts = true;
+        } catch (error) {
+          if (!(error instanceof ORPCError) || error.code !== "FORBIDDEN") throw error;
+        }
       } else {
         spaceId = input.spaceId!;
         await assertSpaceRead(context.db, context, await loadSpace(context.db, spaceId));
       }
-      return context.db.query.attachment.findMany({
+      const rows = await context.db.query.attachment.findMany({
         where: and(
           eq(attachment.spaceId, spaceId),
           input.pageId ? eq(attachment.pageId, input.pageId) : undefined,
         ),
         orderBy: [desc(attachment.createdAt)],
       });
+      return canReadDrafts ? rows : rows.filter((row) => !row.isDraft);
     }),
 
   // Metadata for one attachment, gated on read access to its page (or space for
@@ -74,7 +83,13 @@ export const attachmentRouter = {
       const existing = await loadAttachment(context.db, input.id);
       if (existing.pageId) {
         const target = await loadPage(context.db, existing.pageId);
-        await requirePageCapability(context.db, context, context.headers, target, "read");
+        await requirePageCapability(
+          context.db,
+          context,
+          context.headers,
+          target,
+          existing.isDraft ? "write" : "read",
+        );
       } else {
         await assertSpaceRead(context.db, context, await loadSpace(context.db, existing.spaceId));
       }

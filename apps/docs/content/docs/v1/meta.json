@@ -1,5 +1,5 @@
 {
-  "title": "API reference",
+  "title": "API v1",
   "icon": "Webhook",
   "pages": ["overview", "rpc-client", "rest"]
 }

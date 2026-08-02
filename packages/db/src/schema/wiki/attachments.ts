@@ -1,4 +1,4 @@
-import { text, bigint, index } from "drizzle-orm/pg-core";
+import { text, bigint, boolean, index } from "drizzle-orm/pg-core";
 
 import { wikiSchema } from "./_schema";
 import { id, timestamps } from "../_helpers";
@@ -21,6 +21,11 @@ export const attachment = wikiSchema.table(
     storageKey: text("storage_key").notNull(), // key in S3 / local disk
     checksum: text("checksum"),
     uploadedBy: text("uploaded_by").references(() => user.id, { onDelete: "set null" }),
+    // Editor/import uploads stay writer-only until the page is published.
+    isDraft: boolean("is_draft").default(false).notNull(),
+    // Sidebar attachments added before first publication become public with the
+    // page even when they are not embedded in rich text.
+    publishOnNextPublish: boolean("publish_on_next_publish").default(false).notNull(),
     createdAt: timestamps.createdAt,
   },
   (t) => [

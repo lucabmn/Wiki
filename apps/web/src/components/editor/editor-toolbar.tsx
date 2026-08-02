@@ -29,6 +29,7 @@ import {
   Heading3,
   Highlighter,
   Italic,
+  Image as ImageIcon,
   Link2,
   Link2Off,
   List,
@@ -270,10 +271,14 @@ export function EditorToolbar({
   editor,
   onLinkPage,
   onLinkExternal,
+  onImage,
+  imageUploading = false,
 }: {
   editor: Editor;
   onLinkPage: () => void;
   onLinkExternal: () => void;
+  onImage?: () => void;
+  imageUploading?: boolean;
 }) {
   const state = useToolbarState(editor);
   const onLink = state.linkHref !== null;
@@ -465,6 +470,15 @@ export function EditorToolbar({
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {onImage ? (
+        <ToolButton
+          icon={ImageIcon}
+          label={imageUploading ? "Bild wird hochgeladen" : "Bild einfügen"}
+          disabled={imageUploading}
+          onClick={onImage}
+        />
+      ) : null}
 
       <Separator orientation="vertical" className="mx-1 h-5" />
 

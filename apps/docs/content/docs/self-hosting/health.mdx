@@ -27,5 +27,5 @@ docker compose logs -f server   # one service
 ## What to watch
 
 - **`/health` on the API** — the single best liveness/readiness signal.
-- **Postgres disk usage** — everything lives here; pair with [backups](/docs/self-hosting/backups).
+- **Postgres and object-store disk usage** — attachment bytes live in RustFS/S3; pair both with [backups](/docs/self-hosting/backups).
 - **Caddy logs** (production) — TLS issuance and proxy errors.

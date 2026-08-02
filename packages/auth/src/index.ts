@@ -2,6 +2,7 @@ import { createDb } from "@nilovon-wiki/db";
 import * as schema from "@nilovon-wiki/db/schema/auth";
 import { env } from "@nilovon-wiki/env/server";
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, organization, twoFactor } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
@@ -189,11 +190,17 @@ export function createAuth() {
         // once: in the dialog that created it. Same contract as the two-factor
         // backup codes.
         storeSCIMToken: "hashed",
-        // A SCIM token can create and delete users, and the plugin's own
-        // list endpoint shows *personal* (org-less) connections to every
-        // signed-in user. This wiki has no use for one — every connection
-        // belongs to an organization, where the owner/admin check applies.
-        canGenerateToken: ({ organizationId }) => Boolean(organizationId),
+        // A SCIM token can create and delete users. This wiki has no use for
+        // personal connections: every connection belongs to an organization,
+        // where the plugin's owner/admin check applies. In 1.7 this callback
+        // runs after that built-in authorization; a null member means personal.
+        beforeSCIMTokenGenerated: async ({ member }) => {
+          if (!member) {
+            throw new APIError("BAD_REQUEST", {
+              message: "SCIM-Verbindungen müssen zu einer Organisation gehören",
+            });
+          }
+        },
       }),
       localization({
         defaultLocale: "de-DE-informal",

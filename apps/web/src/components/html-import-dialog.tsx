@@ -61,6 +61,7 @@ async function uploadMigrationAsset(
     body.set("file", asset.file, asset.fileName);
     body.set("spaceId", spaceId);
     body.set("pageId", pageId);
+    body.set("draft", "true");
     return responseAttachmentId(
       await fetch(`${env.VITE_SERVER_URL}/attachments/upload`, {
         method: "POST",

@@ -14,7 +14,7 @@ oRPC's OpenAPI plugin turns it into a browsable, interactive reference served by
 your own instance:
 
 ```
-GET  /api-reference        # interactive API reference (OpenAPI)
+GET  /v1                   # interactive API reference (OpenAPI)
 ```
 
 Because it is generated from the router, it is always in sync with the running
@@ -22,7 +22,7 @@ server — there is no separately maintained spec to fall behind.
 
 <Callout type="info">
   The reference is the **authoritative** endpoint list for your version. The tables below illustrate
-  the shape; browse `/api-reference` on your instance for the complete, current surface.
+  the shape; browse `/v1` on your instance for the complete, current surface.
 </Callout>
 
 ## Example: the `pages` resource
@@ -65,7 +65,7 @@ config already permits them so that batched `/rpc` preflight succeeds.
 ## Related
 
 <Cards>
-  <Card title="RPC client" href="/docs/api-reference/rpc-client">
+  <Card title="RPC client" href="/docs/v1/rpc-client">
     The preferred path for TypeScript callers.
   </Card>
   <Card title="Rate limits" href="/docs/self-hosting/configuration">

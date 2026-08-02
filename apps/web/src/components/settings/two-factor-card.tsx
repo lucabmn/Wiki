@@ -144,6 +144,9 @@ function EnableDialog({
     mutationFn: async () => {
       const result = await authClient.twoFactor.enable({ password });
       if (result.error) throw new Error(result.error.message ?? "Aktivierung fehlgeschlagen");
+      if (!result.data || !("totpURI" in result.data)) {
+        throw new Error("Der Server hat keine TOTP-Einrichtung zurückgegeben");
+      }
       return result.data;
     },
     onSuccess: (data) => {

@@ -54,15 +54,27 @@ beforeAll(async () => {
       createdBy: "u1",
     },
   ]);
-  await db.insert(page).values({
-    id: "pg",
-    spaceId: "sp",
-    slug: "runbook",
-    title: "Runbook",
-    status: "published",
-    position: "a0",
-    createdBy: "u1",
-  });
+  await db.insert(page).values([
+    {
+      id: "pg",
+      spaceId: "sp",
+      slug: "runbook",
+      title: "Runbook",
+      status: "published",
+      publishedAt: now,
+      position: "a0",
+      createdBy: "u1",
+    },
+    {
+      id: "draft-pg",
+      spaceId: "sp",
+      slug: "draft",
+      title: "Draft",
+      status: "draft",
+      position: "a1",
+      createdBy: "u1",
+    },
+  ]);
 });
 afterAll(async () => {
   setStorage(null);
@@ -84,10 +96,11 @@ const fileOf = (name = "spec.pdf", body = "hello") => ({
   body: new Blob([body], { type: "application/pdf" }),
 });
 
-const upload = (overrides: { pageId?: string | null; name?: string } = {}) =>
+const upload = (overrides: { pageId?: string | null; name?: string; draft?: boolean } = {}) =>
   createAttachment(authed(), {
     spaceId: "sp",
     pageId: overrides.pageId ?? null,
+    draft: overrides.draft,
     file: fileOf(overrides.name),
   });
 
@@ -148,6 +161,12 @@ describe("createAttachment", () => {
     expect((await storage.list()).items).toHaveLength(0);
   });
 
+  it("forces uploads on never-published pages behind the publication boundary", async () => {
+    const created = await upload({ pageId: "draft-pg" });
+    expect(created.isDraft).toBe(true);
+    expect(created.publishOnNextPublish).toBe(true);
+  });
+
   it("reports a clear error when no object storage is configured", async () => {
     setStorage(null);
     await expect(
@@ -161,6 +180,21 @@ describe("attachment.get", () => {
     const created = await upload({ pageId: "pg" });
     const got = await call(attachmentRouter.get, { id: created.id }, { context: ctx("u2") });
     expect(got.storageKey).toBe(created.storageKey);
+  });
+
+  it("keeps staged editor assets writer-only until publication", async () => {
+    const created = await upload({ pageId: "pg", draft: true });
+    hasPermission.mockResolvedValue({ success: false });
+
+    await expect(
+      call(attachmentRouter.get, { id: created.id }, { context: ctx("u2") }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const readerList = await call(attachmentRouter.list, { pageId: "pg" }, { context: ctx("u2") });
+    expect(readerList.map((item) => item.id)).not.toContain(created.id);
+
+    hasPermission.mockResolvedValue({ success: true });
+    const writerList = await call(attachmentRouter.list, { pageId: "pg" }, { context: ctx() });
+    expect(writerList.map((item) => item.id)).toContain(created.id);
   });
 });
 

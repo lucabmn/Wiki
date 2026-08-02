@@ -39,7 +39,7 @@ app.use(
   "/*",
   cors({
     origin: env.CORS_ORIGIN,
-    // The generated REST surface (`/api-reference`) uses PATCH/PUT/DELETE;
+    // The generated, versioned REST surface (`/v1`) uses PATCH/PUT/DELETE;
     // omitting them here made every browser call to those routes fail preflight.
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     // `x-orpc-batch` is sent by the client's BatchLinkPlugin; without it the
@@ -92,7 +92,7 @@ app.use(
     weight: (c) => (c.req.header("x-orpc-batch") ? RPC_BATCH_MAX : 1),
   }),
 );
-app.use("/api-reference/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
+app.use("/v1/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
 app.use("/attachments/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
@@ -142,7 +142,7 @@ app.use("/*", async (c, next) => {
   }
 
   const apiResult = await apiHandler.handle(c.req.raw, {
-    prefix: "/api-reference",
+    prefix: "/v1",
     context: context,
   });
 

@@ -40,7 +40,7 @@ user — onboarding creates the first organization.
 ## Manual install (without the script)
 
 ```sh
-cp .env.example .env    # fill in POSTGRES_PASSWORD + BETTER_AUTH_SECRET
+cp .env.example .env    # fill in every required secret (DB, auth, and S3)
                         # generate each with: openssl rand -base64 48
 docker compose up -d --build
 ```

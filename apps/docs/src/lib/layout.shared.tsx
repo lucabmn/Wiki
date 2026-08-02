@@ -43,8 +43,8 @@ export function baseOptions(): BaseLayoutProps {
         url: `${docsRoute}/self-hosting/docker`,
       },
       {
-        text: "API Reference",
-        url: `${docsRoute}/api-reference/overview`,
+        text: "API v1",
+        url: `${docsRoute}/v1/overview`,
       },
     ],
   };

@@ -1,11 +1,13 @@
 import { pageHref } from "@nilovon-wiki/api/lib/page-href";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
+import { env } from "@nilovon-wiki/env/web";
 import type { Editor } from "@tiptap/core";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import { CharacterCount } from "@tiptap/extensions";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import type * as Y from "yjs";
 
 import { cleverEditorExtensions } from "./clever";
@@ -36,12 +38,14 @@ type ExternalLinkTarget = { initialUrl: string | null; showText: boolean };
  * the identical schema while the editor gets a live word count.
  */
 export function RichTextEditor({
+  pageId,
   spaceId,
   doc,
   provider,
   user,
   onEditor,
 }: {
+  pageId?: string;
   spaceId: string;
   doc: Y.Doc;
   provider: HocuspocusProvider;
@@ -54,6 +58,8 @@ export function RichTextEditor({
 }) {
   const [pageLinkOpen, setPageLinkOpen] = useState(false);
   const [externalLink, setExternalLink] = useState<ExternalLinkTarget | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const openPageLink = useCallback(() => setPageLinkOpen(true), []);
   // Snapshotted at open time rather than read during render: the dialog steals
@@ -71,8 +77,13 @@ export function RichTextEditor({
 
   const mention = useMemo(() => createMentionSuggestion(spaceId), [spaceId]);
   const slashCommand = useMemo(
-    () => createSlashCommand({ linkPage: openPageLink, linkExternal: openExternalLink }),
-    [openPageLink, openExternalLink],
+    () =>
+      createSlashCommand({
+        linkPage: openPageLink,
+        linkExternal: openExternalLink,
+        image: pageId ? () => imageInputRef.current?.click() : undefined,
+      }),
+    [openPageLink, openExternalLink, pageId],
   );
 
   const editor = useEditor({
@@ -99,6 +110,52 @@ export function RichTextEditor({
     return () => onEditor?.(null);
   }, [editor, onEditor]);
 
+  const uploadImage = useCallback(
+    async (file: File) => {
+      if (!editor || !pageId) return;
+      if (!/^image\/(png|jpeg|gif|webp|avif|bmp)$/i.test(file.type)) {
+        toast.error("Dieser Bildtyp kann nicht sicher eingebettet werden.");
+        return;
+      }
+      setImageUploading(true);
+      try {
+        const body = new FormData();
+        body.set("file", file, file.name);
+        body.set("spaceId", spaceId);
+        body.set("pageId", pageId);
+        body.set("draft", "true");
+        const response = await fetch(`${env.VITE_SERVER_URL}/attachments/upload`, {
+          method: "POST",
+          credentials: "include",
+          body,
+        });
+        const payload = (await response.json().catch(() => null)) as {
+          id?: string;
+          message?: string;
+        } | null;
+        if (!response.ok || !payload?.id) {
+          throw new Error(payload?.message ?? "Bild-Upload fehlgeschlagen");
+        }
+        const baseUrl = env.VITE_SERVER_URL.replace(/\/$/, "");
+        editor
+          .chain()
+          .focus()
+          .setImage({
+            src: `${baseUrl}/attachments/${payload.id}/inline`,
+            alt: file.name,
+            title: file.name,
+          })
+          .run();
+        toast.success("Bild eingefügt");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Bild-Upload fehlgeschlagen");
+      } finally {
+        setImageUploading(false);
+      }
+    },
+    [editor, pageId, spaceId],
+  );
+
   return (
     // Frameless: the editing surface is the read surface, only the sticky
     // toolbar marks it as editable.
@@ -108,8 +165,22 @@ export function RichTextEditor({
           editor={editor}
           onLinkPage={openPageLink}
           onLinkExternal={() => openExternalLink(editor)}
+          onImage={pageId ? () => imageInputRef.current?.click() : undefined}
+          imageUploading={imageUploading}
         />
       ) : null}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp"
+        className="hidden"
+        aria-label="Bild hochladen"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = "";
+          if (file) void uploadImage(file);
+        }}
+      />
       <EditorContent editor={editor} />
       {editor ? <DocumentStats editor={editor} /> : null}
 

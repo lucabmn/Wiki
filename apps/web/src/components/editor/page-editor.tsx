@@ -300,6 +300,7 @@ function PageEditorForm({
 
       <div className="mt-6">
         <RichTextEditor
+          pageId={page.id}
           spaceId={page.spaceId}
           doc={doc}
           provider={provider}

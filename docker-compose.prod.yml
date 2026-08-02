@@ -39,6 +39,9 @@ services:
 
   web:
     restart: always
+    # Published web images target localhost. Custom-domain deployments must
+    # rebuild with their VITE_* build args instead of silently pulling one.
+    pull_policy: build
     # Not published on the host — reached by Caddy over the compose network.
     ports: !reset []
 

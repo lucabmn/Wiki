@@ -13,7 +13,7 @@ Every procedure carries REST metadata (`method` / `path` / `tags` / `summary`)
 alongside its handler, so the same definition produces:
 
 - **`/rpc`** — the type-safe RPC surface the clients call, and
-- **`/api-reference`** — a generated **OpenAPI** document and interactive
+- **`/v1`** — a generated, versioned **OpenAPI** document and interactive
   reference.
 
 ```ts
@@ -60,7 +60,7 @@ Content routes additionally gate on **space/page capabilities** via the helpers 
 `apps/server` is a thin **Hono** app that mounts:
 
 - the **RPCHandler** under `/rpc`,
-- the **OpenAPIHandler** (with the reference plugin) under `/api-reference`,
+- the **OpenAPIHandler** (with the reference plugin) under `/v1`,
 - Better Auth under `/api/auth/*`,
 - a deep `/health` check.
 
@@ -75,10 +75,10 @@ at this layer.
 ## Consuming it
 
 <Cards>
-  <Card title="RPC client" href="/docs/api-reference/rpc-client">
+  <Card title="RPC client" href="/docs/v1/rpc-client">
     Call the API from TypeScript with full inference.
   </Card>
-  <Card title="REST & OpenAPI" href="/docs/api-reference/rest">
+  <Card title="REST & OpenAPI" href="/docs/v1/rest">
     The generated HTTP surface and where to find the reference.
   </Card>
 </Cards>
