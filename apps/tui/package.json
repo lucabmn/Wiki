@@ -5,7 +5,7 @@
   "module": "src/index.tsx",
   "scripts": {
     "dev": "bun run --watch src/index.tsx",
-    "compile": "bun build --compile --production src/index.tsx --outfile dist/nilovon-wiki-installer",
+    "compile": "bun build --compile --production --define 'process.env.OPENTUI_LIBC=\"glibc\"' src/index.tsx --outfile dist/nilovon-wiki-installer",
     "check-types": "tsc --noEmit",
     "test": "vitest run"
   },
