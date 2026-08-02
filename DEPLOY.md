@@ -11,8 +11,8 @@ service) — no Node/pnpm needed for install, update, or operation.
 ## Quick start (localhost)
 
 ```sh
-git clone https://github.com/Nilovon/Wiki.git && cd Wiki
-curl -fsSLo installer "https://github.com/Nilovon/Wiki/releases/latest/download/nilovon-wiki-installer-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
+git clone https://github.com/lucabmn/Wiki.git && cd Wiki
+curl -fsSLo installer "https://github.com/lucabmn/Wiki/releases/latest/download/nilovon-wiki-installer-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
 chmod +x installer && ./installer      # → "Installieren"
 ```
 
@@ -41,12 +41,12 @@ Placeholder or low-entropy secrets are rejected at startup by design.
 ### Pull a tagged release instead of building
 
 Tagged releases publish `linux/amd64` and `linux/arm64` images as
-`ghcr.io/nilovon/wiki-{web,server,collab}`. For a localhost install:
+`ghcr.io/lucabmn/wiki-{web,server,collab}`. For a localhost install:
 
 ```sh
 cp .env.example .env    # fill all required secrets
-WIKI_VERSION=1.0.0 docker compose pull
-WIKI_VERSION=1.0.0 docker compose up -d
+WIKI_VERSION=0.1.0 docker compose pull
+WIKI_VERSION=0.1.0 docker compose up -d
 ```
 
 `latest` points to the newest tagged release. Custom-domain deployments still

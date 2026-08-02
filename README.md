@@ -4,7 +4,7 @@
 
 **A self-hostable, organization-scoped knowledge base — spaces, hierarchical pages, comments, and fine-grained role-based access, built on an end-to-end type-safe TypeScript stack.**
 
-[![CI](https://github.com/Nilovon/Wiki/actions/workflows/ci.yml/badge.svg)](https://github.com/Nilovon/Wiki/actions/workflows/ci.yml)
+[![CI](https://github.com/lucabmn/Wiki/actions/workflows/ci.yml/badge.svg)](https://github.com/lucabmn/Wiki/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -82,8 +82,8 @@ The only requirement is Docker (with the Compose plugin). Clone the repo,
 download the guided installer from GitHub Releases, run it:
 
 ```bash
-git clone https://github.com/Nilovon/Wiki.git && cd Wiki
-curl -fsSLo installer "https://github.com/Nilovon/Wiki/releases/latest/download/nilovon-wiki-installer-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
+git clone https://github.com/lucabmn/Wiki.git && cd Wiki
+curl -fsSLo installer "https://github.com/lucabmn/Wiki/releases/latest/download/nilovon-wiki-installer-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
 chmod +x installer && ./installer
 ```
 

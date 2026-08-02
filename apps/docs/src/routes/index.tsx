@@ -166,7 +166,7 @@ function Terminal_() {
           <span className="text-fd-muted-foreground">
             {"# clone, download the guided installer, run it\n"}
           </span>
-          <span className="text-fd-primary">git</span> clone https://github.com/Nilovon/Wiki.git
+          <span className="text-fd-primary">git</span> clone https://github.com/lucabmn/Wiki.git
           {"\n"}
           <span className="text-fd-primary">cd</span> Wiki &&{" "}
           <span className="text-fd-primary">./installer</span>

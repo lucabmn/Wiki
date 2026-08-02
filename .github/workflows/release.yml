@@ -150,7 +150,7 @@ jobs:
           # Immutable staging tags keep failed matrix runs from partially
           # replacing release tags or latest. The publish job promotes all
           # three only after every image and installer has succeeded.
-          tags: ghcr.io/nilovon/wiki-${{ matrix.app }}:staging-${{ github.sha }}
+          tags: ghcr.io/lucabmn/wiki-${{ matrix.app }}:staging-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           # The web bundle bakes its public URLs at build time, so the published
@@ -193,10 +193,10 @@ jobs:
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && stable=true
           # Validate the complete set before changing any public tag.
           for app in web server collab; do
-            docker buildx imagetools inspect "ghcr.io/nilovon/wiki-$app:staging-$GITHUB_SHA" >/dev/null
+            docker buildx imagetools inspect "ghcr.io/lucabmn/wiki-$app:staging-$GITHUB_SHA" >/dev/null
           done
           for app in web server collab; do
-            image="ghcr.io/nilovon/wiki-$app"
+            image="ghcr.io/lucabmn/wiki-$app"
             tags=(-t "$image:$version")
             if $stable; then
               major="${version%%.*}"
