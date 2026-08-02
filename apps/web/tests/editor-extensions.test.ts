@@ -51,6 +51,16 @@ describe("editor extensions round-trip", () => {
     editor.destroy();
   });
 
+  it("keeps imported images editable and serializable", () => {
+    const editor = makeEditor(
+      '<p><img src="https://api.example.com/attachments/a/inline" alt="Diagram"></p>',
+    );
+    const out = html(editor);
+    expect(out).toContain("<img");
+    expect(out).toContain("Diagram");
+    editor.destroy();
+  });
+
   it("inserts a table that survives serialization", () => {
     const editor = makeEditor("<p></p>");
     editor.commands.insertTable({ rows: 2, cols: 2, withHeaderRow: true });

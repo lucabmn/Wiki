@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { attachment } from "@nilovon-wiki/db/schema/index";
+import { env } from "@nilovon-wiki/env/server";
 
 import { protectedProcedure } from "../index";
 import { assertSpaceRead } from "../lib/access";
@@ -15,6 +16,20 @@ import { IdSchema } from "../schemas/shared";
 const TAGS = ["Attachments"];
 
 export const attachmentRouter = {
+  capabilities: protectedProcedure
+    .route({
+      method: "GET",
+      path: "/attachments/capabilities",
+      tags: TAGS,
+      summary: "Get attachment storage capabilities",
+    })
+    .input(z.object({}))
+    .output(z.object({ enabled: z.boolean(), maxUploadBytes: z.number().int().positive() }))
+    .handler(() => ({
+      enabled: getStorage() !== null,
+      maxUploadBytes: env.ATTACHMENT_MAX_MB * 1024 * 1024,
+    })),
+
   list: protectedProcedure
     .route({
       method: "GET",

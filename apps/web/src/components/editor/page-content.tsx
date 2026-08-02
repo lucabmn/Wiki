@@ -47,6 +47,20 @@ function hardenLinks(root: DocumentFragment): void {
   });
 }
 
+function hardenImages(root: DocumentFragment): void {
+  root.querySelectorAll("img").forEach((image) => {
+    const src = image.getAttribute("src");
+    if (!src || !normalizeExternalUrl(src)) {
+      image.removeAttribute("src");
+      image.setAttribute("data-unavailable", "true");
+    }
+    image.removeAttribute("srcset");
+    image.setAttribute("loading", "lazy");
+    image.setAttribute("decoding", "async");
+    image.setAttribute("referrerpolicy", "no-referrer");
+  });
+}
+
 /**
  * Read-only renderer for a stored page document. Serializes the TipTap JSON to
  * HTML once (memoized) rather than mounting a second ProseMirror instance per
@@ -79,6 +93,7 @@ export function PageContent({
         heading.id = `heading-${index}`;
       });
       hardenLinks(template.content);
+      hardenImages(template.content);
       return template.innerHTML;
     } catch {
       return null;

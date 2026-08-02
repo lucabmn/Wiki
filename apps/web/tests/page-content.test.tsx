@@ -96,6 +96,27 @@ describe("PageContent", () => {
     expect(screen.getByText("click me").hasAttribute("href")).toBe(false);
   });
 
+  it("renders safe imported images and strips unsafe sources", () => {
+    const withImages = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "image",
+              attrs: { src: "https://api.example.com/attachments/a/inline", alt: "Safe" },
+            },
+            { type: "image", attrs: { src: "javascript:alert(1)", alt: "Unsafe" } },
+          ],
+        },
+      ],
+    };
+    render(<PageContent content={withImages} fallbackText="" />);
+    expect(screen.getByAltText("Safe").getAttribute("src")).toContain("/attachments/a/inline");
+    expect(screen.getByAltText("Unsafe").hasAttribute("src")).toBe(false);
+  });
+
   it("injects positional ids into headings so the TOC can target them", () => {
     const withHeadings = {
       type: "doc",

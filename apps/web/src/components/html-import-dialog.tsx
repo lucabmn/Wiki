@@ -1,10 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, FileCode2, FolderUp, Upload, X } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  FileCode2,
+  FolderUp,
+  Image as ImageIcon,
+  Paperclip,
+  Upload,
+  X,
+} from "lucide-react";
 
-import { parseHtmlFiles, type HtmlImportPreview } from "@/lib/html-import";
+import {
+  prepareHtmlMigration,
+  type HtmlImportPreview,
+  type HtmlMigrationAsset,
+} from "@/lib/html-import";
 import { useInvalidate } from "@/lib/query";
-import { orpc } from "@/utils/orpc";
+import { client, orpc } from "@/utils/orpc";
+import { env } from "@nilovon-wiki/env/web";
 import { Alert, AlertDescription, AlertTitle } from "@nilovon-wiki/ui/components/alert";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import {
@@ -24,6 +38,40 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Der Import ist fehlgeschlagen.";
 }
 
+type ImportResult = Awaited<ReturnType<typeof client.pages.import>>;
+
+async function responseAttachmentId(response: Response): Promise<string> {
+  const payload = (await response.json().catch(() => null)) as {
+    id?: string;
+    message?: string;
+  } | null;
+  if (!response.ok || !payload?.id) {
+    throw new Error(payload?.message ?? "Asset-Upload fehlgeschlagen");
+  }
+  return payload.id;
+}
+
+async function uploadMigrationAsset(
+  asset: HtmlMigrationAsset,
+  spaceId: string,
+  pageId: string,
+): Promise<string> {
+  if (asset.file) {
+    const body = new FormData();
+    body.set("file", asset.file, asset.fileName);
+    body.set("spaceId", spaceId);
+    body.set("pageId", pageId);
+    return responseAttachmentId(
+      await fetch(`${env.VITE_SERVER_URL}/attachments/upload`, {
+        method: "POST",
+        credentials: "include",
+        body,
+      }),
+    );
+  }
+  throw new Error(`Asset „${asset.sourcePath}“ ist nicht lokal verfügbar.`);
+}
+
 export function HtmlImportDialog({
   open,
   onOpenChange,
@@ -37,29 +85,117 @@ export function HtmlImportDialog({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const directoryRef = useRef<HTMLInputElement>(null);
+  const createdRef = useRef<ImportResult | null>(null);
+  const uploadedRef = useRef(new Map<string, string>());
+  const publishedRef = useRef(new Set<string>());
   const [pages, setPages] = useState<HtmlImportPreview[]>([]);
+  const [assets, setAssets] = useState<HtmlMigrationAsset[]>([]);
+  const [ignoredFiles, setIgnoredFiles] = useState<string[]>([]);
   const [parsing, setParsing] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [confirmed, setConfirmed] = useState(false);
+  const [progress, setProgress] = useState(0);
   const invalidatePages = useInvalidate(orpc.pages.list.key());
 
-  const commit = useMutation(
-    orpc.pages.import.mutationOptions({
-      onSuccess: () => {
-        invalidatePages();
-      },
-      onError: (nextError) => setError(errorMessage(nextError)),
-    }),
-  );
+  const commit = useMutation({
+    mutationFn: async () => {
+      let created = createdRef.current;
+      if (!created) {
+        if (assets.length) {
+          const capabilities = await client.attachments.capabilities({});
+          if (!capabilities.enabled) {
+            throw new Error(
+              "Die Migration enthält Assets, aber der S3-kompatible Attachment-Speicher ist nicht konfiguriert.",
+            );
+          }
+          const oversized = assets.find(
+            (asset) => asset.file && asset.file.size > capabilities.maxUploadBytes,
+          );
+          if (oversized) {
+            throw new Error(
+              `„${oversized.fileName}“ überschreitet das Upload-Limit von ${Math.round(capabilities.maxUploadBytes / 1024 / 1024)} MB.`,
+            );
+          }
+        }
+        created = await client.pages.import({
+          spaceId,
+          // Pages with assets stay private drafts until every object is uploaded
+          // and every placeholder is finalized; readers never see a half-migrated page.
+          status: status === "published" && assets.length ? "draft" : status,
+          pages: pages.map(({ warnings: _warnings, ...page }) => page),
+        });
+        createdRef.current = created;
+        setProgress(20);
+      }
+
+      const pageIds = new Map(created.imported.map((page) => [page.key, page.id]));
+      const selectedPageKeys = new Set(pages.map((page) => page.key));
+      const jobs = assets.flatMap((asset) =>
+        asset.references
+          .filter((reference) => selectedPageKeys.has(reference.pageKey))
+          .map((reference) => ({ asset, pageKey: reference.pageKey })),
+      );
+      for (let index = 0; index < jobs.length; index += 1) {
+        const job = jobs[index]!;
+        const pageId = pageIds.get(job.pageKey);
+        if (!pageId) continue;
+        const uploadKey = `${pageId}|${job.asset.placeholder}`;
+        if (!uploadedRef.current.has(uploadKey)) {
+          const attachmentId = await uploadMigrationAsset(job.asset, spaceId, pageId);
+          uploadedRef.current.set(uploadKey, attachmentId);
+        }
+        setProgress(20 + Math.round(((index + 1) / Math.max(jobs.length, 1)) * 70));
+      }
+
+      if (jobs.length) {
+        const mappings = new Map<string, Array<{ placeholder: string; attachmentId: string }>>();
+        for (const job of jobs) {
+          const pageId = pageIds.get(job.pageKey);
+          if (!pageId) continue;
+          const attachmentId = uploadedRef.current.get(`${pageId}|${job.asset.placeholder}`);
+          if (!attachmentId) continue;
+          const current = mappings.get(pageId) ?? [];
+          if (!current.some((item) => item.placeholder === job.asset.placeholder)) {
+            current.push({ placeholder: job.asset.placeholder, attachmentId });
+          }
+          mappings.set(pageId, current);
+        }
+        await client.pages.finalizeImportAssets({
+          pages: [...mappings].map(([id, pageAssets]) => ({ id, assets: pageAssets })),
+        });
+      }
+      if (status === "published" && assets.length) {
+        for (const imported of created.imported) {
+          if (!publishedRef.current.has(imported.id)) {
+            await client.pages.publish({
+              id: imported.id,
+              summary: "HTML-Migration mit Assets abgeschlossen",
+            });
+            publishedRef.current.add(imported.id);
+          }
+        }
+      }
+      setProgress(100);
+      return created;
+    },
+    onSuccess: () => invalidatePages(),
+    onError: (nextError) => setError(errorMessage(nextError)),
+  });
 
   useEffect(() => {
     if (!open) {
       setPages([]);
+      setAssets([]);
+      setIgnoredFiles([]);
       setError(null);
       setConfirmed(false);
       setStatus("draft");
+      setProgress(0);
+      createdRef.current = null;
+      uploadedRef.current.clear();
+      publishedRef.current.clear();
       commit.reset();
     }
   }, [open]);
@@ -68,26 +204,39 @@ export function HtmlImportDialog({
     setParsing(true);
     setError(null);
     setConfirmed(false);
+    createdRef.current = null;
+    uploadedRef.current.clear();
+    publishedRef.current.clear();
     try {
-      setPages(await parseHtmlFiles(files));
+      const bundle = await prepareHtmlMigration(files);
+      setPages(bundle.pages);
+      setAssets(bundle.assets);
+      setIgnoredFiles(bundle.ignoredFiles);
     } catch (nextError) {
       setPages([]);
+      setAssets([]);
+      setIgnoredFiles([]);
       setError(errorMessage(nextError));
     } finally {
       setParsing(false);
     }
   };
 
-  const warningCount = pages.reduce((total, page) => total + page.warnings.length, 0);
+  const warningCount =
+    pages.reduce((total, page) => total + page.warnings.length, 0) + ignoredFiles.length;
+  const imageCount = assets.filter((asset) =>
+    asset.references.some((reference) => reference.kind === "image"),
+  ).length;
+  const attachmentCount = assets.length - imageCount;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !commit.isPending && onOpenChange(next)}>
       <DialogContent className="max-h-[90vh] sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>HTML-Seiten importieren</DialogTitle>
+          <DialogTitle>HTML-Wiki migrieren</DialogTitle>
           <DialogDescription>
-            Migriere exportierte Seiten aus Drupal oder anderen Wikis. Du prüfst alles, bevor Seiten
-            angelegt werden.
+            Importiere Seiten, Bilder und verlinkte Dateien aus Drupal oder anderen Wikis. Vor dem
+            Schreiben erhältst du eine vollständige Vorschau.
           </DialogDescription>
         </DialogHeader>
 
@@ -96,15 +245,18 @@ export function HtmlImportDialog({
           aria-label="Import-Fortschritt"
         >
           <span className={pages.length ? "text-primary" : "font-medium text-foreground"}>
-            1 · Dateien
+            1 · Export
           </span>
-          <Progress value={commit.isSuccess ? 100 : pages.length ? 55 : 10} className="h-1.5" />
+          <Progress
+            value={commit.isPending ? progress : commit.isSuccess ? 100 : pages.length ? 50 : 5}
+            className="h-1.5"
+          />
           <span
             className={
               commit.isSuccess ? "text-primary" : pages.length ? "font-medium text-foreground" : ""
             }
           >
-            {commit.isSuccess ? "3 · Fertig" : "2 · Prüfen"}
+            {commit.isSuccess ? "3 · Fertig" : commit.isPending ? "3 · Übertragen" : "2 · Prüfen"}
           </span>
         </div>
 
@@ -114,9 +266,7 @@ export function HtmlImportDialog({
             <div>
               <h3 className="font-semibold">Migration abgeschlossen</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                {commit.data.imported.length}{" "}
-                {commit.data.imported.length === 1 ? "Seite wurde" : "Seiten wurden"} sicher
-                importiert.
+                {commit.data.imported.length} Seiten und {assets.length} Assets wurden importiert.
               </p>
             </div>
             <Button onClick={() => onComplete?.(commit.data.imported[0]!.id)}>
@@ -146,9 +296,10 @@ export function HtmlImportDialog({
               <span className="mb-4 flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Upload className="size-6" />
               </span>
-              <p className="font-medium">HTML-Dateien hier ablegen</p>
+              <p className="font-medium">Kompletten Export hier ablegen</p>
               <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                Einzelne oder mehrere .html/.htm-Dateien, maximal 100 Dateien und 2 MB pro Datei.
+                Wähle HTML-Seiten zusammen mit ihren Bildern und Downloads. Mit „Ordner wählen“
+                bleiben relative Drupal-Pfade erhalten.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
                 <Button
@@ -170,7 +321,7 @@ export function HtmlImportDialog({
                     directoryRef.current?.click();
                   }}
                 >
-                  <FolderUp className="size-4" /> Ordner wählen
+                  <FolderUp className="size-4" /> Export-Ordner wählen
                 </Button>
               </div>
             </div>
@@ -178,35 +329,54 @@ export function HtmlImportDialog({
               ref={inputRef}
               className="hidden"
               type="file"
-              accept=".html,.htm,text/html"
               multiple
-              onChange={(event) => void selectFiles([...(event.target.files ?? [])])}
+              onChange={(event) => {
+                const files = [...(event.target.files ?? [])];
+                event.currentTarget.value = "";
+                void selectFiles(files);
+              }}
             />
             <input
               ref={directoryRef}
               className="hidden"
               type="file"
-              accept=".html,.htm,text/html"
               multiple
               {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
-              onChange={(event) => void selectFiles([...(event.target.files ?? [])])}
+              onChange={(event) => {
+                const files = [...(event.target.files ?? [])];
+                event.currentTarget.value = "";
+                void selectFiles(files);
+              }}
             />
             {parsing ? (
               <p className="text-center text-sm text-muted-foreground">
-                Dateien werden analysiert …
+                Seiten und Assets werden analysiert …
               </p>
             ) : null}
           </div>
         ) : (
           <div className="min-h-0 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium">{pages.length} Seiten bereit</p>
-                <p className="text-xs text-muted-foreground">
-                  Titel und erkannte Hinweise kannst du vor dem Import prüfen.
-                </p>
+                <p className="text-sm font-medium">Migration bereit zur Prüfung</p>
+                <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <FileCode2 className="size-3.5" /> {pages.length} Seiten
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <ImageIcon className="size-3.5" /> {imageCount} Bilder
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Paperclip className="size-3.5" /> {attachmentCount} Anhänge
+                  </span>
+                </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={createdRef.current !== null}
+                onClick={() => inputRef.current?.click()}
+              >
                 Auswahl ändern
               </Button>
             </div>
@@ -216,7 +386,8 @@ export function HtmlImportDialog({
                 <AlertCircle />
                 <AlertTitle>{warningCount} Hinweise</AlertTitle>
                 <AlertDescription>
-                  Bilder, eingebettete Inhalte und unsichere Links werden bewusst nicht übernommen.
+                  Fehlende Assets werden gekennzeichnet; technische Export-Dateien wie CSS,
+                  JavaScript oder Fonts werden nicht als Wiki-Anhänge übernommen.
                 </AlertDescription>
               </Alert>
             ) : null}
@@ -230,6 +401,7 @@ export function HtmlImportDialog({
                       <Input
                         value={page.title}
                         maxLength={300}
+                        disabled={createdRef.current !== null}
                         aria-label={`Titel für ${page.sourcePath}`}
                         onChange={(event) => {
                           const title = event.target.value;
@@ -252,9 +424,14 @@ export function HtmlImportDialog({
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`${page.title} entfernen`}
+                      disabled={createdRef.current !== null}
                       onClick={() => {
                         setPages((current) =>
-                          current.filter((_, itemIndex) => itemIndex !== index),
+                          current
+                            .filter((_, itemIndex) => itemIndex !== index)
+                            .map((item) =>
+                              item.parentKey === page.key ? { ...item, parentKey: null } : item,
+                            ),
                         );
                         setConfirmed(false);
                       }}
@@ -275,6 +452,7 @@ export function HtmlImportDialog({
                   id="import-status"
                   className="w-full"
                   value={status}
+                  disabled={createdRef.current !== null}
                   onChange={(event) => {
                     setStatus(event.target.value as "draft" | "published");
                     setConfirmed(false);
@@ -285,10 +463,10 @@ export function HtmlImportDialog({
                 </NativeSelect>
               </div>
               <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">Sicherer Import</span>
+                <span className="font-medium text-foreground">Vollständige Übernahme</span>
                 <br />
-                Scripts, Styles und aktive Inhalte werden entfernt. Originaldateien bleiben
-                unverändert.
+                Lokale und eingebettete Bilder werden als geschützte Attachments gespeichert.
+                Externe Bilder bleiben aus Sicherheitsgründen verlinkt oder werden markiert.
               </div>
             </div>
 
@@ -300,19 +478,29 @@ export function HtmlImportDialog({
                 onChange={(event) => setConfirmed(event.target.checked)}
               />
               <span>
-                Ich habe die Vorschau geprüft und möchte {pages.length}{" "}
-                {pages.length === 1 ? "Seite" : "Seiten"}{" "}
-                {status === "draft" ? "als Entwürfe" : "veröffentlicht"} anlegen.
+                Ich habe Seiten, Assets und Hinweise geprüft und möchte die Migration starten.
               </span>
             </label>
           </div>
         )}
 
+        {commit.isPending ? (
+          <p className="text-center text-sm text-muted-foreground" aria-live="polite">
+            {progress < 20
+              ? "Seiten werden angelegt …"
+              : progress < 90
+                ? `Assets werden übertragen … ${progress}%`
+                : "Verknüpfungen werden finalisiert …"}
+          </p>
+        ) : null}
         {error ? (
           <Alert variant="destructive">
             <AlertCircle />
-            <AlertTitle>Import nicht möglich</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertTitle>Migration unterbrochen</AlertTitle>
+            <AlertDescription>
+              {error} Bereits übertragene Daten bleiben für einen sicheren erneuten Versuch
+              erhalten.
+            </AlertDescription>
           </Alert>
         ) : null}
 
@@ -332,16 +520,12 @@ export function HtmlImportDialog({
                 }
                 onClick={() => {
                   setError(null);
-                  commit.mutate({
-                    spaceId,
-                    status,
-                    pages: pages.map(({ warnings: _warnings, ...page }) => page),
-                  });
+                  commit.mutate();
                 }}
               >
                 {commit.isPending
-                  ? "Seiten werden importiert …"
-                  : `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"} importieren`}
+                  ? "Migration läuft …"
+                  : `${pages.length} Seiten + ${assets.length} Assets migrieren`}
               </Button>
             ) : null}
           </DialogFooter>

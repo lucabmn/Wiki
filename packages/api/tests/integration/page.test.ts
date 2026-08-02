@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const { hasPermission } = vi.hoisted(() => ({ hasPermission: vi.fn() }));
 vi.mock("@nilovon-wiki/auth", () => ({ auth: { api: { hasPermission } } }));
 
-import { organization, user, member, page, space } from "@nilovon-wiki/db/schema/index";
+import { attachment, organization, user, member, page, space } from "@nilovon-wiki/db/schema/index";
 
 import { pageRouter } from "../../src/routers/page";
 import { linkRouter } from "../../src/routers/link";
@@ -92,6 +92,88 @@ describe("page.import", () => {
     expect(parent?.status).toBe("draft");
     expect(parent?.yjsState).toBeNull();
     expect(child?.parentId).toBe(parent?.id);
+  });
+
+  it("finalizes uploaded image and attachment placeholders", async () => {
+    const imagePlaceholder = "migration-asset:local%3Aimages%2Fdiagram.png";
+    const linkPlaceholder = "migration-asset:local%3Afiles%2Fguide.pdf";
+    const result = await call(
+      pageRouter.import,
+      {
+        spaceId: "sp",
+        pages: [
+          {
+            key: "assets.html",
+            title: "Imported Assets",
+            sourcePath: "assets.html",
+            content: {
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    { type: "image", attrs: { src: imagePlaceholder, alt: "Diagram" } },
+                    {
+                      type: "text",
+                      text: "Guide",
+                      marks: [{ type: "link", attrs: { href: linkPlaceholder } }],
+                    },
+                  ],
+                },
+              ],
+            },
+            textContent: "Guide",
+          },
+        ],
+      },
+      { context: ctx() },
+    );
+    const pageId = result.imported[0]!.id;
+    await db.insert(attachment).values([
+      {
+        id: "asset-image",
+        spaceId: "sp",
+        pageId,
+        fileName: "diagram.png",
+        mimeType: "image/png",
+        size: 12,
+        storageKey: "test/image",
+        uploadedBy: "u1",
+      },
+      {
+        id: "asset-pdf",
+        spaceId: "sp",
+        pageId,
+        fileName: "guide.pdf",
+        mimeType: "application/pdf",
+        size: 12,
+        storageKey: "test/pdf",
+        uploadedBy: "u1",
+      },
+    ]);
+
+    await call(
+      pageRouter.finalizeImportAssets,
+      {
+        pages: [
+          {
+            id: pageId,
+            assets: [
+              { placeholder: imagePlaceholder, attachmentId: "asset-image" },
+              { placeholder: linkPlaceholder, attachmentId: "asset-pdf" },
+            ],
+          },
+        ],
+      },
+      { context: ctx() },
+    );
+    const imported = await db.query.page.findFirst({
+      where: (row, { eq }) => eq(row.id, pageId),
+    });
+    const json = JSON.stringify(imported?.content);
+    expect(json).toContain("/attachments/asset-image/inline");
+    expect(json).toContain("/attachments/asset-pdf/download");
+    expect(json).not.toContain("migration-asset:");
   });
 
   it("publishes with an initial revision", async () => {

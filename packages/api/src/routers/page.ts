@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@nilovon-wiki/db";
-import { page, pageRevision } from "@nilovon-wiki/db/schema/index";
+import { attachment, page, pageRevision } from "@nilovon-wiki/db/schema/index";
 import { env } from "@nilovon-wiki/env/server";
 
 import { isOrgManager, protectedProcedure } from "../index";
@@ -19,6 +19,8 @@ import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
 import {
   CreatePageInputSchema,
+  FinalizeImportAssetsInputSchema,
+  FinalizeImportAssetsResultSchema,
   ImportPagesInputSchema,
   ImportPagesResultSchema,
   ListPagesInputSchema,
@@ -146,6 +148,7 @@ const IMPORT_NODE_TYPES = new Set([
   "codeBlock",
   "hardBreak",
   "horizontalRule",
+  "image",
   "table",
   "tableRow",
   "tableHeader",
@@ -177,9 +180,16 @@ function assertSafeImportDocument(value: unknown): void {
     if (node.type === "text" && typeof node.text !== "string") {
       throw new ORPCError("BAD_REQUEST", { message: "Imported text node is invalid" });
     }
+    if (node.type === "image") {
+      const src = (node.attrs as Record<string, unknown> | undefined)?.src;
+      if (typeof src !== "string" || !src.startsWith("migration-asset:")) {
+        throw new ORPCError("BAD_REQUEST", { message: "Imported image source is invalid" });
+      }
+    }
     if (node.marks !== undefined) {
-      if (!Array.isArray(node.marks))
+      if (!Array.isArray(node.marks)) {
         throw new ORPCError("BAD_REQUEST", { message: "Invalid marks" });
+      }
       for (const candidateMark of node.marks) {
         if (!candidateMark || typeof candidateMark !== "object") {
           throw new ORPCError("BAD_REQUEST", { message: "Invalid mark" });
@@ -190,7 +200,7 @@ function assertSafeImportDocument(value: unknown): void {
         }
         if (mark.type === "link") {
           const href = (mark.attrs as Record<string, unknown> | undefined)?.href;
-          if (typeof href !== "string" || !/^(https?:|mailto:|\/|#)/i.test(href)) {
+          if (typeof href !== "string" || !/^(https?:|mailto:|\/|#|migration-asset:)/i.test(href)) {
             throw new ORPCError("BAD_REQUEST", { message: "Imported link has an unsafe URL" });
           }
         }
@@ -204,6 +214,36 @@ function assertSafeImportDocument(value: unknown): void {
     }
   };
   visit(value, 0);
+}
+
+function replaceImportAssetUrls(
+  value: unknown,
+  replacements: ReadonlyMap<string, string>,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => replaceImportAssetUrls(item, replacements));
+  }
+  if (!value || typeof value !== "object") return value;
+
+  const object = value as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...object };
+  if (object.attrs && typeof object.attrs === "object" && !Array.isArray(object.attrs)) {
+    const attrs = { ...(object.attrs as Record<string, unknown>) };
+    if (typeof attrs.src === "string" && replacements.has(attrs.src)) {
+      attrs.src = replacements.get(attrs.src)!;
+    }
+    if (typeof attrs.href === "string" && replacements.has(attrs.href)) {
+      attrs.href = replacements.get(attrs.href)!;
+    }
+    next.attrs = attrs;
+  }
+  if (Array.isArray(object.content)) {
+    next.content = object.content.map((item) => replaceImportAssetUrls(item, replacements));
+  }
+  if (Array.isArray(object.marks)) {
+    next.marks = object.marks.map((item) => replaceImportAssetUrls(item, replacements));
+  }
+  return next;
 }
 
 export const pageRouter = {
@@ -269,6 +309,14 @@ export const pageRouter = {
       }
       for (const item of input.pages) {
         assertSafeImportDocument(item.content);
+        if (
+          input.status === "published" &&
+          JSON.stringify(item.content).includes("migration-asset:")
+        ) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Pages with migration assets must be finalized before publishing",
+          });
+        }
         if (item.parentKey && !byKey.has(item.parentKey)) {
           throw new ORPCError("BAD_REQUEST", {
             message: `Missing imported parent for ${item.title}`,
@@ -386,6 +434,87 @@ export const pageRouter = {
           }),
         "A page with one of the imported slugs already exists",
       );
+    }),
+
+  finalizeImportAssets: protectedProcedure
+    .route({
+      method: "POST",
+      path: "/pages/import/assets",
+      tags: TAGS,
+      summary: "Replace migration asset placeholders with uploaded attachments",
+    })
+    .input(FinalizeImportAssetsInputSchema)
+    .output(FinalizeImportAssetsResultSchema)
+    .handler(async ({ input, context }) => {
+      const prepared: Array<{
+        row: Awaited<ReturnType<typeof loadPage>>;
+        organizationId: string;
+        replacements: Map<string, string>;
+      }> = [];
+      const baseUrl = env.BETTER_AUTH_URL.replace(/\/$/, "");
+
+      for (const item of input.pages) {
+        const row = await loadPage(context.db, item.id);
+        const { organizationId } = await requirePageCapability(
+          context.db,
+          context,
+          context.headers,
+          row,
+          "write",
+        );
+        if (row.yjsState) {
+          throw new ORPCError("CONFLICT", {
+            message:
+              "This imported page was already opened for editing; assets can no longer be finalized safely.",
+          });
+        }
+        const replacements = new Map<string, string>();
+        for (const asset of item.assets) {
+          if (!asset.placeholder.startsWith("migration-asset:")) {
+            throw new ORPCError("BAD_REQUEST", { message: "Invalid migration asset placeholder" });
+          }
+          const stored = await context.db.query.attachment.findFirst({
+            where: eq(attachment.id, asset.attachmentId),
+            columns: { id: true, pageId: true, mimeType: true },
+          });
+          if (!stored || stored.pageId !== row.id) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "Imported attachment does not belong to the target page",
+            });
+          }
+          const endpoint = /^(image\/(png|jpeg|gif|webp|avif|bmp))$/i.test(stored.mimeType)
+            ? "inline"
+            : "download";
+          replacements.set(asset.placeholder, `${baseUrl}/attachments/${stored.id}/${endpoint}`);
+        }
+        prepared.push({ row, organizationId, replacements });
+      }
+
+      await context.db.transaction(async (tx) => {
+        for (const item of prepared) {
+          const content = replaceImportAssetUrls(item.row.content, item.replacements);
+          const updated = await tx
+            .update(page)
+            .set({ content, lastEditedBy: context.session.user.id })
+            .where(and(eq(page.id, item.row.id), isNull(page.yjsState), eq(page.status, "draft")))
+            .returning({ id: page.id });
+          if (!updated.length) {
+            throw new ORPCError("CONFLICT", {
+              message: "The imported page changed while its assets were being finalized.",
+            });
+          }
+          await recordActivity(tx, {
+            organizationId: item.organizationId,
+            action: "page.updated",
+            actorId: context.session.user.id,
+            spaceId: item.row.spaceId,
+            pageId: item.row.id,
+            metadata: { title: item.row.title, source: "html-import-assets" },
+          });
+        }
+      });
+
+      return { finalizedPageIds: prepared.map((item) => item.row.id) };
     }),
 
   create: protectedProcedure

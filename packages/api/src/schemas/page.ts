@@ -87,6 +87,29 @@ export const ImportPagesResultSchema = z.object({
   ),
 });
 
+export const FinalizeImportAssetsInputSchema = z.object({
+  pages: z
+    .array(
+      z.object({
+        id: IdSchema,
+        assets: z
+          .array(
+            z.object({
+              placeholder: z.string().min(1).max(1200),
+              attachmentId: IdSchema,
+            }),
+          )
+          .max(250),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+
+export const FinalizeImportAssetsResultSchema = z.object({
+  finalizedPageIds: z.array(IdSchema),
+});
+
 // Note: no `content`/`textContent` here. The page body is a collaborative
 // working copy (see `apps/collab`) whose published projection advances ONLY via
 // `pages.publish`. Letting a plain PATCH write `content` would leak an

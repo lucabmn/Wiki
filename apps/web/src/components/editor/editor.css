@@ -124,6 +124,21 @@
   line-height: 0;
 }
 
+.tiptap img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1em auto;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--muted);
+}
+
+.tiptap img[data-unavailable="true"] {
+  min-height: 5rem;
+  padding: 1rem;
+}
+
 /* Tables */
 .tiptap .tableWrapper {
   overflow-x: auto;

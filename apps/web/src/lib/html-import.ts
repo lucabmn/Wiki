@@ -16,6 +16,31 @@ export type HtmlImportPreview = {
   warnings: string[];
 };
 
+export type HtmlMigrationAsset = {
+  key: string;
+  placeholder: string;
+  sourcePath: string;
+  fileName: string;
+  mimeType: string;
+  file?: File;
+  references: Array<{ pageKey: string; kind: "image" | "attachment" }>;
+};
+
+export type HtmlMigrationBundle = {
+  pages: HtmlImportPreview[];
+  assets: HtmlMigrationAsset[];
+  ignoredFiles: string[];
+};
+
+type AssetCandidate = Omit<HtmlMigrationAsset, "references">;
+type ParseContext = {
+  registerAsset?: (
+    candidate: AssetCandidate,
+    reference: { pageKey: string; kind: "image" | "attachment" },
+  ) => string;
+  dataAssetIndex: number;
+};
+
 const BLOCK_TAGS = new Set([
   "P",
   "DIV",
@@ -41,6 +66,15 @@ const BLOCK_TAGS = new Set([
   "TD",
   "HR",
 ]);
+const REMOVED_TAGS = ["script", "style", "noscript", "iframe", "object", "embed", "form", "nav"];
+const INLINE_IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/bmp",
+]);
 
 function safeHref(raw: string): string | null {
   const href = raw.trim();
@@ -56,9 +90,112 @@ function textNode(text: string, marks: Array<{ type: string; attrs?: Record<stri
   return text ? [{ type: "text", text, ...(marks.length ? { marks } : {}) }] : [];
 }
 
+function normalizedPath(value: string): string | null {
+  try {
+    const decoded = decodeURIComponent(value.split(/[?#]/)[0] ?? "");
+    const parts: string[] = [];
+    for (const part of decoded.replace(/\\/g, "/").split("/")) {
+      if (!part || part === ".") continue;
+      if (part === "..") {
+        if (!parts.length) return null;
+        parts.pop();
+      } else {
+        parts.push(part);
+      }
+    }
+    return parts.join("/");
+  } catch {
+    return null;
+  }
+}
+
+function resolveLocalPath(sourcePath: string, reference: string): string | null {
+  if (reference.startsWith("/")) return normalizedPath(reference);
+  const directory = sourcePath.includes("/")
+    ? sourcePath.slice(0, sourcePath.lastIndexOf("/") + 1)
+    : "";
+  return normalizedPath(`${directory}${reference}`);
+}
+
+function extensionMimeType(path: string): string {
+  const extension = path.split(".").pop()?.toLowerCase();
+  return (
+    {
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      avif: "image/avif",
+      bmp: "image/bmp",
+      svg: "image/svg+xml",
+      pdf: "application/pdf",
+    }[extension ?? ""] ?? "application/octet-stream"
+  );
+}
+
+function dataUrlFile(dataUrl: string, fileName: string): File | null {
+  const match = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(dataUrl);
+  if (!match) return null;
+  try {
+    const type = match[1] || "application/octet-stream";
+    const raw = match[2] ? atob(match[3] ?? "") : decodeURIComponent(match[3] ?? "");
+    const bytes = Uint8Array.from(raw, (character) => character.charCodeAt(0));
+    return new File([bytes], fileName, { type });
+  } catch {
+    return null;
+  }
+}
+
+function assetCandidate(
+  raw: string,
+  sourcePath: string,
+  kind: "image" | "attachment",
+  context: ParseContext,
+): AssetCandidate | null {
+  const reference = raw.trim();
+  if (!reference || reference.startsWith("#")) return null;
+
+  if (reference.startsWith("data:")) {
+    if (kind !== "image") return null;
+    const mimeType = /^data:([^;,]+)/.exec(reference)?.[1] ?? "application/octet-stream";
+    const extension = mimeType.split("/")[1]?.replace("jpeg", "jpg") || "bin";
+    const fileName = `eingebettetes-bild-${++context.dataAssetIndex}.${extension}`;
+    const file = dataUrlFile(reference, fileName);
+    if (!file) return null;
+    const key = `data:${sourcePath}:${context.dataAssetIndex}`;
+    return {
+      key,
+      placeholder: `migration-asset:${encodeURIComponent(key)}`,
+      sourcePath: key,
+      fileName,
+      mimeType,
+      file,
+    };
+  }
+
+  const externalReference = reference.startsWith("//") ? `https:${reference}` : reference;
+  // Fetching arbitrary remote assets from the server creates an SSRF surface
+  // (DNS can change between validation and connection). v1 imports only files
+  // supplied by the operator; ordinary external links remain links.
+  if (/^https?:\/\//i.test(externalReference)) return null;
+
+  const path = resolveLocalPath(sourcePath, reference);
+  if (!path || (/\.html?$/i.test(path) && kind === "attachment")) return null;
+  return {
+    key: `local:${path.toLowerCase()}`,
+    placeholder: `migration-asset:${encodeURIComponent(`local:${path.toLowerCase()}`)}`,
+    sourcePath: path,
+    fileName: path.split("/").pop() || "asset",
+    mimeType: extensionMimeType(path),
+  };
+}
+
 function inlineChildren(
   element: Element,
+  sourcePath: string,
   warnings: string[],
+  context: ParseContext,
   marks: Array<{ type: string; attrs?: Record<string, unknown> }> = [],
 ): ImportedDocumentNode[] {
   const result: ImportedDocumentNode[] = [];
@@ -76,8 +213,35 @@ function inlineChildren(
     }
     if (tag === "IMG") {
       const alt = compactText(el.getAttribute("alt") ?? "");
-      if (alt) result.push(...textNode(`[Bild: ${alt}]`, marks));
-      warnings.push("Bilder werden nicht übernommen. Bitte füge sie später als Anhang hinzu.");
+      const candidate = assetCandidate(el.getAttribute("src") ?? "", sourcePath, "image", context);
+      const inline = candidate ? INLINE_IMAGE_TYPES.has(candidate.mimeType.toLowerCase()) : false;
+      const placeholder = candidate
+        ? context.registerAsset?.(candidate, {
+            pageKey: sourcePath,
+            kind: inline ? "image" : "attachment",
+          })
+        : null;
+      if (placeholder && inline) {
+        result.push({
+          type: "image",
+          attrs: {
+            src: placeholder,
+            alt: alt || candidate?.fileName || "Importiertes Bild",
+            title: compactText(el.getAttribute("title") ?? "") || null,
+          },
+        });
+      } else if (placeholder) {
+        result.push(
+          ...textNode(alt ? `[Bilddatei: ${alt}]` : `[Bilddatei: ${candidate?.fileName}]`, [
+            ...marks,
+            { type: "link", attrs: { href: placeholder } },
+          ]),
+        );
+        warnings.push("Ein nicht inline-fähiges Bild wurde als Anhang übernommen.");
+      } else {
+        result.push(...textNode(alt ? `[Bild: ${alt}]` : "[Bild nicht verfügbar]", marks));
+        warnings.push("Ein Bild ohne gültige Quelle konnte nicht übernommen werden.");
+      }
       continue;
     }
     const nextMarks = [...marks];
@@ -88,35 +252,51 @@ function inlineChildren(
     if (tag === "SUB") nextMarks.push({ type: "subscript" });
     if (tag === "SUP") nextMarks.push({ type: "superscript" });
     if (tag === "A") {
-      const href = safeHref(el.getAttribute("href") ?? "");
+      const rawHref = el.getAttribute("href") ?? "";
+      const candidate = assetCandidate(rawHref, sourcePath, "attachment", context);
+      const placeholder = candidate
+        ? context.registerAsset?.(candidate, { pageKey: sourcePath, kind: "attachment" })
+        : null;
+      const href = placeholder || safeHref(rawHref);
       if (href) nextMarks.push({ type: "link", attrs: { href } });
-      else if (el.hasAttribute("href"))
-        warnings.push("Ein Link mit unsicherer oder lokaler URL wurde entfernt.");
+      else if (rawHref)
+        warnings.push("Ein lokaler oder unsicherer Link konnte nicht aufgelöst werden.");
     }
     if (BLOCK_TAGS.has(tag)) {
       result.push(...textNode(compactText(el.textContent ?? ""), nextMarks));
     } else {
-      result.push(...inlineChildren(el, warnings, nextMarks));
+      result.push(...inlineChildren(el, sourcePath, warnings, context, nextMarks));
     }
   }
   return result;
 }
 
-function blocks(element: Element, warnings: string[]): ImportedDocumentNode[] {
+function blocks(
+  element: Element,
+  sourcePath: string,
+  warnings: string[],
+  context: ParseContext,
+): ImportedDocumentNode[] {
   const result: ImportedDocumentNode[] = [];
   for (const child of element.children) {
     const tag = child.tagName;
     if (/^H[1-6]$/.test(tag)) {
-      const level = Math.min(Number(tag.slice(1)), 3);
-      result.push({ type: "heading", attrs: { level }, content: inlineChildren(child, warnings) });
+      result.push({
+        type: "heading",
+        attrs: { level: Math.min(Number(tag.slice(1)), 3) },
+        content: inlineChildren(child, sourcePath, warnings, context),
+      });
     } else if (tag === "P") {
-      result.push({ type: "paragraph", content: inlineChildren(child, warnings) });
+      result.push({
+        type: "paragraph",
+        content: inlineChildren(child, sourcePath, warnings, context),
+      });
     } else if (tag === "UL" || tag === "OL") {
       const items = [...child.children]
         .filter((item) => item.tagName === "LI")
         .map((item) => {
-          const nested = blocks(item, warnings);
-          const direct = inlineChildren(item, warnings);
+          const nested = blocks(item, sourcePath, warnings, context);
+          const direct = inlineChildren(item, sourcePath, warnings, context);
           return {
             type: "listItem",
             content: [
@@ -133,12 +313,17 @@ function blocks(element: Element, warnings: string[]): ImportedDocumentNode[] {
         content: items,
       });
     } else if (tag === "BLOCKQUOTE") {
-      const content = blocks(child, warnings);
+      const content = blocks(child, sourcePath, warnings, context);
       result.push({
         type: "blockquote",
         content: content.length
           ? content
-          : [{ type: "paragraph", content: inlineChildren(child, warnings) }],
+          : [
+              {
+                type: "paragraph",
+                content: inlineChildren(child, sourcePath, warnings, context),
+              },
+            ],
       });
     } else if (tag === "PRE") {
       result.push({
@@ -158,17 +343,22 @@ function blocks(element: Element, warnings: string[]): ImportedDocumentNode[] {
           .map((cell) => ({
             type: cell.tagName === "TH" ? "tableHeader" : "tableCell",
             attrs: { colspan: 1, rowspan: 1, colwidth: null },
-            content: [{ type: "paragraph", content: inlineChildren(cell, warnings) }],
+            content: [
+              {
+                type: "paragraph",
+                content: inlineChildren(cell, sourcePath, warnings, context),
+              },
+            ],
           })),
       }));
       if (rows.length) result.push({ type: "table", content: rows });
-    } else if (["SCRIPT", "STYLE", "NOSCRIPT", "IFRAME", "OBJECT", "FORM", "NAV"].includes(tag)) {
+    } else if (REMOVED_TAGS.map((value) => value.toUpperCase()).includes(tag)) {
       warnings.push(`Nicht unterstützter Inhalt <${tag.toLowerCase()}> wurde entfernt.`);
     } else {
-      const nested = blocks(child, warnings);
+      const nested = blocks(child, sourcePath, warnings, context);
       if (nested.length) result.push(...nested);
       else {
-        const inline = inlineChildren(child, warnings);
+        const inline = inlineChildren(child, sourcePath, warnings, context);
         if (inline.length) result.push({ type: "paragraph", content: inline });
       }
     }
@@ -189,17 +379,27 @@ function parentPath(path: string) {
   return parts.length > 1 ? parts.slice(0, -1).join("/") : null;
 }
 
-export function parseHtmlSource(sourcePath: string, html: string): HtmlImportPreview {
+export function parseHtmlSource(
+  sourcePath: string,
+  html: string,
+  parseContext: Partial<ParseContext> = {},
+): HtmlImportPreview {
   const document = new DOMParser().parseFromString(html, "text/html");
   const warnings: string[] = [];
-  const root =
+  const sourceRoot =
     document.querySelector(
       ".field--name-body, .node__content, main, article, [role='main'], #content",
     ) ?? document.body;
+  const root = sourceRoot.cloneNode(true) as Element;
+  for (const tag of REMOVED_TAGS) {
+    const removed = root.querySelectorAll(tag);
+    if (removed.length) warnings.push(`${removed.length}× <${tag}> wurde entfernt.`);
+    removed.forEach((element) => element.remove());
+  }
   const heading = compactText(root.querySelector("h1")?.textContent ?? "");
-  const documentTitle = compactText(document.title);
-  const title = (heading || documentTitle || filenameTitle(sourcePath)).slice(0, 300);
-  const content = blocks(root, warnings);
+  const title = (heading || compactText(document.title) || filenameTitle(sourcePath)).slice(0, 300);
+  const context: ParseContext = { dataAssetIndex: 0, ...parseContext };
+  const content = blocks(root, sourcePath, warnings, context);
   if (
     content[0]?.type === "heading" &&
     compactText(root.querySelector("h1")?.textContent ?? "") === title
@@ -207,47 +407,160 @@ export function parseHtmlSource(sourcePath: string, html: string): HtmlImportPre
     content.shift();
   }
   if (!content.length) content.push({ type: "paragraph" });
-  const textContent = compactText(root.textContent ?? "");
   return {
     key: sourcePath,
     parentKey: null,
     sourcePath,
     title,
     content: { type: "doc", content },
-    textContent,
+    textContent: compactText(root.textContent ?? ""),
     warnings: [...new Set(warnings)],
   };
 }
 
-export async function parseHtmlFiles(files: File[]): Promise<HtmlImportPreview[]> {
-  if (!files.length) return [];
-  if (files.length > 100) throw new Error("Bitte wähle höchstens 100 HTML-Dateien aus.");
-  const seen = new Set<string>();
-  const parsed = await Promise.all(
-    files.map(async (file) => {
-      const path = (file.webkitRelativePath || file.name).replace(/^\/+/, "");
-      if (!/\.html?$/i.test(path)) throw new Error(`„${file.name}“ ist keine HTML-Datei.`);
-      if (file.size > 2_000_000) throw new Error(`„${file.name}“ ist größer als 2 MB.`);
-      const normalized = path.toLowerCase();
-      if (seen.has(normalized)) throw new Error(`„${path}“ wurde doppelt ausgewählt.`);
-      seen.add(normalized);
-      return parseHtmlSource(path, await file.text());
-    }),
-  );
-  const byPath = new Map(parsed.map((item) => [item.sourcePath.toLowerCase(), item.key]));
-  for (const item of parsed) {
-    const directory = parentPath(item.sourcePath);
-    if (!directory) continue;
-    const candidates = [
-      `${directory}/index.html`,
-      `${directory}/index.htm`,
-      `${directory}.html`,
-      `${directory}.htm`,
-    ];
-    item.parentKey =
-      candidates
-        .map((candidate) => byPath.get(candidate.toLowerCase()))
-        .find((key) => key && key !== item.key) ?? null;
+export async function prepareHtmlMigration(files: File[]): Promise<HtmlMigrationBundle> {
+  if (!files.length) return { pages: [], assets: [], ignoredFiles: [] };
+  const htmlFiles = files.filter((file) => /\.html?$/i.test(file.name));
+  if (!htmlFiles.length) throw new Error("Wähle mindestens eine HTML-Datei aus.");
+  if (htmlFiles.length > 100) throw new Error("Bitte wähle höchstens 100 HTML-Dateien aus.");
+
+  const filesByPath = new Map<string, { path: string; file: File }>();
+  const ignoredFiles: string[] = [];
+  for (const file of files) {
+    const path = normalizedPath(file.webkitRelativePath || file.name);
+    if (!path) throw new Error(`„${file.name}“ hat einen ungültigen Pfad.`);
+    const key = path.toLowerCase();
+    if (filesByPath.has(key)) throw new Error(`„${path}“ wurde doppelt ausgewählt.`);
+    filesByPath.set(key, { path, file });
   }
-  return parsed;
+
+  const assets = new Map<string, HtmlMigrationAsset>();
+  const registerAsset = (
+    candidate: AssetCandidate,
+    reference: { pageKey: string; kind: "image" | "attachment" },
+  ) => {
+    let resolved = candidate;
+    if (candidate.key.startsWith("local:")) {
+      const selected = filesByPath.get(candidate.sourcePath.toLowerCase());
+      if (selected) {
+        resolved = {
+          ...candidate,
+          sourcePath: selected.path,
+          fileName: selected.file.name,
+          mimeType: selected.file.type || extensionMimeType(selected.path),
+          file: selected.file,
+        };
+      }
+    }
+    const existing = assets.get(candidate.key);
+    if (existing) {
+      if (
+        !existing.references.some(
+          (item) => item.pageKey === reference.pageKey && item.kind === reference.kind,
+        )
+      ) {
+        existing.references.push(reference);
+      }
+    } else {
+      assets.set(candidate.key, { ...resolved, references: [reference] });
+    }
+    return candidate.placeholder;
+  };
+
+  const pages: HtmlImportPreview[] = [];
+  for (const file of htmlFiles) {
+    const sourcePath = normalizedPath(file.webkitRelativePath || file.name)!;
+    if (file.size > 2_000_000) throw new Error(`„${file.name}“ ist größer als 2 MB.`);
+    pages.push(parseHtmlSource(sourcePath, await file.text(), { registerAsset }));
+  }
+
+  const rootPage = pages[0]!;
+  for (const { path, file } of filesByPath.values()) {
+    if (/\.html?$/i.test(path)) continue;
+    const key = `local:${path.toLowerCase()}`;
+    if (assets.has(key)) continue;
+    const mimeType = file.type || extensionMimeType(path);
+    const migratable =
+      mimeType.startsWith("image/") ||
+      mimeType === "application/pdf" ||
+      mimeType === "text/plain" ||
+      /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf|csv|zip|7z|tar|gz)$/i.test(path);
+    if (!migratable) {
+      ignoredFiles.push(path);
+      continue;
+    }
+    const placeholder = `migration-asset:${encodeURIComponent(key)}`;
+    assets.set(key, {
+      key,
+      placeholder,
+      sourcePath: path,
+      fileName: file.name,
+      mimeType,
+      file,
+      references: [{ pageKey: rootPage.key, kind: "attachment" }],
+    });
+    rootPage.warnings.push(`Nicht verlinktes Asset wird an „${rootPage.title}“ angehängt: ${path}`);
+  }
+
+  const byPath = new Map(pages.map((item) => [item.sourcePath.toLowerCase(), item.key]));
+  for (const item of pages) {
+    const directory = parentPath(item.sourcePath);
+    if (directory) {
+      const candidates = [
+        `${directory}/index.html`,
+        `${directory}/index.htm`,
+        `${directory}.html`,
+        `${directory}.htm`,
+      ];
+      item.parentKey =
+        candidates
+          .map((candidate) => byPath.get(candidate.toLowerCase()))
+          .find((key) => key && key !== item.key) ?? null;
+    }
+  }
+
+  const missingPlaceholders = new Set<string>();
+  for (const asset of assets.values()) {
+    if (!asset.file && !asset.remoteUrl) {
+      missingPlaceholders.add(asset.placeholder);
+      for (const reference of asset.references) {
+        const page = pages.find((item) => item.key === reference.pageKey);
+        page?.warnings.push(`Asset fehlt: ${asset.sourcePath}`);
+      }
+    }
+  }
+  const removeMissing = (node: ImportedDocumentNode): ImportedDocumentNode => {
+    const src = typeof node.attrs?.src === "string" ? node.attrs.src : null;
+    if (node.type === "image" && src && missingPlaceholders.has(src)) {
+      return { type: "text", text: `[Fehlendes Bild: ${String(node.attrs?.alt || "ohne Titel")}]` };
+    }
+    return {
+      ...node,
+      ...(node.content ? { content: node.content.map(removeMissing) } : {}),
+      ...(node.marks
+        ? {
+            marks: node.marks.filter(
+              (mark) =>
+                !(
+                  mark.type === "link" &&
+                  typeof mark.attrs?.href === "string" &&
+                  missingPlaceholders.has(mark.attrs.href)
+                ),
+            ),
+          }
+        : {}),
+    };
+  };
+  for (const page of pages) page.content = removeMissing(page.content);
+
+  return {
+    pages,
+    assets: [...assets.values()].filter((asset) => asset.file || asset.remoteUrl),
+    ignoredFiles,
+  };
+}
+
+/** Compatibility helper for callers interested only in converted pages. */
+export async function parseHtmlFiles(files: File[]): Promise<HtmlImportPreview[]> {
+  return (await prepareHtmlMigration(files)).pages;
 }
