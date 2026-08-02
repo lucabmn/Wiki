@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const { hasPermission } = vi.hoisted(() => ({ hasPermission: vi.fn() }));
 vi.mock("@nilovon-wiki/auth", () => ({ auth: { api: { hasPermission } } }));
 
-import { organization, user, member, space } from "@nilovon-wiki/db/schema/index";
+import { organization, user, member, page, space } from "@nilovon-wiki/db/schema/index";
 
 import { pageRouter } from "../../src/routers/page";
 import { linkRouter } from "../../src/routers/link";
@@ -45,6 +45,123 @@ afterAll(async () => {
 beforeEach(() => {
   hasPermission.mockReset();
   hasPermission.mockResolvedValue({ success: true });
+});
+
+describe("page.import", () => {
+  const paragraph = (text: string) => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  });
+
+  it("creates a hierarchy atomically and de-duplicates slugs", async () => {
+    const result = await call(
+      pageRouter.import,
+      {
+        spaceId: "sp",
+        pages: [
+          {
+            key: "guide/index.html",
+            title: "Migration Guide",
+            sourcePath: "guide/index.html",
+            content: paragraph("Guide"),
+            textContent: "Guide",
+          },
+          {
+            key: "guide/install.html",
+            parentKey: "guide/index.html",
+            title: "Migration Guide",
+            sourcePath: "guide/install.html",
+            content: paragraph("Install"),
+            textContent: "Install",
+          },
+        ],
+      },
+      { context: ctx() },
+    );
+
+    expect(result.imported.map((item) => item.slug)).toEqual([
+      "migration-guide",
+      "migration-guide-2",
+    ]);
+    const parent = await db.query.page.findFirst({
+      where: (row, { eq }) => eq(row.id, result.imported[0]!.id),
+    });
+    const child = await db.query.page.findFirst({
+      where: (row, { eq }) => eq(row.id, result.imported[1]!.id),
+    });
+    expect(parent?.status).toBe("draft");
+    expect(parent?.yjsState).toBeNull();
+    expect(child?.parentId).toBe(parent?.id);
+  });
+
+  it("publishes with an initial revision", async () => {
+    const result = await call(
+      pageRouter.import,
+      {
+        spaceId: "sp",
+        status: "published",
+        pages: [
+          {
+            key: "published.html",
+            title: "Imported Published Page",
+            sourcePath: "published.html",
+            content: paragraph("Published body"),
+            textContent: "Published body",
+          },
+        ],
+      },
+      { context: ctx() },
+    );
+    const imported = result.imported[0]!;
+    const revisions = await call(pageRouter.listRevisions, { id: imported.id }, { context: ctx() });
+    expect(imported.status).toBe("published");
+    expect(revisions).toHaveLength(1);
+    expect(revisions[0]?.summary).toContain("published.html");
+  });
+
+  it("rejects unsafe documents without creating partial rows", async () => {
+    const before = await db.$count(page);
+    await expect(
+      call(
+        pageRouter.import,
+        {
+          spaceId: "sp",
+          pages: [
+            {
+              key: "safe.html",
+              title: "Safe before failure",
+              sourcePath: "safe.html",
+              content: paragraph("Safe"),
+              textContent: "Safe",
+            },
+            {
+              key: "unsafe.html",
+              title: "Unsafe",
+              sourcePath: "unsafe.html",
+              content: {
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [
+                      {
+                        type: "text",
+                        text: "Bad",
+                        marks: [{ type: "link", attrs: { href: "javascript:alert(1)" } }],
+                      },
+                    ],
+                  },
+                ],
+              },
+              textContent: "Bad",
+            },
+          ],
+        },
+        { context: ctx() },
+      ),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(await db.$count(page)).toBe(before);
+  });
 });
 
 describe("page.create", () => {

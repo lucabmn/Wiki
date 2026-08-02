@@ -1,4 +1,5 @@
 import { CreatePageDialog } from "@/components/create-page-dialog";
+import { HtmlImportDialog } from "@/components/html-import-dialog";
 import { SpaceSettingsSheet } from "@/components/spaces/space-settings-sheet";
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
@@ -20,7 +21,17 @@ import { Separator } from "@nilovon-wiki/ui/components/separator";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { ChevronRight, FilePlus, FileText, Folder, Plus, Search, Settings, X } from "lucide-react";
+import {
+  ChevronRight,
+  FilePlus,
+  FileText,
+  FileUp,
+  Folder,
+  Plus,
+  Search,
+  Settings,
+  X,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/_auth/spaces/$slug")({
@@ -42,6 +53,7 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
 function RouteComponent() {
   const { slug } = Route.useParams();
   const [createPageOpen, setCreatePageOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -76,6 +88,7 @@ function RouteComponent() {
     }),
   );
   const canManageSpace = myRole?.role === "admin";
+  const canWriteSpace = myRole?.role === "editor" || myRole?.role === "admin";
 
   const filtered = useMemo(() => {
     if (!pages) return [];
@@ -167,6 +180,12 @@ function RouteComponent() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {canWriteSpace ? (
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <FileUp className="size-4" />
+                HTML importieren
+              </Button>
+            ) : null}
             {canManageSpace ? (
               <Button variant="outline" onClick={() => setSettingsOpen(true)}>
                 <Settings className="size-4" />
@@ -291,6 +310,17 @@ function RouteComponent() {
       </div>
 
       <CreatePageDialog open={createPageOpen} spaceId={space.id} onOpenChange={setCreatePageOpen} />
+      {canWriteSpace ? (
+        <HtmlImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          spaceId={space.id}
+          onComplete={(pageId) => {
+            setImportOpen(false);
+            window.location.assign(`/pages/${pageId}`);
+          }}
+        />
+      ) : null}
       {canManageSpace ? (
         <SpaceSettingsSheet
           open={settingsOpen}

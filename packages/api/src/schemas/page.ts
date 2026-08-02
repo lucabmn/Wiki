@@ -58,6 +58,35 @@ export const CreatePageInputSchema = z.object({
   isTemplate: z.boolean().default(false),
 });
 
+const ImportPageSchema = z.object({
+  /** Stable only within this request; lets children refer to imported parents. */
+  key: z.string().min(1).max(240),
+  parentKey: z.string().min(1).max(240).nullish(),
+  title: z.string().trim().min(1).max(300),
+  sourcePath: z.string().max(1000),
+  content: DocumentSchema,
+  textContent: z.string().max(2_000_000),
+});
+
+export const ImportPagesInputSchema = z.object({
+  spaceId: IdSchema,
+  parentId: IdSchema.nullish(),
+  status: z.enum(["draft", "published"]).default("draft"),
+  pages: z.array(ImportPageSchema).min(1).max(100),
+});
+
+export const ImportPagesResultSchema = z.object({
+  imported: z.array(
+    z.object({
+      key: z.string(),
+      id: IdSchema,
+      title: z.string(),
+      slug: z.string(),
+      status: z.enum(["draft", "published"]),
+    }),
+  ),
+});
+
 // Note: no `content`/`textContent` here. The page body is a collaborative
 // working copy (see `apps/collab`) whose published projection advances ONLY via
 // `pages.publish`. Letting a plain PATCH write `content` would leak an

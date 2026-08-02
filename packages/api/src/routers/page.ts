@@ -19,6 +19,8 @@ import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
 import {
   CreatePageInputSchema,
+  ImportPagesInputSchema,
+  ImportPagesResultSchema,
   ListPagesInputSchema,
   MovePageInputSchema,
   PageRevisionSchema,
@@ -130,6 +132,80 @@ async function positionForMove(
   return positionAtEnd(db, spaceId, parentId, movedId);
 }
 
+const IMPORT_NODE_TYPES = new Set([
+  "doc",
+  "paragraph",
+  "text",
+  "heading",
+  "bulletList",
+  "orderedList",
+  "listItem",
+  "taskList",
+  "taskItem",
+  "blockquote",
+  "codeBlock",
+  "hardBreak",
+  "horizontalRule",
+  "table",
+  "tableRow",
+  "tableHeader",
+  "tableCell",
+]);
+const IMPORT_MARK_TYPES = new Set([
+  "bold",
+  "italic",
+  "strike",
+  "code",
+  "link",
+  "highlight",
+  "subscript",
+  "superscript",
+]);
+
+/** Imported JSON never contains raw HTML. This guard also rejects unsafe link schemes. */
+function assertSafeImportDocument(value: unknown): void {
+  const visit = (candidate: unknown, depth: number): void => {
+    if (depth > 100 || !candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      throw new ORPCError("BAD_REQUEST", { message: "Invalid imported document" });
+    }
+    const node = candidate as Record<string, unknown>;
+    if (typeof node.type !== "string" || !IMPORT_NODE_TYPES.has(node.type)) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: `Unsupported imported node: ${String(node.type)}`,
+      });
+    }
+    if (node.type === "text" && typeof node.text !== "string") {
+      throw new ORPCError("BAD_REQUEST", { message: "Imported text node is invalid" });
+    }
+    if (node.marks !== undefined) {
+      if (!Array.isArray(node.marks))
+        throw new ORPCError("BAD_REQUEST", { message: "Invalid marks" });
+      for (const candidateMark of node.marks) {
+        if (!candidateMark || typeof candidateMark !== "object") {
+          throw new ORPCError("BAD_REQUEST", { message: "Invalid mark" });
+        }
+        const mark = candidateMark as Record<string, unknown>;
+        if (typeof mark.type !== "string" || !IMPORT_MARK_TYPES.has(mark.type)) {
+          throw new ORPCError("BAD_REQUEST", { message: "Unsupported imported mark" });
+        }
+        if (mark.type === "link") {
+          const href = (mark.attrs as Record<string, unknown> | undefined)?.href;
+          if (typeof href !== "string" || !/^(https?:|mailto:|\/|#)/i.test(href)) {
+            throw new ORPCError("BAD_REQUEST", { message: "Imported link has an unsafe URL" });
+          }
+        }
+      }
+    }
+    if (node.content !== undefined) {
+      if (!Array.isArray(node.content)) {
+        throw new ORPCError("BAD_REQUEST", { message: "Invalid imported document content" });
+      }
+      for (const child of node.content) visit(child, depth + 1);
+    }
+  };
+  visit(value, 0);
+}
+
 export const pageRouter = {
   list: protectedProcedure
     .route({ method: "GET", path: "/pages", tags: TAGS, summary: "List pages in a space" })
@@ -165,6 +241,151 @@ export const pageRouter = {
       const row = await loadPage(context.db, input.id);
       await requirePageCapability(context.db, context, context.headers, row, "read");
       return row;
+    }),
+
+  import: protectedProcedure
+    .route({
+      method: "POST",
+      path: "/pages/import",
+      tags: TAGS,
+      summary: "Import a batch of HTML-converted pages",
+    })
+    .input(ImportPagesInputSchema)
+    .output(ImportPagesResultSchema)
+    .handler(async ({ input, context }) => {
+      const { organizationId } = await requireSpaceCapabilityById(
+        context.db,
+        context,
+        context.headers,
+        input.spaceId,
+        "write",
+      );
+      const rootParentId = input.parentId ?? null;
+      await assertParentInSpace(context.db, rootParentId, input.spaceId);
+
+      const byKey = new Map(input.pages.map((item) => [item.key, item]));
+      if (byKey.size !== input.pages.length) {
+        throw new ORPCError("BAD_REQUEST", { message: "Import page keys must be unique" });
+      }
+      for (const item of input.pages) {
+        assertSafeImportDocument(item.content);
+        if (item.parentKey && !byKey.has(item.parentKey)) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: `Missing imported parent for ${item.title}`,
+          });
+        }
+      }
+
+      // Topological order makes parent ids available before children and detects cycles.
+      const ordered: typeof input.pages = [];
+      const remaining = new Map(byKey);
+      while (remaining.size) {
+        const ready = [...remaining.values()].filter(
+          (item) => !item.parentKey || !remaining.has(item.parentKey),
+        );
+        if (!ready.length) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Imported page hierarchy contains a cycle",
+          });
+        }
+        for (const item of ready) {
+          ordered.push(item);
+          remaining.delete(item.key);
+        }
+      }
+
+      const userId = context.session.user.id;
+      const reservedSlugs = new Set<string>();
+      const resolvedSlugs = new Map<string, string>();
+      for (const item of ordered) {
+        const slug = await uniqueSlug(slugify(item.title), async (candidate) => {
+          if (reservedSlugs.has(candidate)) return true;
+          return !!(await context.db.query.page.findFirst({
+            where: and(eq(page.spaceId, input.spaceId), eq(page.slug, candidate)),
+            columns: { id: true },
+          }));
+        });
+        reservedSlugs.add(slug);
+        resolvedSlugs.set(item.key, slug);
+      }
+
+      const existingRootPosition = await context.db.query.page.findFirst({
+        where: siblingsOf(input.spaceId, rootParentId),
+        orderBy: [desc(page.position)],
+        columns: { position: true },
+      });
+
+      return mapUniqueViolation(
+        () =>
+          context.db.transaction(async (tx) => {
+            const ids = new Map<string, string>();
+            const lastPosition = new Map<string, string | null>([
+              [rootParentId ?? "__root__", existingRootPosition?.position ?? null],
+            ]);
+            const imported: Array<{
+              key: string;
+              id: string;
+              title: string;
+              slug: string;
+              status: "draft" | "published";
+            }> = [];
+
+            for (const item of ordered) {
+              const parentId = item.parentKey ? ids.get(item.parentKey)! : rootParentId;
+              const positionKey = parentId ?? "__root__";
+              const position = generateKeyBetween(lastPosition.get(positionKey) ?? null, null);
+              lastPosition.set(positionKey, position);
+              const publishedAt = input.status === "published" ? new Date() : null;
+              const rows = await tx
+                .insert(page)
+                .values({
+                  spaceId: input.spaceId,
+                  parentId,
+                  title: item.title,
+                  slug: resolvedSlugs.get(item.key)!,
+                  content: item.content,
+                  textContent: item.textContent,
+                  status: input.status,
+                  position,
+                  publishedAt,
+                  createdBy: userId,
+                  lastEditedBy: userId,
+                })
+                .returning();
+              const row = firstRow(rows);
+              ids.set(item.key, row.id);
+              if (input.status === "published") {
+                await tx.insert(pageRevision).values({
+                  pageId: row.id,
+                  version: 1,
+                  title: row.title,
+                  content: row.content,
+                  textContent: row.textContent,
+                  summary: `Importiert aus ${item.sourcePath}`,
+                  editedBy: userId,
+                });
+                await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(row.content));
+              }
+              await recordActivity(tx, {
+                organizationId,
+                action: "page.created",
+                actorId: userId,
+                spaceId: row.spaceId,
+                pageId: row.id,
+                metadata: { title: row.title, source: "html-import", sourcePath: item.sourcePath },
+              });
+              imported.push({
+                key: item.key,
+                id: row.id,
+                title: row.title,
+                slug: row.slug,
+                status: input.status,
+              });
+            }
+            return { imported };
+          }),
+        "A page with one of the imported slugs already exists",
+      );
     }),
 
   create: protectedProcedure
