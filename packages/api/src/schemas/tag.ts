@@ -14,7 +14,25 @@ export const TagSchema = z.object({
 });
 export type Tag = z.infer<typeof TagSchema>;
 
+export const TagWithCountSchema = TagSchema.extend({ pageCount: z.number().int().nonnegative() });
+export type TagWithCount = z.infer<typeof TagWithCountSchema>;
+
+export const TaggedPageSchema = z.object({
+  pageId: IdSchema,
+  spaceId: IdSchema,
+  title: z.string(),
+  slug: z.string(),
+  icon: z.string().nullable(),
+  updatedAt: z.date(),
+});
+export type TaggedPage = z.infer<typeof TaggedPageSchema>;
+
 export const ListTagsInputSchema = z.object({ spaceId: IdSchema });
+
+export const ListPagesByTagInputSchema = z.object({
+  tagId: IdSchema,
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
 
 export const CreateTagInputSchema = z.object({
   spaceId: IdSchema,

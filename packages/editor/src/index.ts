@@ -1,5 +1,6 @@
 import type { Extensions } from "@tiptap/core";
 import Highlight from "@tiptap/extension-highlight";
+import Image from "@tiptap/extension-image";
 import Mention, { type MentionOptions } from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
 import Subscript from "@tiptap/extension-subscript";
@@ -61,6 +62,11 @@ export function pageEditorExtensions(options?: {
     TaskList,
     TaskItem.configure({ nested: true }),
     TableKit.configure({ table: { resizable: true } }),
+    Image.configure({
+      inline: true,
+      allowBase64: false,
+      HTMLAttributes: { loading: "lazy", decoding: "async" },
+    }),
     TextStyle,
     Color,
     Highlight.configure({ multicolor: true }),

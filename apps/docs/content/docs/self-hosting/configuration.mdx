@@ -25,9 +25,8 @@ openssl rand -base64 48
 ```
 
 <Callout type="warn">
-  `VITE_*` values are compiled into the web bundle at build time. Changing one
-  requires rebuilding the web image:
-  `docker compose ... up -d --build web`.
+  `VITE_*` values are compiled into the web bundle at build time. Changing one requires rebuilding
+  the web image: `docker compose ... up -d --build web`.
 </Callout>
 
 ## Local development — per-app `.env`
@@ -45,14 +44,15 @@ For `pnpm dev`, each app reads its own file.
 | `NODE_ENV`                               | no       | `development` (default) / `production` / `test`     |
 | `APP_NAME`                               | no       | Display name used by auth flows (white-labeling)    |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_AUTH_MAX` | no       | Per-IP requests/minute for the API / auth routes    |
+| `RATE_LIMIT_SCIM_MAX`                    | no       | Per-IP requests/minute for SCIM (default `1200`)    |
 
 ### `apps/collab/.env`
 
-| Variable             | Required | Description                                        |
-| -------------------- | -------- | -------------------------------------------------- |
-| `DATABASE_URL`       | yes      | Same database as the server                        |
+| Variable             | Required | Description                                            |
+| -------------------- | -------- | ------------------------------------------------------ |
+| `DATABASE_URL`       | yes      | Same database as the server                            |
 | `BETTER_AUTH_SECRET` | yes      | **Same secret as the server** (verifies collab tokens) |
-| `COLLAB_PORT`        | no       | WebSocket port (default `1234`)                    |
+| `COLLAB_PORT`        | no       | WebSocket port (default `1234`)                        |
 
 ### `apps/web/.env`
 
@@ -62,18 +62,17 @@ For `pnpm dev`, each app reads its own file.
 | `VITE_COLLAB_URL` | yes      | WebSocket URL of the collab service (`ws(s)://`) |
 
 <Callout type="info">
-  The collab service must share `BETTER_AUTH_SECRET` with the server — it verifies
-  page-scoped collab tokens signed with it. See
-  [Collaboration architecture](/docs/architecture/collaboration).
+  The collab service must share `BETTER_AUTH_SECRET` with the server — it verifies page-scoped
+  collab tokens signed with it. See [Collaboration architecture](/docs/architecture/collaboration).
 </Callout>
 
 ## Ports at a glance
 
-| Service  | Port                 |
-| -------- | -------------------- |
-| web      | `3001`               |
-| server   | `3000`               |
-| collab   | `1234`               |
-| postgres | `127.0.0.1:5432`     |
+| Service  | Port             |
+| -------- | ---------------- |
+| web      | `3001`           |
+| server   | `3000`           |
+| collab   | `1234`           |
+| postgres | `127.0.0.1:5432` |
 
 In production, only Caddy (80/443) is published; the app ports are internal.

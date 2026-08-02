@@ -2,7 +2,7 @@ import { TextAttributes } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import { useEffect, useState } from "react";
 import { theme } from "../theme";
-import { isProduction, readConfig } from "../lib/config";
+import { ensureStorageCredentials, isProduction, readConfig } from "../lib/config";
 import { composeUp } from "../lib/docker";
 import { gitInfo, gitPull } from "../lib/git";
 import { LogBox, StatusRow, pollUntilHealthy, useRunLog } from "../components/run-log";
@@ -39,6 +39,9 @@ export function Update({ onExit }: { onExit: () => void }) {
         // Migrations run inside the stack via the one-shot `migrate` service
         // before server/collab restart — no host-side tooling needed. Reuse
         // the install's mode: https configs restart with the TLS overlay.
+        if (await ensureStorageCredentials()) {
+          append("✔ Fehlende S3-Zugangsdaten für die bestehende Installation wurden ergänzt.");
+        }
         const production = isProduction(await readConfig());
         append("→ Baue Images neu und starte Dienste (inkl. DB-Migrationen) …");
         const upCode = await composeUp(production, (l) => !signal.aborted && append(l));

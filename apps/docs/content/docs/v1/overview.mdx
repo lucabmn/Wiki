@@ -12,19 +12,18 @@ caller.
     Full type inference, no codegen. The way the web and terminal clients call it.
   </Card>
   <Card title="REST & OpenAPI" href="/docs/v1/rest">
-    A generated HTTP surface with an interactive reference — for anything not
-    written in TypeScript.
+    A generated HTTP surface with an interactive reference — for anything not written in TypeScript.
   </Card>
 </Cards>
 
 ## The surfaces
 
-| Path             | Surface                                                    |
-| ---------------- | --------------------------------------------------------- |
-| `/rpc`           | Type-safe oRPC endpoint the clients call.                 |
-| `/v1` | Generated OpenAPI document + interactive reference.        |
-| `/api/auth/*`    | Better Auth routes (sign-in, session, organization, etc.). |
-| `/health`        | Deep health check (verifies the database).                |
+| Path          | Surface                                                    |
+| ------------- | ---------------------------------------------------------- |
+| `/rpc`        | Type-safe oRPC endpoint the clients call.                  |
+| `/v1`         | Generated OpenAPI document + interactive reference.        |
+| `/api/auth/*` | Better Auth routes (sign-in, session, organization, etc.). |
+| `/health`     | Deep health check (verifies the database).                 |
 
 Both `/rpc` and `/v1` are generated from **one** router definition, so
 they never drift. See [API & oRPC](/docs/architecture/api) for how that works.
@@ -33,22 +32,22 @@ they never drift. See [API & oRPC](/docs/architecture/api) for how that works.
 
 The top-level routers, each in its own module under `packages/api/src/routers`:
 
-| Router          | Responsibility                                        |
-| --------------- | ----------------------------------------------------- |
-| `spaces`        | Create and manage spaces.                             |
-| `spaceMembers`  | Space membership and roles (`myRole`).                |
-| `pages`         | Page CRUD, lifecycle, tree, drafts, revisions.        |
-| `pageAccess`    | Per-page ACLs (`get`, `setVisibility`, members).      |
-| `comments`      | Create, resolve, moderate comments.                   |
-| `tags`          | Tag CRUD and assignment.                              |
-| `attachments`   | Upload and delete attachments.                        |
-| `links`         | Internal link / backlink tracking.                    |
-| `activity`      | Activity feed / audit stream.                         |
-| `search`        | Full-text search.                                     |
-| `me`            | Per-user state (favorites, subscriptions).            |
-| `onboarding`    | First-run org creation and sample seeding.            |
-| `dashboard`     | Aggregated home-screen data.                          |
-| `health`        | Liveness probe.                                       |
+| Router         | Responsibility                                   |
+| -------------- | ------------------------------------------------ |
+| `spaces`       | Create and manage spaces.                        |
+| `spaceMembers` | Space membership and roles (`myRole`).           |
+| `pages`        | Page CRUD, lifecycle, tree, drafts, revisions.   |
+| `pageAccess`   | Per-page ACLs (`get`, `setVisibility`, members). |
+| `comments`     | Create, resolve, moderate comments.              |
+| `tags`         | Tag CRUD and assignment.                         |
+| `attachments`  | Upload and delete attachments.                   |
+| `links`        | Internal link / backlink tracking.               |
+| `activity`     | Activity feed / audit stream.                    |
+| `search`       | Full-text search.                                |
+| `me`           | Per-user state (favorites, subscriptions).       |
+| `onboarding`   | First-run org creation and sample seeding.       |
+| `dashboard`    | Aggregated home-screen data.                     |
+| `health`       | Liveness probe.                                  |
 
 ## Authorization
 

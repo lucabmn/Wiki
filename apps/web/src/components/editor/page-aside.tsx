@@ -1,4 +1,7 @@
+import { UserLink } from "@/components/user-link";
 import { STATUS_LABEL } from "@/lib/labels";
+import { scrollIntoPageView } from "@/lib/scroll";
+import { orpc } from "@/utils/orpc";
 import type { Page } from "@nilovon-wiki/api/schemas/page";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import {
@@ -9,7 +12,9 @@ import {
 } from "@nilovon-wiki/ui/components/dropdown-menu";
 import { Separator } from "@nilovon-wiki/ui/components/separator";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
-import { History, Link2, MessageSquare, Printer, Share2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { FileText, History, Link2, MessageSquare, Printer, Share2 } from "lucide-react";
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -41,8 +46,10 @@ export function PageAside({
   const toc = headings.filter((h) => h.text.length > 0);
   const activeId = useScrollSpy(toc.map((h) => h.id));
 
-  const scrollTo = (id: string) =>
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const scrollTo = (id: string) => {
+    const heading = document.getElementById(id);
+    if (heading) scrollIntoPageView(heading);
+  };
 
   return (
     <div className="space-y-4 text-[13px]">
@@ -90,6 +97,8 @@ export function PageAside({
 
       <Separator />
 
+      <PageReferences pageId={page.id} />
+
       <dl className="space-y-2.5">
         <MetaRow label="Status">
           <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
@@ -99,10 +108,64 @@ export function PageAside({
         ) : null}
         <MetaRow label="Zuletzt geändert">{dateFormat.format(page.updatedAt)}</MetaRow>
         <MetaRow label="Erstellt am">{dayFormat.format(page.createdAt)}</MetaRow>
-        <MetaRow label="Erstellt von">{nameOf(page.createdBy)}</MetaRow>
-        <MetaRow label="Bearbeitet von">{nameOf(page.lastEditedBy)}</MetaRow>
+        <MetaRow label="Erstellt von">
+          <UserLink userId={page.createdBy} name={nameOf(page.createdBy)} />
+        </MetaRow>
+        <MetaRow label="Bearbeitet von">
+          <UserLink userId={page.lastEditedBy} name={nameOf(page.lastEditedBy)} />
+        </MetaRow>
       </dl>
     </div>
+  );
+}
+
+/**
+ * Incoming and outgoing links for the page. The link graph is written on
+ * publish (`lib/page-links.ts`); backlinks only count published sources, so an
+ * empty list here is normal for a page nobody references yet — in that case the
+ * whole block collapses rather than showing two empty headings.
+ */
+function PageReferences({ pageId }: { pageId: string }) {
+  const { data: backlinks } = useQuery(
+    orpc.links.backlinks.queryOptions({ input: { id: pageId } }),
+  );
+  const { data: outgoing } = useQuery(orpc.links.outgoing.queryOptions({ input: { id: pageId } }));
+
+  if (!backlinks?.length && !outgoing?.length) return null;
+
+  return (
+    <>
+      <ReferenceList title="Verlinkt von" pages={backlinks ?? []} />
+      <ReferenceList title="Verweist auf" pages={outgoing ?? []} />
+      <Separator />
+    </>
+  );
+}
+
+function ReferenceList({ title, pages }: { title: string; pages: Page[] }) {
+  if (!pages.length) return null;
+  return (
+    <nav aria-label={title} className="space-y-1">
+      <h2 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        {title}
+      </h2>
+      <ul className="space-y-0.5">
+        {pages.map((linked) => (
+          <li key={linked.id}>
+            <Link
+              to="/pages/$id"
+              params={{ id: linked.id }}
+              className="flex items-center gap-2 rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <span className="shrink-0 text-sm leading-none">
+                {linked.icon ?? <FileText className="size-3.5" />}
+              </span>
+              <span className="truncate">{linked.title}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 

@@ -11,8 +11,8 @@ service) — no Node/pnpm needed for install, update, or operation.
 ## Quick start (localhost)
 
 ```sh
-git clone https://github.com/Nilovon/Wiki.git && cd Wiki
-curl -fsSLo installer "https://github.com/Nilovon/Wiki/releases/latest/download/nilovon-wiki-installer-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
+git clone https://github.com/lucabmn/Wiki.git && cd Wiki
+curl -fsSLo installer "https://github.com/lucabmn/Wiki/releases/latest/download/nilovon-wiki-installer-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
 chmod +x installer && ./installer      # → "Installieren"
 ```
 
@@ -31,49 +31,28 @@ From a checkout with the dev toolchain, `pnpm dev:tui` runs the same wizard.
 Manual equivalent, without the script:
 
 ```sh
-cp .env.example .env    # fill in POSTGRES_PASSWORD + BETTER_AUTH_SECRET
+cp .env.example .env    # fill in every required secret (DB, auth, and S3)
                         # (generate each with: openssl rand -base64 48)
 docker compose up -d --build
 ```
 
 Placeholder or low-entropy secrets are rejected at startup by design.
 
-### Pull pre-built images (skip the local build)
+### Pull a tagged release instead of building
 
-Pre-built multi-arch images (amd64 + arm64) are published to GHCR, so a
-**localhost** install can pull instead of building:
-
-```sh
-cp .env.example .env    # fill in the two secrets as above
-docker compose pull     # fetch web/server/collab from ghcr.io/nilovon/wiki-*
-docker compose up -d    # note: no --build
-```
-
-The default `latest` tag exists **only after the first tagged release** (`v*`).
-Before that, pull the rolling image built from `main`, or just use the
-`--build` quick start above:
+Tagged releases publish `linux/amd64` and `linux/arm64` images as
+`ghcr.io/lucabmn/wiki-{web,server,collab}`. For a localhost install:
 
 ```sh
-WIKI_VERSION=main docker compose pull && WIKI_VERSION=main docker compose up -d
+cp .env.example .env    # fill all required secrets
+WIKI_VERSION=0.1.0 docker compose pull
+WIKI_VERSION=0.1.0 docker compose up -d
 ```
 
-Pin a release instead of the moving `latest` tag with `WIKI_VERSION`:
-
-```sh
-WIKI_VERSION=1.4.0 docker compose pull && WIKI_VERSION=1.4.0 docker compose up -d
-```
-
-> The GHCR packages must be **public** for anonymous `docker compose pull` to
-> work. GHCR creates them private on first publish even for a public repo — a
-> maintainer flips `wiki-web`, `wiki-server`, `wiki-collab` to public once under
-> the org's package settings. Until then, run `docker login ghcr.io` first, or
-> use the `--build` path (no registry auth needed).
-
-> **localhost only.** The published `web` image bakes `VITE_SERVER_URL` /
-> `VITE_COLLAB_URL` at build time with `http://localhost:3000` /
-> `ws://localhost:1234`. A custom-domain install can **not** use the pulled web
-> image — it must rebuild web from its own domain vars (see Production below).
-> The production overlay enforces this automatically (`pull_policy: build`).
+`latest` points to the newest tagged release. Custom-domain deployments still
+build the web image locally because `VITE_SERVER_URL` and `VITE_COLLAB_URL` are
+compiled into its bundle; the production overlay enforces that with
+`pull_policy: build`.
 
 ## Production (public domain, HTTPS)
 
@@ -141,12 +120,6 @@ docker compose up -d --build                      # local
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-A localhost install running the pulled GHCR images updates without a rebuild:
-
-```sh
-docker compose pull && docker compose up -d       # localhost only
-```
-
 The `migrate` service applies any new database migrations before the app
 services restart. Migrations are versioned SQL files
 (`packages/db/src/migrations`) tracked in the database — re-running is a no-op,
@@ -161,13 +134,33 @@ and destructive schema diffs can no longer be auto-applied (the previous
 
 ## Backups
 
-Postgres holds everything (pages, Yjs snapshots, users). Back it up:
+Two things need backing up: **Postgres** (pages, revisions, Yjs snapshots,
+users, and all attachment _metadata_) and the **object store** (the attachment
+bytes themselves). A database dump alone restores a wiki whose attachments all 404.
+
+### Automatic
 
 ```sh
+docker compose --profile backup up -d backup
+```
+
+Dumps the database nightly into the `nilovon-wiki_nilovon-wiki_backups` volume and prunes
+anything older than `BACKUP_KEEP_DAYS` (default 14). This does not snapshot the
+object store. Copy database dumps off-host and use the quiesced object-store
+procedure below; never archive a live RustFS data volume.
+
+### Manual
+
+Postgres holds everything except attachment bytes. For a consistent recovery
+set, first stop application writers, then dump Postgres:
+
+```sh
+docker compose stop web server collab
 docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki | gzip > backup-$(date +%F).sql.gz
 ```
 
-Restore into a fresh stack (empty database):
+Restore into a fresh stack (empty database) only after restoring the matching
+attachment backup below:
 
 ```sh
 gunzip -c backup-2026-07-09.sql.gz | docker exec -i nilovon-wiki-postgres psql -U postgres nilovon-wiki
@@ -179,9 +172,38 @@ Automate it with cron, e.g. daily at 03:00 with 14 days retention:
 0 3 * * * cd /path/to/Wiki && docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki | gzip > /var/backups/wiki-$(date +\%F).sql.gz && find /var/backups -name 'wiki-*.sql.gz' -mtime +14 -delete
 ```
 
-Keep the `.env` file (or at least `BETTER_AUTH_SECRET` and
-`POSTGRES_PASSWORD`) with your backups — sessions and collab tokens are signed
-with it.
+Attachment bytes live in the object store, not in Postgres. With the bundled
+RustFS service that is the `nilovon-wiki_nilovon-wiki_rustfs_data` volume. Stop RustFS before
+reading its raw volume, then restart the stack after the archive completes:
+
+```sh
+docker compose stop rustfs
+docker run --rm -v nilovon-wiki_nilovon-wiki_rustfs_data:/data -v "$PWD":/out alpine \
+  tar czf /out/attachments-$(date +%F).tar.gz -C /data .
+docker compose up -d
+```
+
+Restore the bundled object store only into a stopped, empty RustFS volume. Put
+the original `.env` in place first, then:
+
+```sh
+docker compose down
+docker volume rm nilovon-wiki_nilovon-wiki_postgres_data nilovon-wiki_nilovon-wiki_rustfs_data
+docker volume create nilovon-wiki_nilovon-wiki_rustfs_data
+docker run --rm \
+  -v nilovon-wiki_nilovon-wiki_rustfs_data:/data \
+  -v "$PWD":/out \
+  alpine sh -c 'cd /data && tar xzf /out/attachments-2026-07-09.tar.gz'
+docker compose up -d postgres rustfs rustfs-init
+```
+
+Then restore the matching database dump and start the remaining services. Do
+not extract over a live or non-empty volume. Treat the database dump and object
+archive as one recovery set and verify attachment downloads after restoring.
+
+Keep the `.env` file (especially `BETTER_AUTH_SECRET`, `POSTGRES_PASSWORD`,
+`S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`) with your backups — sessions and
+collab tokens are signed with it, and RustFS needs the original credentials.
 
 ## Health & monitoring
 

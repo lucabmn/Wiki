@@ -3,6 +3,7 @@
   "icon": "Boxes",
   "pages": [
     "organizations",
+    "sso",
     "spaces",
     "pages",
     "comments",

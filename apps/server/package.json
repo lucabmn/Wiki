@@ -7,7 +7,8 @@
     "check-types": "tsc -b",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
     "dev": "bun run --hot src/index.ts",
-    "start": "bun run dist/index.mjs"
+    "start": "bun run dist/index.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@nilovon-wiki/api": "workspace:*",
@@ -27,6 +28,7 @@
     "@nilovon-wiki/config": "workspace:*",
     "@types/bun": "catalog:",
     "tsdown": "^0.22.3",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

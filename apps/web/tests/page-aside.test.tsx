@@ -1,5 +1,31 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+
+const { references } = vi.hoisted(() => ({
+  references: { backlinks: [] as unknown[], outgoing: [] as unknown[] },
+}));
+
+// The aside fetches its own backlink/outgoing-link lists; drive both off the
+// query key so a test can set either side independently.
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: (opts: { queryKey: string[] }) => ({
+    data: references[opts.queryKey[0] as keyof typeof references],
+  }),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children }: { children: ReactNode }) => <span>{children}</span>,
+}));
+
+vi.mock("@/utils/orpc", () => ({
+  orpc: {
+    links: {
+      backlinks: { queryOptions: () => ({ queryKey: ["backlinks"] }) },
+      outgoing: { queryOptions: () => ({ queryKey: ["outgoing"] }) },
+    },
+  },
+}));
 
 import { PageAside } from "@/components/editor/page-aside";
 import type { Heading } from "@/components/editor/headings";
@@ -81,5 +107,34 @@ describe("PageAside", () => {
   it("singularizes the comment label", () => {
     renderAside({ commentCount: 1 });
     expect(screen.getByText("1 Kommentar")).toBeDefined();
+  });
+
+  it("omits the reference block entirely when the page has no links", () => {
+    references.backlinks = [];
+    references.outgoing = [];
+    renderAside();
+    expect(screen.queryByText("Verlinkt von")).toBeNull();
+    expect(screen.queryByText("Verweist auf")).toBeNull();
+  });
+
+  it("lists backlinks and outgoing links separately", () => {
+    references.backlinks = [{ id: "p2", title: "Onboarding", icon: null }];
+    references.outgoing = [{ id: "p3", title: "Deploy-Checkliste", icon: null }];
+    renderAside();
+    expect(screen.getByText("Verlinkt von")).toBeDefined();
+    expect(screen.getByText("Onboarding")).toBeDefined();
+    expect(screen.getByText("Verweist auf")).toBeDefined();
+    expect(screen.getByText("Deploy-Checkliste")).toBeDefined();
+    references.backlinks = [];
+    references.outgoing = [];
+  });
+
+  it("shows only the side that has links", () => {
+    references.backlinks = [{ id: "p2", title: "Onboarding", icon: null }];
+    references.outgoing = [];
+    renderAside();
+    expect(screen.getByText("Verlinkt von")).toBeDefined();
+    expect(screen.queryByText("Verweist auf")).toBeNull();
+    references.backlinks = [];
   });
 });

@@ -11,15 +11,15 @@ a project. It is also the primary unit of **content access control**.
 
 Every space has a visibility that gates **who can read** it:
 
-| Visibility   | Who can read                                            |
-| ------------ | ------------------------------------------------------- |
-| `public`     | any member of the organization                          |
-| `private`    | members of the space only                               |
-| `restricted` | the creator and explicitly added members                |
+| Visibility   | Who can read                             |
+| ------------ | ---------------------------------------- |
+| `public`     | any member of the organization           |
+| `private`    | members of the space only                |
+| `restricted` | the creator and explicitly added members |
 
 <Callout>
-  Visibility gates **reads**. Writing always requires a space role — a member can
-  read a public space without being able to edit it.
+  Visibility gates **reads**. Writing always requires a space role — a member can read a public
+  space without being able to edit it.
 </Callout>
 
 ## Space roles
@@ -40,8 +40,8 @@ the strongest of:
 | `admin`     | editor + manage the space (settings, visibility, members) |
 
 <Callout type="warn" title="Private stays private">
-  Org managers only reach spaces they can already read. A `private` space is not
-  visible to an owner or admin who isn't a member of it.
+  Org managers only reach spaces they can already read. A `private` space is not visible to an owner
+  or admin who isn't a member of it.
 </Callout>
 
 ## Managing a space

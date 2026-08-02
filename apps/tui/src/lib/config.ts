@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { envPath } from "./paths";
 import { generatePassword, generateSecret } from "./secrets";
 
@@ -20,6 +20,10 @@ export interface InstallConfig {
   postgresPassword: string;
   /** Better Auth signing secret, shared by server + collab (min 32 chars). */
   authSecret: string;
+  /** Access-key identifier for the bundled S3-compatible object store. */
+  s3AccessKeyId: string;
+  /** Secret key for the bundled S3-compatible object store. */
+  s3SecretAccessKey: string;
 }
 
 export function defaultConfig(): InstallConfig {
@@ -30,6 +34,8 @@ export function defaultConfig(): InstallConfig {
     acmeEmail: "",
     postgresPassword: generatePassword(),
     authSecret: generateSecret(),
+    s3AccessKeyId: generatePassword(16),
+    s3SecretAccessKey: generateSecret(),
   };
 }
 
@@ -72,6 +78,18 @@ export const fields: FieldDef[] = [
     help: "Better-Auth Signatur-Secret (automatisch generiert)",
     secret: true,
   },
+  {
+    key: "s3AccessKeyId",
+    label: "S3-Zugriff",
+    help: "Zugriffsschlüssel für den Attachment-Speicher (automatisch generiert)",
+    secret: true,
+  },
+  {
+    key: "s3SecretAccessKey",
+    label: "S3-Secret",
+    help: "Geheimer Schlüssel für den Attachment-Speicher (automatisch generiert)",
+    secret: true,
+  },
 ];
 
 // ── Validation ──────────────────────────────────────────────────────────────
@@ -103,6 +121,9 @@ export function validate(config: Partial<InstallConfig>): FieldErrors {
   if ((config.postgresPassword ?? "").trim().length < 8)
     errors.postgresPassword = "mindestens 8 Zeichen";
   if ((config.authSecret ?? "").length < 32) errors.authSecret = "mindestens 32 Zeichen";
+  if ((config.s3AccessKeyId ?? "").length < 16) errors.s3AccessKeyId = "mindestens 16 Zeichen";
+  if ((config.s3SecretAccessKey ?? "").length < 32)
+    errors.s3SecretAccessKey = "mindestens 32 Zeichen";
 
   // TLS terminates at Caddy for all three services at once — mixed http/https
   // configs produce broken cookies or blocked WebSockets, so refuse them.
@@ -175,6 +196,12 @@ export function renderEnvFiles(config: InstallConfig): EnvFile[] {
         CORS_ORIGIN: config.webUrl,
         VITE_SERVER_URL: config.serverUrl,
         VITE_COLLAB_URL: config.collabUrl,
+        S3_ACCESS_KEY_ID: config.s3AccessKeyId,
+        S3_SECRET_ACCESS_KEY: config.s3SecretAccessKey,
+        S3_BUCKET: "nilovon-wiki",
+        S3_ENDPOINT: "http://rustfs:9000",
+        S3_REGION: "us-east-1",
+        S3_FORCE_PATH_STYLE: "true",
         ...(production
           ? {
               WEB_DOMAIN: new URL(config.webUrl).hostname,
@@ -195,6 +222,12 @@ export function renderEnvFiles(config: InstallConfig): EnvFile[] {
         CORS_ORIGIN: config.webUrl,
         NODE_ENV: isLocal ? "development" : "production",
         COLLAB_PORT: "1234",
+        S3_ACCESS_KEY_ID: config.s3AccessKeyId,
+        S3_SECRET_ACCESS_KEY: config.s3SecretAccessKey,
+        S3_BUCKET: "nilovon-wiki",
+        S3_ENDPOINT: "http://rustfs:9000",
+        S3_REGION: "us-east-1",
+        S3_FORCE_PATH_STYLE: "true",
       }),
     },
     {
@@ -217,6 +250,28 @@ export function renderEnvFiles(config: InstallConfig): EnvFile[] {
       }),
     },
   ];
+}
+
+/**
+ * Add credentials required by the bundled object store to a legacy root env.
+ * Appending preserves optional SMTP/custom-S3 settings that the installer does
+ * not model and avoids silently rewriting a live installation.
+ */
+export async function ensureStorageCredentials(): Promise<boolean> {
+  const root = await readEnv(".env");
+  if (root.S3_ACCESS_KEY_ID && root.S3_SECRET_ACCESS_KEY) return false;
+  const accessKey = root.S3_ACCESS_KEY_ID || generatePassword(16);
+  const secretKey = root.S3_SECRET_ACCESS_KEY || generateSecret();
+  const additions = [
+    root.S3_ACCESS_KEY_ID ? null : `S3_ACCESS_KEY_ID=${accessKey}`,
+    root.S3_SECRET_ACCESS_KEY ? null : `S3_SECRET_ACCESS_KEY=${secretKey}`,
+  ].filter((line): line is string => line !== null);
+  await appendFile(
+    envPath(".env"),
+    `\n# Added by the v1 storage credential migration\n${additions.join("\n")}\n`,
+    "utf8",
+  );
+  return true;
 }
 
 /** Write all env files to disk. Returns the relative paths written. */
@@ -252,7 +307,7 @@ async function readEnv(rel: string): Promise<Record<string, string>> {
  * Reconstruct an {@link InstallConfig} from the `.env` files on disk.
  *
  * URLs fall back to sane defaults when absent (harmless). Secrets do NOT: a
- * missing `POSTGRES_PASSWORD` / `BETTER_AUTH_SECRET` yields an empty string, not
+ * missing database/auth/storage credentials yield an empty string, not
  * a freshly-minted value. Inventing a secret here would let the config editor
  * silently overwrite a live install's working credentials — instead the empty
  * value fails {@link validate}, which the editor surfaces as "run Install first"
@@ -272,5 +327,7 @@ export async function readConfig(): Promise<InstallConfig> {
     acmeEmail: root.ACME_EMAIL ?? "",
     postgresPassword: root.POSTGRES_PASSWORD ?? "",
     authSecret: server.BETTER_AUTH_SECRET ?? root.BETTER_AUTH_SECRET ?? "",
+    s3AccessKeyId: server.S3_ACCESS_KEY_ID ?? root.S3_ACCESS_KEY_ID ?? "",
+    s3SecretAccessKey: server.S3_SECRET_ACCESS_KEY ?? root.S3_SECRET_ACCESS_KEY ?? "",
   };
 }

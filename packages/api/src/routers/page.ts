@@ -1,9 +1,9 @@
 import { ORPCError } from "@orpc/server";
-import { and, asc, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@nilovon-wiki/db";
-import { page, pageDraft, pageRevision } from "@nilovon-wiki/db/schema/index";
+import { attachment, page, pageRevision } from "@nilovon-wiki/db/schema/index";
 import { env } from "@nilovon-wiki/env/server";
 
 import { isOrgManager, protectedProcedure } from "../index";
@@ -19,13 +19,15 @@ import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
 import {
   CreatePageInputSchema,
+  FinalizeImportAssetsInputSchema,
+  FinalizeImportAssetsResultSchema,
+  ImportPagesInputSchema,
+  ImportPagesResultSchema,
   ListPagesInputSchema,
   MovePageInputSchema,
-  PageDraftSchema,
   PageRevisionSchema,
   PageSchema,
   PublishPageInputSchema,
-  SaveDraftInputSchema,
   UpdatePageInputSchema,
 } from "../schemas/page";
 import { IdSchema } from "../schemas/shared";
@@ -132,6 +134,242 @@ async function positionForMove(
   return positionAtEnd(db, spaceId, parentId, movedId);
 }
 
+const IMPORT_NODE_TYPES = new Set([
+  "doc",
+  "paragraph",
+  "text",
+  "heading",
+  "bulletList",
+  "orderedList",
+  "listItem",
+  "taskList",
+  "taskItem",
+  "blockquote",
+  "codeBlock",
+  "hardBreak",
+  "horizontalRule",
+  "image",
+  "table",
+  "tableRow",
+  "tableHeader",
+  "tableCell",
+]);
+const IMPORT_MARK_TYPES = new Set([
+  "bold",
+  "italic",
+  "strike",
+  "code",
+  "link",
+  "highlight",
+  "subscript",
+  "superscript",
+]);
+
+function assertImportKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  message: string,
+): void {
+  if (Object.keys(value).some((key) => !allowed.includes(key))) {
+    throw new ORPCError("BAD_REQUEST", { message });
+  }
+}
+
+function importAttrs(node: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (node.attrs === undefined) return undefined;
+  if (!node.attrs || typeof node.attrs !== "object" || Array.isArray(node.attrs)) {
+    throw new ORPCError("BAD_REQUEST", { message: "Invalid imported attributes" });
+  }
+  return node.attrs as Record<string, unknown>;
+}
+
+function assertSafeImportNodeAttrs(node: Record<string, unknown>): void {
+  const attrs = importAttrs(node);
+  if (!attrs) return;
+  switch (node.type) {
+    case "image": {
+      assertImportKeys(attrs, ["src", "alt", "title"], "Unsupported image attribute");
+      if (
+        typeof attrs.src !== "string" ||
+        !attrs.src.startsWith("migration-asset:") ||
+        (attrs.alt !== undefined && attrs.alt !== null && typeof attrs.alt !== "string") ||
+        (attrs.title !== undefined && attrs.title !== null && typeof attrs.title !== "string")
+      ) {
+        throw new ORPCError("BAD_REQUEST", { message: "Imported image attributes are invalid" });
+      }
+      return;
+    }
+    case "heading":
+      assertImportKeys(attrs, ["level"], "Unsupported heading attribute");
+      if (!Number.isInteger(attrs.level) || Number(attrs.level) < 1 || Number(attrs.level) > 6) {
+        throw new ORPCError("BAD_REQUEST", { message: "Imported heading level is invalid" });
+      }
+      return;
+    case "orderedList":
+      assertImportKeys(attrs, ["start", "type"], "Unsupported ordered-list attribute");
+      if (!Number.isInteger(attrs.start) || Number(attrs.start) < 1 || attrs.type !== null) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Imported ordered-list attributes are invalid",
+        });
+      }
+      return;
+    case "codeBlock":
+      assertImportKeys(attrs, ["language"], "Unsupported code-block attribute");
+      if (
+        attrs.language !== null &&
+        (typeof attrs.language !== "string" || !/^[A-Za-z0-9_+-]{1,40}$/.test(attrs.language))
+      ) {
+        throw new ORPCError("BAD_REQUEST", { message: "Imported code language is invalid" });
+      }
+      return;
+    case "tableCell":
+    case "tableHeader":
+      assertImportKeys(attrs, ["colspan", "rowspan", "colwidth"], "Unsupported table attribute");
+      if (
+        !Number.isInteger(attrs.colspan) ||
+        Number(attrs.colspan) < 1 ||
+        Number(attrs.colspan) > 100 ||
+        !Number.isInteger(attrs.rowspan) ||
+        Number(attrs.rowspan) < 1 ||
+        Number(attrs.rowspan) > 100 ||
+        attrs.colwidth !== null
+      ) {
+        throw new ORPCError("BAD_REQUEST", { message: "Imported table attributes are invalid" });
+      }
+      return;
+    default:
+      if (Object.keys(attrs).length) {
+        throw new ORPCError("BAD_REQUEST", { message: "Unsupported imported node attributes" });
+      }
+  }
+}
+
+/** Imported JSON never contains raw HTML or unchecked style-bearing attributes. */
+function assertSafeImportDocument(value: unknown): void {
+  const visit = (candidate: unknown, depth: number): void => {
+    if (depth > 100 || !candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      throw new ORPCError("BAD_REQUEST", { message: "Invalid imported document" });
+    }
+    const node = candidate as Record<string, unknown>;
+    if (typeof node.type !== "string" || !IMPORT_NODE_TYPES.has(node.type)) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: `Unsupported imported node: ${String(node.type)}`,
+      });
+    }
+    assertImportKeys(node, ["type", "text", "attrs", "marks", "content"], "Invalid node field");
+    assertSafeImportNodeAttrs(node);
+    if (node.type === "text" && typeof node.text !== "string") {
+      throw new ORPCError("BAD_REQUEST", { message: "Imported text node is invalid" });
+    }
+    if (node.marks !== undefined) {
+      if (!Array.isArray(node.marks))
+        throw new ORPCError("BAD_REQUEST", { message: "Invalid marks" });
+      for (const candidateMark of node.marks) {
+        if (!candidateMark || typeof candidateMark !== "object") {
+          throw new ORPCError("BAD_REQUEST", { message: "Invalid mark" });
+        }
+        const mark = candidateMark as Record<string, unknown>;
+        assertImportKeys(mark, ["type", "attrs"], "Invalid imported mark field");
+        if (typeof mark.type !== "string" || !IMPORT_MARK_TYPES.has(mark.type)) {
+          throw new ORPCError("BAD_REQUEST", { message: "Unsupported imported mark" });
+        }
+        const attrs = importAttrs(mark);
+        if (mark.type === "link") {
+          if (!attrs) throw new ORPCError("BAD_REQUEST", { message: "Imported link has no URL" });
+          assertImportKeys(attrs, ["href"], "Unsupported link attribute");
+          const href = attrs.href;
+          if (typeof href !== "string" || !/^(https?:|mailto:|\/|#|migration-asset:)/i.test(href)) {
+            throw new ORPCError("BAD_REQUEST", { message: "Imported link has an unsafe URL" });
+          }
+        } else if (mark.type === "highlight") {
+          if (attrs) {
+            assertImportKeys(attrs, ["color"], "Unsupported highlight attribute");
+            if (attrs.color !== null && !/^#[0-9a-f]{3,8}$/i.test(String(attrs.color))) {
+              throw new ORPCError("BAD_REQUEST", {
+                message: "Imported highlight color is invalid",
+              });
+            }
+          }
+        } else if (attrs && Object.keys(attrs).length) {
+          throw new ORPCError("BAD_REQUEST", { message: "Unsupported imported mark attributes" });
+        }
+      }
+    }
+    if (node.content !== undefined) {
+      if (!Array.isArray(node.content)) {
+        throw new ORPCError("BAD_REQUEST", { message: "Invalid imported document content" });
+      }
+      for (const child of node.content) visit(child, depth + 1);
+    }
+  };
+  visit(value, 0);
+}
+
+function attachmentIdsInDocument(value: unknown): string[] {
+  const ids = new Set<string>();
+  const visit = (candidate: unknown): void => {
+    if (Array.isArray(candidate)) {
+      candidate.forEach(visit);
+      return;
+    }
+    if (!candidate || typeof candidate !== "object") return;
+    const object = candidate as Record<string, unknown>;
+    const attrs = object.attrs;
+    if (attrs && typeof attrs === "object" && !Array.isArray(attrs)) {
+      for (const key of ["src", "href"] as const) {
+        const value = (attrs as Record<string, unknown>)[key];
+        if (typeof value !== "string") continue;
+        const match = /\/attachments\/([^/]+)\/(?:inline|download)(?:[?#]|$)/.exec(value);
+        if (match?.[1]) ids.add(match[1]);
+      }
+    }
+    visit(object.content);
+    visit(object.marks);
+  };
+  visit(value);
+  return [...ids];
+}
+
+function redactDraftBody<
+  T extends { status: string; publishedAt: Date | null; content: unknown; textContent: string },
+>(row: T): T {
+  // Archiving changes status, so publishedAt is the durable signal that a body
+  // has ever crossed the publication boundary.
+  return row.status === "draft" || row.publishedAt === null
+    ? { ...row, content: null, textContent: "" }
+    : row;
+}
+
+function replaceImportAssetUrls(
+  value: unknown,
+  replacements: ReadonlyMap<string, string>,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => replaceImportAssetUrls(item, replacements));
+  }
+  if (!value || typeof value !== "object") return value;
+
+  const object = value as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...object };
+  if (object.attrs && typeof object.attrs === "object" && !Array.isArray(object.attrs)) {
+    const attrs = { ...(object.attrs as Record<string, unknown>) };
+    if (typeof attrs.src === "string" && replacements.has(attrs.src)) {
+      attrs.src = replacements.get(attrs.src)!;
+    }
+    if (typeof attrs.href === "string" && replacements.has(attrs.href)) {
+      attrs.href = replacements.get(attrs.href)!;
+    }
+    next.attrs = attrs;
+  }
+  if (Array.isArray(object.content)) {
+    next.content = object.content.map((item) => replaceImportAssetUrls(item, replacements));
+  }
+  if (Array.isArray(object.marks)) {
+    next.marks = object.marks.map((item) => replaceImportAssetUrls(item, replacements));
+  }
+  return next;
+}
+
 export const pageRouter = {
   list: protectedProcedure
     .route({ method: "GET", path: "/pages", tags: TAGS, summary: "List pages in a space" })
@@ -156,7 +394,9 @@ export const pageRouter = {
         orderBy: [asc(page.position)],
       });
       // Drop pages restricted by a per-page override the caller can't read.
-      return filterReadablePages(context.db, context, rows, spaceRole);
+      // Draft bodies live in the working copy and never cross reader APIs.
+      const readable = await filterReadablePages(context.db, context, rows, spaceRole);
+      return readable.map(redactDraftBody);
     }),
 
   get: protectedProcedure
@@ -166,7 +406,246 @@ export const pageRouter = {
     .handler(async ({ input, context }) => {
       const row = await loadPage(context.db, input.id);
       await requirePageCapability(context.db, context, context.headers, row, "read");
-      return row;
+      return redactDraftBody(row);
+    }),
+
+  import: protectedProcedure
+    .route({
+      method: "POST",
+      path: "/pages/import",
+      tags: TAGS,
+      summary: "Import a batch of HTML-converted pages",
+    })
+    .input(ImportPagesInputSchema)
+    .output(ImportPagesResultSchema)
+    .handler(async ({ input, context }) => {
+      const { organizationId } = await requireSpaceCapabilityById(
+        context.db,
+        context,
+        context.headers,
+        input.spaceId,
+        "write",
+      );
+      const rootParentId = input.parentId ?? null;
+      await assertParentInSpace(context.db, rootParentId, input.spaceId);
+
+      const byKey = new Map(input.pages.map((item) => [item.key, item]));
+      if (byKey.size !== input.pages.length) {
+        throw new ORPCError("BAD_REQUEST", { message: "Import page keys must be unique" });
+      }
+      for (const item of input.pages) {
+        assertSafeImportDocument(item.content);
+        if (
+          input.status === "published" &&
+          JSON.stringify(item.content).includes("migration-asset:")
+        ) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Pages with migration assets must be finalized before publishing",
+          });
+        }
+        if (item.parentKey && !byKey.has(item.parentKey)) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: `Missing imported parent for ${item.title}`,
+          });
+        }
+      }
+
+      // Topological order makes parent ids available before children and detects cycles.
+      const ordered: typeof input.pages = [];
+      const remaining = new Map(byKey);
+      while (remaining.size) {
+        const ready = [...remaining.values()].filter(
+          (item) => !item.parentKey || !remaining.has(item.parentKey),
+        );
+        if (!ready.length) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Imported page hierarchy contains a cycle",
+          });
+        }
+        for (const item of ready) {
+          ordered.push(item);
+          remaining.delete(item.key);
+        }
+      }
+
+      const userId = context.session.user.id;
+      const reservedSlugs = new Set<string>();
+      const resolvedSlugs = new Map<string, string>();
+      for (const item of ordered) {
+        const slug = await uniqueSlug(slugify(item.title), async (candidate) => {
+          if (reservedSlugs.has(candidate)) return true;
+          return !!(await context.db.query.page.findFirst({
+            where: and(eq(page.spaceId, input.spaceId), eq(page.slug, candidate)),
+            columns: { id: true },
+          }));
+        });
+        reservedSlugs.add(slug);
+        resolvedSlugs.set(item.key, slug);
+      }
+
+      const existingRootPosition = await context.db.query.page.findFirst({
+        where: siblingsOf(input.spaceId, rootParentId),
+        orderBy: [desc(page.position)],
+        columns: { position: true },
+      });
+
+      return mapUniqueViolation(
+        () =>
+          context.db.transaction(async (tx) => {
+            const ids = new Map<string, string>();
+            const lastPosition = new Map<string, string | null>([
+              [rootParentId ?? "__root__", existingRootPosition?.position ?? null],
+            ]);
+            const imported: Array<{
+              key: string;
+              id: string;
+              title: string;
+              slug: string;
+              status: "draft" | "published";
+            }> = [];
+
+            for (const item of ordered) {
+              const parentId = item.parentKey ? ids.get(item.parentKey)! : rootParentId;
+              const positionKey = parentId ?? "__root__";
+              const position = generateKeyBetween(lastPosition.get(positionKey) ?? null, null);
+              lastPosition.set(positionKey, position);
+              const publishedAt = input.status === "published" ? new Date() : null;
+              const rows = await tx
+                .insert(page)
+                .values({
+                  spaceId: input.spaceId,
+                  parentId,
+                  title: item.title,
+                  slug: resolvedSlugs.get(item.key)!,
+                  content: item.content,
+                  textContent: item.textContent,
+                  status: input.status,
+                  position,
+                  publishedAt,
+                  createdBy: userId,
+                  lastEditedBy: userId,
+                })
+                .returning();
+              const row = firstRow(rows);
+              ids.set(item.key, row.id);
+              if (input.status === "published") {
+                await tx.insert(pageRevision).values({
+                  pageId: row.id,
+                  version: 1,
+                  title: row.title,
+                  content: row.content,
+                  textContent: row.textContent,
+                  summary: `Importiert aus ${item.sourcePath}`,
+                  editedBy: userId,
+                });
+                await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(row.content));
+              }
+              await recordActivity(tx, {
+                organizationId,
+                action: "page.created",
+                actorId: userId,
+                spaceId: row.spaceId,
+                pageId: row.id,
+                metadata: { title: row.title, source: "html-import", sourcePath: item.sourcePath },
+              });
+              imported.push({
+                key: item.key,
+                id: row.id,
+                title: row.title,
+                slug: row.slug,
+                status: input.status,
+              });
+            }
+            return { imported };
+          }),
+        "A page with one of the imported slugs already exists",
+      );
+    }),
+
+  finalizeImportAssets: protectedProcedure
+    .route({
+      method: "POST",
+      path: "/pages/import/assets",
+      tags: TAGS,
+      summary: "Replace migration asset placeholders with uploaded attachments",
+    })
+    .input(FinalizeImportAssetsInputSchema)
+    .output(FinalizeImportAssetsResultSchema)
+    .handler(async ({ input, context }) => {
+      const prepared: Array<{
+        row: Awaited<ReturnType<typeof loadPage>>;
+        organizationId: string;
+        replacements: Map<string, string>;
+      }> = [];
+      const baseUrl = env.BETTER_AUTH_URL.replace(/\/$/, "");
+
+      for (const item of input.pages) {
+        const row = await loadPage(context.db, item.id);
+        const { organizationId } = await requirePageCapability(
+          context.db,
+          context,
+          context.headers,
+          row,
+          "write",
+        );
+        if (row.status !== "draft") {
+          throw new ORPCError("CONFLICT", {
+            message: "Only unpublished imported pages can have assets finalized.",
+          });
+        }
+        if (row.yjsState) {
+          throw new ORPCError("CONFLICT", {
+            message:
+              "This imported page was already opened for editing; assets can no longer be finalized safely.",
+          });
+        }
+        const replacements = new Map<string, string>();
+        for (const asset of item.assets) {
+          if (!asset.placeholder.startsWith("migration-asset:")) {
+            throw new ORPCError("BAD_REQUEST", { message: "Invalid migration asset placeholder" });
+          }
+          const stored = await context.db.query.attachment.findFirst({
+            where: eq(attachment.id, asset.attachmentId),
+            columns: { id: true, pageId: true, mimeType: true },
+          });
+          if (!stored || stored.pageId !== row.id) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "Imported attachment does not belong to the target page",
+            });
+          }
+          const endpoint = /^(image\/(png|jpeg|gif|webp|avif|bmp))$/i.test(stored.mimeType)
+            ? "inline"
+            : "download";
+          replacements.set(asset.placeholder, `${baseUrl}/attachments/${stored.id}/${endpoint}`);
+        }
+        prepared.push({ row, organizationId, replacements });
+      }
+
+      await context.db.transaction(async (tx) => {
+        for (const item of prepared) {
+          const content = replaceImportAssetUrls(item.row.content, item.replacements);
+          const updated = await tx
+            .update(page)
+            .set({ content, lastEditedBy: context.session.user.id })
+            .where(and(eq(page.id, item.row.id), isNull(page.yjsState), eq(page.status, "draft")))
+            .returning({ id: page.id });
+          if (!updated.length) {
+            throw new ORPCError("CONFLICT", {
+              message: "The imported page changed while its assets were being finalized.",
+            });
+          }
+          await recordActivity(tx, {
+            organizationId: item.organizationId,
+            action: "page.updated",
+            actorId: context.session.user.id,
+            spaceId: item.row.spaceId,
+            pageId: item.row.id,
+            metadata: { title: item.row.title, source: "html-import-assets" },
+          });
+        }
+      });
+
+      return { finalizedPageIds: prepared.map((item) => item.row.id) };
     }),
 
   create: protectedProcedure
@@ -337,6 +816,25 @@ export const pageRouter = {
           .where(eq(page.id, existing.id))
           .returning();
         const row = firstRow(rows);
+        // Promote queued sidebar attachments and only editor/import assets that
+        // the published document actually references. Removed draft images stay
+        // private instead of becoming enumerable merely because Publish ran.
+        const referencedAttachmentIds = attachmentIdsInDocument(nextContent);
+        await tx
+          .update(attachment)
+          .set({ isDraft: false, publishOnNextPublish: false })
+          .where(
+            and(
+              eq(attachment.pageId, row.id),
+              eq(attachment.isDraft, true),
+              or(
+                eq(attachment.publishOnNextPublish, true),
+                referencedAttachmentIds.length
+                  ? inArray(attachment.id, referencedAttachmentIds)
+                  : undefined,
+              ),
+            ),
+          );
         // Backlinks reflect published content only — resynced here, never by the
         // collab store.
         await syncPageLinks(tx, row.id, row.spaceId, extractPageLinks(nextContent));
@@ -478,40 +976,6 @@ export const pageRouter = {
       });
     }),
 
-  delete: protectedProcedure
-    .route({
-      method: "DELETE",
-      path: "/pages/{id}",
-      tags: TAGS,
-      summary: "Permanently delete a page and its subtree",
-    })
-    .input(z.object({ id: IdSchema }))
-    .output(z.object({ id: IdSchema }))
-    .handler(async ({ input, context }) => {
-      const existing = await loadPage(context.db, input.id);
-      const { organizationId } = await requirePageCapability(
-        context.db,
-        context,
-        context.headers,
-        existing,
-        "write",
-      );
-      await context.db.transaction(async (tx) => {
-        // `parentId` self-reference cascades, so children are removed with it.
-        await tx.delete(page).where(eq(page.id, existing.id));
-        // `activity.pageId` is set-null on delete, so keep the id/title in
-        // metadata — the audit row must survive the page it describes.
-        await recordActivity(tx, {
-          organizationId,
-          action: "page.deleted",
-          actorId: context.session.user.id,
-          spaceId: existing.spaceId,
-          metadata: { pageId: existing.id, title: existing.title },
-        });
-      });
-      return { id: existing.id };
-    }),
-
   // --- Revisions ---------------------------------------------------------
 
   listRevisions: protectedProcedure
@@ -587,79 +1051,6 @@ export const pageRouter = {
         });
         return row;
       });
-    }),
-
-  // --- Per-user drafts ---------------------------------------------------
-
-  getDraft: protectedProcedure
-    .route({
-      method: "GET",
-      path: "/pages/{id}/draft",
-      tags: TAGS,
-      summary: "Get the caller's autosave draft for a page",
-    })
-    .input(z.object({ id: IdSchema }))
-    .output(PageDraftSchema.nullable())
-    .handler(async ({ input, context }) => {
-      const existing = await loadPage(context.db, input.id);
-      await requirePageCapability(context.db, context, context.headers, existing, "read");
-      const row = await context.db.query.pageDraft.findFirst({
-        where: and(
-          eq(pageDraft.pageId, existing.id),
-          eq(pageDraft.userId, context.session.user.id),
-        ),
-      });
-      return row ?? null;
-    }),
-
-  saveDraft: protectedProcedure
-    .route({
-      method: "PUT",
-      path: "/pages/{pageId}/draft",
-      tags: TAGS,
-      summary: "Upsert the caller's autosave draft for a page",
-    })
-    .input(SaveDraftInputSchema)
-    .output(PageDraftSchema)
-    .handler(async ({ input, context }) => {
-      const existing = await loadPage(context.db, input.pageId);
-      // Drafting requires write access to the page.
-      await requirePageCapability(context.db, context, context.headers, existing, "write");
-      const userId = context.session.user.id;
-      const rows = await context.db
-        .insert(pageDraft)
-        .values({
-          pageId: existing.id,
-          userId,
-          title: input.title ?? null,
-          content: input.content ?? null,
-        })
-        .onConflictDoUpdate({
-          target: [pageDraft.pageId, pageDraft.userId],
-          set: { title: input.title ?? null, content: input.content ?? null },
-        })
-        .returning();
-      return firstRow(rows);
-    }),
-
-  deleteDraft: protectedProcedure
-    .route({
-      method: "DELETE",
-      path: "/pages/{id}/draft",
-      tags: TAGS,
-      summary: "Discard the caller's autosave draft for a page",
-    })
-    .input(z.object({ id: IdSchema }))
-    .output(z.object({ pageId: IdSchema }))
-    .handler(async ({ input, context }) => {
-      const existing = await loadPage(context.db, input.id);
-      await requirePageCapability(context.db, context, context.headers, existing, "read");
-      await context.db
-        .delete(pageDraft)
-        .where(
-          and(eq(pageDraft.pageId, existing.id), eq(pageDraft.userId, context.session.user.id)),
-        );
-      return { pageId: existing.id };
     }),
 
   collabToken: protectedProcedure

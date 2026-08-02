@@ -52,6 +52,10 @@ export function useConfigForm(opts: {
       if (field.key === "authSecret") setConfig((c) => ({ ...c, authSecret: generateSecret() }));
       if (field.key === "postgresPassword")
         setConfig((c) => ({ ...c, postgresPassword: generatePassword() }));
+      if (field.key === "s3AccessKeyId")
+        setConfig((c) => ({ ...c, s3AccessKeyId: generatePassword(16) }));
+      if (field.key === "s3SecretAccessKey")
+        setConfig((c) => ({ ...c, s3SecretAccessKey: generateSecret() }));
       return;
     }
     if (key.name === "return" || key.name === "enter") {

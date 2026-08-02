@@ -33,7 +33,7 @@ export function findRepoRoot(): string {
   throw new Error(
     "Repo-Root nicht gefunden (keine docker-compose.yml oberhalb von " +
       `${process.cwd()}). Führe den Installer aus dem geklonten Wiki-Verzeichnis aus:\n` +
-      "  git clone https://github.com/Nilovon/Wiki.git && cd Wiki && ./nilovon-wiki-installer",
+      "  git clone https://github.com/lucabmn/Wiki.git && cd Wiki && ./nilovon-wiki-installer",
   );
 }
 

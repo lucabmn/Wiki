@@ -58,6 +58,58 @@ export const CreatePageInputSchema = z.object({
   isTemplate: z.boolean().default(false),
 });
 
+const ImportPageSchema = z.object({
+  /** Stable only within this request; lets children refer to imported parents. */
+  key: z.string().min(1).max(240),
+  parentKey: z.string().min(1).max(240).nullish(),
+  title: z.string().trim().min(1).max(300),
+  sourcePath: z.string().max(1000),
+  content: DocumentSchema,
+  textContent: z.string().max(2_000_000),
+});
+
+export const ImportPagesInputSchema = z.object({
+  spaceId: IdSchema,
+  parentId: IdSchema.nullish(),
+  status: z.enum(["draft", "published"]).default("draft"),
+  pages: z.array(ImportPageSchema).min(1).max(100),
+});
+
+export const ImportPagesResultSchema = z.object({
+  imported: z.array(
+    z.object({
+      key: z.string(),
+      id: IdSchema,
+      title: z.string(),
+      slug: z.string(),
+      status: z.enum(["draft", "published"]),
+    }),
+  ),
+});
+
+export const FinalizeImportAssetsInputSchema = z.object({
+  pages: z
+    .array(
+      z.object({
+        id: IdSchema,
+        assets: z
+          .array(
+            z.object({
+              placeholder: z.string().min(1).max(1200),
+              attachmentId: IdSchema,
+            }),
+          )
+          .max(250),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+
+export const FinalizeImportAssetsResultSchema = z.object({
+  finalizedPageIds: z.array(IdSchema),
+});
+
 // Note: no `content`/`textContent` here. The page body is a collaborative
 // working copy (see `apps/collab`) whose published projection advances ONLY via
 // `pages.publish`. Letting a plain PATCH write `content` would leak an
@@ -110,23 +162,6 @@ export const PageRevisionSchema = z.object({
   summary: z.string().nullable(),
   editedBy: IdSchema.nullable(),
   createdAt: z.date(),
-});
-
-/** Per-user autosave draft. */
-export const PageDraftSchema = z.object({
-  id: IdSchema,
-  pageId: IdSchema,
-  userId: IdSchema,
-  title: z.string().nullable(),
-  content: DocumentSchema.nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-});
-
-export const SaveDraftInputSchema = z.object({
-  pageId: IdSchema,
-  title: z.string().max(300).nullish(),
-  content: DocumentSchema.optional(),
 });
 
 // --- Page access (per-page ACL) --------------------------------------------

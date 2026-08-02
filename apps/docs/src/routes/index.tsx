@@ -59,7 +59,7 @@ function MarketingHeader() {
   const nav = [
     { label: "Documentation", to: "" },
     { label: "Self-hosting", to: "self-hosting/docker" },
-    { label: "API", to: "api-reference/overview" },
+    { label: "API v1", to: "v1/overview" },
   ];
   return (
     <header className="sticky top-0 z-40 border-b border-fd-border bg-fd-background/80 backdrop-blur">
@@ -166,7 +166,7 @@ function Terminal_() {
           <span className="text-fd-muted-foreground">
             {"# clone, download the guided installer, run it\n"}
           </span>
-          <span className="text-fd-primary">git</span> clone https://github.com/Nilovon/Wiki.git
+          <span className="text-fd-primary">git</span> clone https://github.com/lucabmn/Wiki.git
           {"\n"}
           <span className="text-fd-primary">cd</span> Wiki &&{" "}
           <span className="text-fd-primary">./installer</span>

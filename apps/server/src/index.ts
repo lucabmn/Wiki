@@ -15,6 +15,7 @@ import { evlog, type EvlogVariables } from "evlog/hono";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
+import { attachmentRoutes } from "./attachments";
 import { rateLimit } from "./rate-limit";
 
 initLogger({
@@ -38,7 +39,7 @@ app.use(
   "/*",
   cors({
     origin: env.CORS_ORIGIN,
-    // The generated REST surface (`/v1`) uses PATCH/PUT/DELETE;
+    // The generated, versioned REST surface (`/v1`) uses PATCH/PUT/DELETE;
     // omitting them here made every browser call to those routes fail preflight.
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     // `x-orpc-batch` is sent by the client's BatchLinkPlugin; without it the
@@ -50,13 +51,37 @@ app.use(
 
 // Page documents are the largest legitimate payloads; 10 MB leaves generous
 // headroom while bounding what an unauthenticated client can make us buffer.
-app.use("/*", bodyLimit({ maxSize: 10 * 1024 * 1024 }));
+// Attachment uploads are exempt — they carry file bytes and enforce their own,
+// larger ceiling (ATTACHMENT_MAX_MB) inside the route.
+app.use("/*", async (c, next) => {
+  if (c.req.path.startsWith("/attachments/")) return next();
+  return bodyLimit({ maxSize: 10 * 1024 * 1024 })(c, next);
+});
 
 // Max RPC calls the client's BatchLinkPlugin bundles into one HTTP request;
 // pinned so the batch handler and the rate limiter agree on the ceiling.
 const RPC_BATCH_MAX = 10;
 
-app.use("/api/auth/*", rateLimit({ max: env.RATE_LIMIT_AUTH_MAX, keyPrefix: "auth" }));
+// The SCIM 2.0 resource routes are machine traffic: an identity provider's
+// initial sync pushes one request per directory user from a single IP, which the
+// credential-stuffing ceiling below would 429 within seconds. They get their own,
+// far wider bucket — and the auth limiter has to step aside for them, because
+// Hono runs *every* matching middleware and would otherwise still apply the
+// tighter limit on top.
+//
+// Deliberately only `/v2/`: the SCIM *management* routes (minting and listing
+// tokens) are session-authenticated and belong under the auth ceiling.
+const SCIM_RESOURCE_PREFIX = "/api/auth/scim/v2/";
+
+// Built once: each limiter owns a bucket map and a sweep timer, so building one
+// per request would leak both.
+const authRateLimit = rateLimit({ max: env.RATE_LIMIT_AUTH_MAX, keyPrefix: "auth" });
+
+app.use("/api/auth/*", async (c, next) => {
+  if (c.req.path.startsWith(SCIM_RESOURCE_PREFIX)) return next();
+  return authRateLimit(c, next);
+});
+app.use(`${SCIM_RESOURCE_PREFIX}*`, rateLimit({ max: env.RATE_LIMIT_SCIM_MAX, keyPrefix: "scim" }));
 app.use(
   "/rpc/*",
   rateLimit({
@@ -69,7 +94,15 @@ app.use(
 );
 app.use("/v1/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
-app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+app.use("/attachments/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
+
+// PUT/PATCH/DELETE are not optional here: SCIM 2.0 replaces (`PUT`), patches
+// (`PATCH`) and deprovisions (`DELETE`) users over these very routes, and
+// without them an identity provider's sync silently 404s.
+app.on(["POST", "GET", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// Binary transfer for attachments; the metadata lives on the oRPC router.
+app.route("/attachments", attachmentRoutes);
 
 export const apiHandler = new OpenAPIHandler(appRouter, {
   plugins: [

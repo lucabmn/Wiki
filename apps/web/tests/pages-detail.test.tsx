@@ -161,6 +161,48 @@ vi.mock("@/utils/orpc", () => ({
         queryOptions: () => ({ queryKey: ["spaces"], queryFn: async () => data.spaces }),
       },
     },
+    // The tag row and the aside's reference lists render alongside the page;
+    // both stay empty here so they collapse and leave the assertions alone.
+    tags: {
+      listForPage: {
+        queryOptions: () => ({ queryKey: ["pageTags"], queryFn: async () => [] }),
+      },
+      list: {
+        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
+          queryKey: ["spaceTags"],
+          queryFn: async () => [],
+          enabled,
+        }),
+        key: () => ["spaceTags"],
+      },
+      attach: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+      detach: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+      create: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+    },
+    attachments: {
+      list: {
+        queryOptions: () => ({ queryKey: ["attachments"], queryFn: async () => [] }),
+        key: () => ["attachments"],
+      },
+      delete: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+    },
+    links: {
+      backlinks: {
+        queryOptions: () => ({ queryKey: ["backlinks"], queryFn: async () => [] }),
+      },
+      outgoing: {
+        queryOptions: () => ({ queryKey: ["outgoing"], queryFn: async () => [] }),
+      },
+    },
+    externalLinks: {
+      list: {
+        queryOptions: () => ({ queryKey: ["external-links"], queryFn: async () => [] }),
+      },
+      create: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+      update: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+      move: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+      delete: { mutationOptions: (opts: Record<string, unknown>) => ({ ...opts }) },
+    },
     pageAccess: {
       myRole: {
         queryOptions: () => ({
@@ -194,6 +236,8 @@ describe("page view route", () => {
     data.subscriptions = [];
     data.canEdit = false;
     data.error = false;
+    vi.restoreAllMocks();
+    document.body.replaceChildren();
   });
 
   // Published so its body renders — these fixtures exercise edit/archive/subscribe
@@ -289,6 +333,55 @@ describe("page view route", () => {
     data.error = true;
     renderView();
     expect(await screen.findByText("Seite nicht gefunden")).toBeDefined();
+  });
+
+  it("jumps to comments by scrolling the page container instead of the viewport", async () => {
+    data.page = somePage;
+    data.comments = [
+      { id: "c1", body: "Q", resolvedAt: null, deletedAt: null, createdAt: new Date() },
+      { id: "c2", body: "A", resolvedAt: null, deletedAt: null, createdAt: new Date() },
+      { id: "c3", body: "Note", resolvedAt: null, deletedAt: null, createdAt: new Date() },
+    ];
+
+    const pageScroll = document.createElement("div");
+    pageScroll.setAttribute("data-page-scroll", "");
+    pageScroll.scrollTop = 700;
+    pageScroll.scrollTo = vi.fn();
+    vi.spyOn(pageScroll, "getBoundingClientRect").mockReturnValue({
+      top: 20,
+      left: 0,
+      right: 1000,
+      bottom: 820,
+      width: 1000,
+      height: 800,
+      x: 0,
+      y: 20,
+      toJSON: () => ({}),
+    });
+    document.body.append(pageScroll);
+
+    renderView();
+    const commentsSection = await screen.findByRole("heading", { name: "Kommentare (3)" });
+    const section = commentsSection.closest("section") as HTMLElement;
+    section.style.scrollMarginTop = "24px";
+    const scrollIntoView = vi.fn();
+    section.scrollIntoView = scrollIntoView;
+    vi.spyOn(section, "getBoundingClientRect").mockReturnValue({
+      top: 1220,
+      left: 0,
+      right: 700,
+      bottom: 1500,
+      width: 700,
+      height: 280,
+      x: 0,
+      y: 1220,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "3 Kommentare" }));
+
+    expect(pageScroll.scrollTo).toHaveBeenCalledWith({ behavior: "smooth", top: 1876 });
+    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
   it("submits a new comment", async () => {
@@ -397,8 +490,12 @@ describe("page view route", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Bearbeiten" }));
     expect(await screen.findByText("EDITOR AKTIV")).toBeDefined();
-    // View chrome (comment box) is replaced by the editor surface.
-    expect(screen.queryByPlaceholderText("Kommentar schreiben …")).toBeNull();
+    // Only the header + body swap: the surrounding view chrome (comment box,
+    // right rail) stays put so the page does not re-flow around the editor.
+    expect(screen.getByPlaceholderText("Kommentar schreiben …")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Versionsverlauf" })).toBeDefined();
+    // The read body is gone — the editor owns that slot now.
+    expect(screen.queryByText("body")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Editor schließen" }));
     expect(await screen.findByText("body")).toBeDefined();

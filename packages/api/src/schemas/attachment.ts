@@ -12,6 +12,8 @@ export const AttachmentSchema = z.object({
   storageKey: z.string(),
   checksum: z.string().nullable(),
   uploadedBy: IdSchema.nullable(),
+  isDraft: z.boolean(),
+  publishOnNextPublish: z.boolean(),
   createdAt: z.date(),
 });
 export type Attachment = z.infer<typeof AttachmentSchema>;

@@ -238,6 +238,162 @@ export const invitation = authSchema.table(
   ],
 );
 
+/**
+ * An enterprise identity provider (OIDC or SAML) an organization signs in with.
+ *
+ * `oidcConfig` / `samlConfig` are JSON blobs owned by the SSO plugin — one of
+ * the two is set. They hold the client secret, which is why nothing outside
+ * Better Auth reads this table: its own endpoints return a masked projection.
+ *
+ * The `organization` cascade is load-bearing. A provider left behind by a
+ * deleted organization would keep authenticating people into an org that no
+ * longer exists, and its `domain` would keep matching those e-mail addresses on
+ * every sign-in attempt.
+ */
+export const ssoProvider = authSchema.table(
+  "sso_provider",
+  {
+    id: text("id").primaryKey(),
+    issuer: text("issuer").notNull(),
+    oidcConfig: text("oidc_config"),
+    samlConfig: text("saml_config"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").notNull().unique(),
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+    domain: text("domain").notNull(),
+    // Set by the DNS TXT check. Sign-in is refused until it is true, so this
+    // column — not the row's existence — is what makes a provider live.
+    domainVerified: boolean("domain_verified").default(false),
+  },
+  (table) => [
+    index("ssoProvider_userId_idx").on(table.userId),
+    index("ssoProvider_organizationId_idx").on(table.organizationId),
+    // `signIn.sso({ email })` resolves the provider by the address' domain.
+    index("ssoProvider_domain_idx").on(table.domain),
+    uniqueIndex("ssoProvider_providerId_uidx").on(table.providerId),
+  ],
+);
+
+/**
+ * A directory-sync connection: the bearer token an IdP presents to
+ * `/api/auth/scim/v2/*` to provision users into `organizationId`.
+ *
+ * `scimToken` holds a hash, never the token itself (`storeSCIMToken: "hashed"`
+ * in `@nilovon-wiki/auth`) — the cleartext exists only in the dialog that
+ * created it.
+ */
+export const scimProvider = authSchema.table(
+  "scim_provider",
+  {
+    id: text("id").primaryKey(),
+    providerId: text("provider_id").notNull().unique(),
+    scimToken: text("scim_token").notNull().unique(),
+    // Added by @better-auth/scim >= 1.7.0. Personal providers bind to their
+    // owner through this column; organization providers intentionally leave it
+    // null and bind through organizationId.
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+  },
+  (table) => [
+    index("scimProvider_userId_idx").on(table.userId),
+    index("scimProvider_organizationId_idx").on(table.organizationId),
+    uniqueIndex("scimProvider_providerId_uidx").on(table.providerId),
+  ],
+);
+
+export const scimGroup = authSchema.table(
+  "scim_group",
+  {
+    id: text("id").primaryKey(),
+    providerId: text("provider_id").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    scimGroupId: text("scim_group_id").notNull().unique(),
+    externalId: text("external_id"),
+    externalIdKey: text("external_id_key").unique(),
+    displayName: text("display_name").notNull(),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at"),
+  },
+  (table) => [
+    index("scimGroup_providerId_idx").on(table.providerId),
+    index("scimGroup_organizationId_idx").on(table.organizationId),
+  ],
+);
+
+export const scimGroupMember = authSchema.table(
+  "scim_group_member",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => scimGroup.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    membershipKey: text("membership_key").notNull().unique(),
+    createdAt: timestamp("created_at").notNull(),
+  },
+  (table) => [
+    index("scimGroupMember_groupId_idx").on(table.groupId),
+    index("scimGroupMember_providerId_idx").on(table.providerId),
+    index("scimGroupMember_organizationId_idx").on(table.organizationId),
+    index("scimGroupMember_userId_idx").on(table.userId),
+  ],
+);
+
+export const scimGroupRole = authSchema.table(
+  "scim_group_role",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => scimGroup.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    roleKey: text("role_key").notNull().unique(),
+    createdAt: timestamp("created_at").notNull(),
+  },
+  (table) => [index("scimGroupRole_groupId_idx").on(table.groupId)],
+);
+
+export const scimGroupRoleGrant = authSchema.table(
+  "scim_group_role_grant",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => scimGroup.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    roleGrantKey: text("role_grant_key").notNull().unique(),
+    isRoleProjected: boolean("is_role_projected").notNull(),
+    createdAt: timestamp("created_at").notNull(),
+  },
+  (table) => [
+    index("scimGroupRoleGrant_groupId_idx").on(table.groupId),
+    index("scimGroupRoleGrant_providerId_idx").on(table.providerId),
+    index("scimGroupRoleGrant_organizationId_idx").on(table.organizationId),
+    index("scimGroupRoleGrant_userId_idx").on(table.userId),
+  ],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
@@ -246,6 +402,10 @@ export const userRelations = relations(user, ({ many }) => ({
   teamMembers: many(teamMember),
   members: many(member),
   invitations: many(invitation),
+  ssoProviders: many(ssoProvider),
+  scimProviders: many(scimProvider),
+  scimGroupMembers: many(scimGroupMember),
+  scimGroupRoleGrants: many(scimGroupRoleGrant),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -281,6 +441,11 @@ export const organizationRelations = relations(organization, ({ many }) => ({
   teams: many(team),
   members: many(member),
   invitations: many(invitation),
+  ssoProviders: many(ssoProvider),
+  scimProviders: many(scimProvider),
+  scimGroups: many(scimGroup),
+  scimGroupMembers: many(scimGroupMember),
+  scimGroupRoleGrants: many(scimGroupRoleGrant),
 }));
 
 export const organizationRoleRelations = relations(organizationRole, ({ one }) => ({
@@ -327,6 +492,75 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
   }),
   user: one(user, {
     fields: [invitation.inviterId],
+    references: [user.id],
+  }),
+}));
+
+export const ssoProviderRelations = relations(ssoProvider, ({ one }) => ({
+  organization: one(organization, {
+    fields: [ssoProvider.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [ssoProvider.userId],
+    references: [user.id],
+  }),
+}));
+
+export const scimProviderRelations = relations(scimProvider, ({ one }) => ({
+  organization: one(organization, {
+    fields: [scimProvider.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [scimProvider.userId],
+    references: [user.id],
+  }),
+}));
+
+export const scimGroupRelations = relations(scimGroup, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [scimGroup.organizationId],
+    references: [organization.id],
+  }),
+  members: many(scimGroupMember),
+  roles: many(scimGroupRole),
+  roleGrants: many(scimGroupRoleGrant),
+}));
+
+export const scimGroupMemberRelations = relations(scimGroupMember, ({ one }) => ({
+  group: one(scimGroup, {
+    fields: [scimGroupMember.groupId],
+    references: [scimGroup.id],
+  }),
+  organization: one(organization, {
+    fields: [scimGroupMember.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [scimGroupMember.userId],
+    references: [user.id],
+  }),
+}));
+
+export const scimGroupRoleRelations = relations(scimGroupRole, ({ one }) => ({
+  group: one(scimGroup, {
+    fields: [scimGroupRole.groupId],
+    references: [scimGroup.id],
+  }),
+}));
+
+export const scimGroupRoleGrantRelations = relations(scimGroupRoleGrant, ({ one }) => ({
+  group: one(scimGroup, {
+    fields: [scimGroupRoleGrant.groupId],
+    references: [scimGroup.id],
+  }),
+  organization: one(organization, {
+    fields: [scimGroupRoleGrant.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [scimGroupRoleGrant.userId],
     references: [user.id],
   }),
 }));

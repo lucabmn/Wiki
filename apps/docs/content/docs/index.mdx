@@ -13,8 +13,8 @@ It is designed to be **run by you** — a Docker Compose stack you deploy on you
 host, with a guided installer, automatic HTTPS, and no managed cloud dependency.
 
 <Callout title="Built for ownership">
-  No seats, no per-user pricing, no lock-in. Nilovon Wiki is MIT licensed and
-  ships everything you need to operate it yourself.
+  No seats, no per-user pricing, no lock-in. Nilovon Wiki is MIT licensed and ships everything you
+  need to operate it yourself.
 </Callout>
 
 ## What you get
@@ -59,17 +59,17 @@ host, with a guided installer, automatic HTTPS, and no managed cloud dependency.
 
 ## The stack
 
-| Layer            | Technology                                             |
-| ---------------- | ------------------------------------------------------ |
-| Web client       | React 19, TanStack Start & Router, Tailwind CSS 4      |
-| Terminal client  | OpenTUI + React _(preview)_                            |
-| HTTP server      | Hono                                                   |
-| API / RPC        | oRPC with OpenAPI generation                           |
-| Auth             | Better Auth (organization + dynamic access control)    |
-| Database / ORM   | PostgreSQL + Drizzle ORM                               |
-| Real-time        | Hocuspocus + Yjs, shared TipTap schema                 |
-| Validation       | Zod                                                    |
-| Tooling          | pnpm, Turborepo, Vitest, Oxlint / Oxfmt                |
+| Layer           | Technology                                          |
+| --------------- | --------------------------------------------------- |
+| Web client      | React 19, TanStack Start & Router, Tailwind CSS 4   |
+| Terminal client | OpenTUI + React _(preview)_                         |
+| HTTP server     | Hono                                                |
+| API / RPC       | oRPC with OpenAPI generation                        |
+| Auth            | Better Auth (organization + dynamic access control) |
+| Database / ORM  | PostgreSQL + Drizzle ORM                            |
+| Real-time       | Hocuspocus + Yjs, shared TipTap schema              |
+| Validation      | Zod                                                 |
+| Tooling         | pnpm, Turborepo, Vitest, Oxlint / Oxfmt             |
 
 Everything is type-checked from the database schema through to the browser — a
 change to a data contract surfaces as a compile error, not a runtime surprise.

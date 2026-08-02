@@ -41,15 +41,20 @@ survives restarts.
 The client can't just connect — it must present a **signed, page-scoped token**:
 
 <Steps>
-<Step>The web app asks the API for a collab token for a specific page (`pages.collabToken`).</Step>
-<Step>The API signs a token scoped to that page with `BETTER_AUTH_SECRET`.</Step>
-<Step>The browser opens a WebSocket to the collab service and presents the token.</Step>
-<Step>The collab service verifies it with the **same** `BETTER_AUTH_SECRET`, and only then joins the client to that page's document.</Step>
+  <Step>
+    The web app asks the API for a collab token for a specific page (`pages.collabToken`).
+  </Step>
+  <Step>The API signs a token scoped to that page with `BETTER_AUTH_SECRET`.</Step>
+  <Step>The browser opens a WebSocket to the collab service and presents the token.</Step>
+  <Step>
+    The collab service verifies it with the **same** `BETTER_AUTH_SECRET`, and only then joins the
+    client to that page's document.
+  </Step>
 </Steps>
 
 <Callout type="warn">
-  This is why `apps/collab` must share `BETTER_AUTH_SECRET` with the server — the
-  token is worthless if the two ends don't agree on the signing key.
+  This is why `apps/collab` must share `BETTER_AUTH_SECRET` with the server — the token is worthless
+  if the two ends don't agree on the signing key.
 </Callout>
 
 ## Deployment

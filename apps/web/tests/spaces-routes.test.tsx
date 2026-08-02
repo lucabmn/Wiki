@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { data } = vi.hoisted(() => ({
-  data: { spaces: [] as unknown[], pages: [] as unknown[] },
+  data: { spaces: [] as unknown[], pages: [] as unknown[], role: "viewer" },
 }));
 
 vi.mock("@/components/layouts/dashboard-layout", () => ({
@@ -14,6 +14,7 @@ vi.mock("@/components/layouts/dashboard-layout", () => ({
 // The create/settings dialogs pull their own mutations — out of scope here.
 vi.mock("@/components/create-space-dialog", () => ({ CreateSpaceDialog: () => null }));
 vi.mock("@/components/create-page-dialog", () => ({ CreatePageDialog: () => null }));
+vi.mock("@/components/html-import-dialog", () => ({ HtmlImportDialog: () => null }));
 vi.mock("@/components/spaces/space-settings-sheet", () => ({ SpaceSettingsSheet: () => null }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -53,7 +54,7 @@ vi.mock("@/utils/orpc", () => ({
       myRole: {
         queryOptions: ({ enabled }: { enabled?: boolean }) => ({
           queryKey: ["myRole"],
-          queryFn: async () => ({ role: "viewer" }),
+          queryFn: async () => ({ role: data.role }),
           enabled,
         }),
         key: () => ["myRole"],
@@ -76,6 +77,7 @@ function renderComponent(node: ReactNode) {
 beforeEach(() => {
   data.spaces = [];
   data.pages = [];
+  data.role = "viewer";
 });
 
 describe("spaces index route", () => {
@@ -156,6 +158,25 @@ describe("space browse route", () => {
     ];
     renderComponent(<SpaceBrowse />);
     expect(await screen.findByText("Space nicht gefunden")).toBeDefined();
+  });
+
+  it("offers HTML migration only to space editors and admins", async () => {
+    data.spaces = [
+      {
+        id: "s1",
+        slug: "ops",
+        name: "Operations",
+        visibility: "public",
+        color: null,
+        icon: null,
+        description: null,
+        createdBy: null,
+        createdAt: new Date("2026-01-02T10:00:00Z"),
+      },
+    ];
+    data.role = "editor";
+    renderComponent(<SpaceBrowse />);
+    expect(await screen.findByRole("button", { name: "HTML importieren" })).toBeDefined();
   });
 
   it("shows an empty-pages hint", async () => {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MoreHorizontal, Plus, ShieldAlert, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ import {
 } from "@/lib/org-queries";
 import { summarizePermission } from "@/lib/permission-catalog";
 import { GroupEditorSheet } from "@/components/settings/group-editor-sheet";
+import { PermissionGate } from "@/components/settings/permission-gate";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,8 +47,15 @@ import {
 } from "@nilovon-wiki/ui/components/empty";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 
+/** Managing dynamic roles is the `ac` resource — see docs/permissions.md. */
+const ROLE_MANAGE: PermissionRequest[] = [{ ac: ["create"] }];
+
 export const Route = createFileRoute("/_auth/settings/groups")({
-  component: GroupsSettings,
+  component: () => (
+    <PermissionGate permissions={ROLE_MANAGE}>
+      <GroupsSettings />
+    </PermissionGate>
+  ),
 });
 
 function GroupCard({

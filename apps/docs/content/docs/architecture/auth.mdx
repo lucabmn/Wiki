@@ -19,6 +19,20 @@ The RBAC source of truth (`packages/auth/src/permissions.ts`) is deliberately
 never import the database or server code into it. See
 [Permissions](/docs/permissions).
 
+## Enterprise identity
+
+Two further plugins cover enterprise sign-in, both configured **per organization
+from the app** rather than from the environment:
+
+- **SSO** — OIDC (and, server-side, SAML) identity providers. Registration is
+  restricted to organization owners/admins, and a provider stays inert until its
+  e-mail domain is verified by DNS TXT record.
+- **SCIM** — directory sync. Tokens are stored hashed, must belong to an
+  organization, and reach the server under `/api/auth/scim/v2/*` — which is why
+  the auth routes accept `PUT`/`PATCH`/`DELETE` as well.
+
+See [Single Sign-On & SCIM](/docs/concepts/sso) for the setup flow.
+
 ## Sessions & cookies
 
 Sessions are cookie-based and signed with **`BETTER_AUTH_SECRET`**:
@@ -29,10 +43,9 @@ Sessions are cookie-based and signed with **`BETTER_AUTH_SECRET`**:
   work without TLS.
 
 <Callout type="warn" title="One secret, several services">
-  `BETTER_AUTH_SECRET` signs sessions **and** the page-scoped collab tokens. The
-  collab service must be given the **same** secret so it can verify those tokens.
-  Keep it with your backups — a restore can't validate existing sessions without
-  it.
+  `BETTER_AUTH_SECRET` signs sessions **and** the page-scoped collab tokens. The collab service must
+  be given the **same** secret so it can verify those tokens. Keep it with your backups — a restore
+  can't validate existing sessions without it.
 </Callout>
 
 ## Rate limiting
@@ -42,6 +55,9 @@ routes:
 
 - `RATE_LIMIT_MAX` — general API requests/minute.
 - `RATE_LIMIT_AUTH_MAX` — auth routes/minute.
+- `RATE_LIMIT_SCIM_MAX` — SCIM routes/minute. Deliberately much wider: a
+  directory sync is one request per user from a single IP, which the auth
+  ceiling would throttle within seconds.
 
 ## White-labeling
 

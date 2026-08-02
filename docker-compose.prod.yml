@@ -39,11 +39,8 @@ services:
 
   web:
     restart: always
-    # The published GHCR web image bakes localhost URLs at build time, so in
-    # production the client bundle MUST be rebuilt from the domain vars in .env.
-    # `pull_policy: build` forces a local build and refuses to pull the
-    # localhost-baked image — a `docker compose ... up -d` that forgot `--build`
-    # can't silently ship a frontend that calls localhost:3000.
+    # Published web images target localhost. Custom-domain deployments must
+    # rebuild with their VITE_* build args instead of silently pulling one.
     pull_policy: build
     # Not published on the host — reached by Caddy over the compose network.
     ports: !reset []

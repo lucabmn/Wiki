@@ -109,18 +109,18 @@ pnpm check          # oxlint + oxfmt
 
 ## Database scripts
 
-| Script             | Description                                    |
-| ------------------ | ---------------------------------------------- |
-| `pnpm db:push`     | Push the schema directly (dev shortcut)        |
-| `pnpm db:generate` | Generate SQL migrations from schema changes    |
-| `pnpm db:migrate`  | Apply pending migrations                       |
-| `pnpm db:studio`   | Open Drizzle Studio                            |
-| `pnpm db:stop`     | Stop the Postgres container                    |
-| `pnpm db:down`     | Remove the Postgres container                  |
+| Script             | Description                                 |
+| ------------------ | ------------------------------------------- |
+| `pnpm db:push`     | Push the schema directly (dev shortcut)     |
+| `pnpm db:generate` | Generate SQL migrations from schema changes |
+| `pnpm db:migrate`  | Apply pending migrations                    |
+| `pnpm db:studio`   | Open Drizzle Studio                         |
+| `pnpm db:stop`     | Stop the Postgres container                 |
+| `pnpm db:down`     | Remove the Postgres container               |
 
 <Callout type="info">
-  `db:push` is for development only. Production installs apply **versioned SQL
-  migrations** automatically. See [Updates](/docs/self-hosting/updates).
+  `db:push` is for development only. Production installs apply **versioned SQL migrations**
+  automatically. See [Updates](/docs/self-hosting/updates).
 </Callout>
 
 ## Next steps

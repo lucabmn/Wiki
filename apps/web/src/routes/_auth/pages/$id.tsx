@@ -3,10 +3,14 @@ import { PageAside } from "@/components/editor/page-aside";
 import { PageContent } from "@/components/editor/page-content";
 import { PageEditor } from "@/components/editor/page-editor";
 import { PageAccessSheet } from "@/components/pages/page-access-sheet";
+import { PageAttachments } from "@/components/pages/page-attachments";
+import { PageExternalLinks } from "@/components/pages/page-external-links";
+import { PageTags } from "@/components/pages/page-tags";
 import { RevisionHistory } from "@/components/editor/revision-history";
 import { extractHeadings } from "@/components/editor/headings";
 import { STATUS_LABEL } from "@/lib/labels";
 import { toastError, useInvalidate, useOptimisticListToggle } from "@/lib/query";
+import { scrollIntoPageView } from "@/lib/scroll";
 import { orpc } from "@/utils/orpc";
 import type { Page } from "@nilovon-wiki/api/schemas/page";
 import {
@@ -433,82 +437,98 @@ function RouteComponent() {
   // erste Eintrag neutral zur Übersicht.
   const breadcrumb = <PageBreadcrumb page={page} space={space} />;
 
-  if (editing) {
-    return (
-      <DashboardLayout className="p-7">
-        <div className="mx-auto w-full max-w-4xl">
-          {breadcrumb}
-          <div className="mt-3">
-            <PageEditor page={page} canPublish={canEdit} onDone={() => setEditing(false)} />
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // TOC mirrors the read view: derive headings from the published body only.
+  // TOC derives from the published body only — also while editing, where the
+  // rail keeps showing the last published outline instead of disappearing.
   const headings = extractHeadings(page.status === "published" ? page.content : null);
+
+  const tagRow = <PageTags pageId={page.id} spaceId={page.spaceId} canEdit={canEdit} />;
 
   return (
     <DashboardLayout className="p-7">
+      {/* One shell for both modes — same width, same right rail, same sections
+          below — so editing swaps header actions and body in place instead of
+          re-flowing the page into a narrower column. */}
       <div className="mx-auto flex w-full max-w-6xl gap-10">
         <div className="min-w-0 flex-1">
           {breadcrumb}
 
-          <div className="mt-3 flex items-start gap-3">
-            <span className="mt-1 text-2xl leading-none">
-              {page.icon ?? <FileText className="size-6 text-muted-foreground" />}
-            </span>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-[30px] leading-tight font-semibold tracking-tight">
-                {page.title}
-              </h1>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
-                <span>Zuletzt geändert {dateFormat.format(page.updatedAt)}</span>
+          {editing ? (
+            <PageEditor
+              page={page}
+              canPublish={canEdit}
+              onDone={() => setEditing(false)}
+              belowHeader={tagRow}
+              historyOpen={historyOpen}
+              onHistoryOpenChange={setHistoryOpen}
+            />
+          ) : (
+            <>
+              <div className="mt-3 flex items-start gap-3">
+                <span className="mt-1 text-2xl leading-none">
+                  {page.icon ?? <FileText className="size-6 text-muted-foreground" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-[30px] leading-tight font-semibold tracking-tight">
+                    {page.title}
+                  </h1>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
+                    <span>Zuletzt geändert {dateFormat.format(page.updatedAt)}</span>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {canManageAccess ? (
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Zugriff"
+                      title="Zugriff"
+                      onClick={() => setAccessOpen(true)}
+                    >
+                      <Lock className="size-4" />
+                    </Button>
+                  ) : null}
+                  {canEdit ? (
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Bearbeiten"
+                      title="Bearbeiten"
+                      onClick={() => setEditing(true)}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                  ) : null}
+                  <SubscribeButton page={page} />
+                  <FavoriteButton page={page} />
+                  <ArchiveButton pageId={page.id} spaceSlug={space?.slug} />
+                </div>
               </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {canManageAccess ? (
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label="Zugriff"
-                  title="Zugriff"
-                  onClick={() => setAccessOpen(true)}
-                >
-                  <Lock className="size-4" />
-                </Button>
-              ) : null}
-              {canEdit ? (
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label="Bearbeiten"
-                  title="Bearbeiten"
-                  onClick={() => setEditing(true)}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-              ) : null}
-              <SubscribeButton page={page} />
-              <FavoriteButton page={page} />
-              <ArchiveButton pageId={page.id} spaceSlug={space?.slug} />
-            </div>
+
+              <div className="mt-3 pl-9">{tagRow}</div>
+
+              <div className="mt-6">
+                {/* Readers see the published projection only: an unpublished page
+                    (or draft with leftover content) never renders its body. */}
+                <PageContent
+                  content={page.status === "published" ? page.content : null}
+                  fallbackText={page.status === "published" ? page.textContent : ""}
+                  emptyLabel={
+                    page.status === "published"
+                      ? "Diese Seite hat noch keinen Inhalt."
+                      : "Diese Seite wurde noch nicht veröffentlicht."
+                  }
+                />
+              </div>
+            </>
+          )}
+
+          <div className="mt-10">
+            <PageExternalLinks pageId={page.id} canEdit={canEdit} />
           </div>
 
-          <div className="mt-6">
-            {/* Readers see the published projection only: an unpublished page
-                (or draft with leftover content) never renders its body. */}
-            <PageContent
-              content={page.status === "published" ? page.content : null}
-              fallbackText={page.status === "published" ? page.textContent : ""}
-              emptyLabel={
-                page.status === "published"
-                  ? "Diese Seite hat noch keinen Inhalt."
-                  : "Diese Seite wurde noch nicht veröffentlicht."
-              }
-            />
+          <div className="mt-10">
+            <PageAttachments pageId={page.id} spaceId={page.spaceId} canEdit={canEdit} />
           </div>
 
           <section id="page-comments" className="mt-10 scroll-mt-6">
@@ -536,22 +556,25 @@ function RouteComponent() {
               nameOf={nameOf}
               commentCount={openComments.length}
               onOpenHistory={() => setHistoryOpen(true)}
-              onJumpToComments={() =>
-                document
-                  .getElementById("page-comments")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
-              }
+              onJumpToComments={() => {
+                const comments = document.getElementById("page-comments");
+                if (comments) scrollIntoPageView(comments);
+              }}
             />
           </div>
         </aside>
       </div>
 
-      <RevisionHistory
-        pageId={page.id}
-        open={historyOpen}
-        onOpenChange={setHistoryOpen}
-        canRestore={canEdit}
-      />
+      {/* While editing, the editor owns the history sheet: a restore has to go
+          into the live Yjs document, not through a server-side content write. */}
+      {editing ? null : (
+        <RevisionHistory
+          pageId={page.id}
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          canRestore={canEdit}
+        />
+      )}
       {canManageAccess ? (
         <PageAccessSheet
           open={accessOpen}

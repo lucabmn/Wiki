@@ -48,6 +48,8 @@ export const ActivitySchema = z.object({
 export const ListActivityInputSchema = z.object({
   spaceId: IdSchema.optional(),
   pageId: IdSchema.optional(),
+  /** Narrows the feed to one actor — powers the "activity" tab on a profile. */
+  actorId: IdSchema.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 

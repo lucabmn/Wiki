@@ -28,25 +28,25 @@ deployable units; packages are shared libraries consumed by the apps.
 
 ## Apps
 
-| App           | Role                                                                       |
-| ------------- | -------------------------------------------------------------------------- |
-| `apps/web`    | The primary client — React 19, TanStack Start & Router, Tailwind CSS 4.    |
-| `apps/server` | Thin Hono host that mounts the oRPC handler, OpenAPI, and auth routes.     |
-| `apps/collab` | Node-only real-time collaboration service (Hocuspocus + Yjs).              |
+| App           | Role                                                                        |
+| ------------- | --------------------------------------------------------------------------- |
+| `apps/web`    | The primary client — React 19, TanStack Start & Router, Tailwind CSS 4.     |
+| `apps/server` | Thin Hono host that mounts the oRPC handler, OpenAPI, and auth routes.      |
+| `apps/collab` | Node-only real-time collaboration service (Hocuspocus + Yjs).               |
 | `apps/tui`    | Self-contained installer/ops wizard (OpenTUI + React), shipped as a binary. |
-| `apps/docs`   | The docs + marketing site (Fumadocs on TanStack Start).                    |
+| `apps/docs`   | The docs + marketing site (Fumadocs on TanStack Start).                     |
 
 ## Packages
 
-| Package             | Role                                                                          |
-| ------------------- | ----------------------------------------------------------------------------- |
-| `packages/api`      | **Business logic and data contracts.** All routers, schemas, and access control. |
-| `packages/auth`     | Better Auth configuration; the RBAC `statement` and static `roles` (single source of truth). |
-| `packages/db`       | Drizzle ORM schema and versioned SQL migrations.                              |
-| `packages/editor`   | The shared TipTap schema used by both the web editor and the collab service.  |
-| `packages/ui`       | Shared UI primitives (shadcn/ui on base-ui) and Tailwind styles.              |
-| `packages/env`      | Typed environment-variable schemas (t3-env style).                            |
-| `packages/config`   | Shared `tsconfig` base.                                                        |
+| Package           | Role                                                                                         |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| `packages/api`    | **Business logic and data contracts.** All routers, schemas, and access control.             |
+| `packages/auth`   | Better Auth configuration; the RBAC `statement` and static `roles` (single source of truth). |
+| `packages/db`     | Drizzle ORM schema and versioned SQL migrations.                                             |
+| `packages/editor` | The shared TipTap schema used by both the web editor and the collab service.                 |
+| `packages/ui`     | Shared UI primitives (shadcn/ui on base-ui) and Tailwind styles.                             |
+| `packages/env`    | Typed environment-variable schemas (t3-env style).                                           |
+| `packages/config` | Shared `tsconfig` base.                                                                      |
 
 ## Why this shape
 

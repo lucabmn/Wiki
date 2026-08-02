@@ -157,7 +157,7 @@ function ReviewStage({ config }: { config: InstallConfig }) {
             .map((line, i) => {
               const [k, ...rest] = line.split("=");
               const v = rest.join("=");
-              const secret = /SECRET|PASSWORD/.test(k ?? "");
+              const secret = /SECRET|PASSWORD|ACCESS_KEY/.test(k ?? "");
               return (
                 <box key={i} flexDirection="row" gap={1}>
                   <text fg={theme.dim}>{k}</text>

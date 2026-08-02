@@ -14,10 +14,9 @@ x-logging: &default-logging
 
 services:
   web:
-    # Pre-built image from GHCR (`docker compose pull`). The published image
-    # bakes localhost URLs — a custom-domain install must rebuild with
-    # `docker compose ... up -d --build web` (the prod overlay enforces this).
-    image: ${WIKI_IMAGE_PREFIX:-ghcr.io/nilovon/wiki}-web:${WIKI_VERSION:-latest}
+    # Tagged multi-arch releases are available from GHCR for localhost installs.
+    # Production custom domains rebuild web because VITE_* is baked at build time.
+    image: ${WIKI_IMAGE_PREFIX:-ghcr.io/lucabmn/wiki}-web:${WIKI_VERSION:-latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -57,7 +56,7 @@ services:
   # are tracked in the database. Reuses the server image, so nothing extra is
   # built.
   migrate:
-    image: ${WIKI_IMAGE_PREFIX:-ghcr.io/nilovon/wiki}-server:${WIKI_VERSION:-latest}
+    image: ${WIKI_IMAGE_PREFIX:-ghcr.io/lucabmn/wiki}-server:${WIKI_VERSION:-latest}
     working_dir: /app
     command: ["pnpm", "--filter", "@nilovon-wiki/db", "db:migrate"]
     environment:
@@ -69,7 +68,7 @@ services:
     logging: *default-logging
 
   server:
-    image: ${WIKI_IMAGE_PREFIX:-ghcr.io/nilovon/wiki}-server:${WIKI_VERSION:-latest}
+    image: ${WIKI_IMAGE_PREFIX:-ghcr.io/lucabmn/wiki}-server:${WIKI_VERSION:-latest}
     build:
       context: .
       dockerfile: apps/server/Dockerfile
@@ -84,6 +83,22 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env (see .env.example, or use the installer)}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example, or use the installer)}@postgres:5432/nilovon-wiki
+      # Mail. Unset SMTP_HOST disables delivery (mails are logged instead), so a
+      # single-user install boots without a mail server. Invitations and
+      # password resets only reach their recipient once this points somewhere.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-Nilovon Wiki <no-reply@localhost>}
+      # Object storage for attachments — defaults to the bundled RustFS.
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://rustfs:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-nilovon-wiki}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID in .env (or use the installer)}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env (or use the installer)}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
     healthcheck:
       # /health verifies database connectivity, not just process liveness.
       test:
@@ -102,11 +117,13 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      rustfs-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     logging: *default-logging
 
   collab:
-    image: ${WIKI_IMAGE_PREFIX:-ghcr.io/nilovon/wiki}-collab:${WIKI_VERSION:-latest}
+    image: ${WIKI_IMAGE_PREFIX:-ghcr.io/lucabmn/wiki}-collab:${WIKI_VERSION:-latest}
     build:
       context: .
       dockerfile: apps/collab/Dockerfile
@@ -164,5 +181,108 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  # S3-compatible object storage for page attachments. The API server proxies
+  # every upload and download, so this never needs to be reachable from a
+  # browser — it stays on the compose network and loopback only.
+  rustfs:
+    image: rustfs/rustfs:1.0.0-beta.10
+    container_name: nilovon-wiki-rustfs
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      RUSTFS_VOLUMES: /data/rustfs
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID in .env (or use the installer)}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env (or use the installer)}
+    ports:
+      # Loopback-only like Postgres: the compose network handles the server, and
+      # the prod overlay publishes it through Caddy when browsers need it.
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - nilovon-wiki_rustfs_data:/data
+    restart: unless-stopped
+    logging: *default-logging
+
+  # One-shot authenticated readiness probe and idempotent bucket bootstrap.
+  # The API does not start until object storage works and its bucket exists.
+  rustfs-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    environment:
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://rustfs:9000}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID in .env (or use the installer)}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env (or use the installer)}
+      S3_BUCKET: ${S3_BUCKET:-nilovon-wiki}
+    depends_on:
+      - rustfs
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        attempts=0
+        until mc alias set local "$$S3_ENDPOINT" "$$S3_ACCESS_KEY_ID" "$$S3_SECRET_ACCESS_KEY"; do
+          attempts=$$((attempts + 1))
+          [ "$$attempts" -lt 30 ] || exit 1
+          sleep 2
+        done
+        mc stat "local/$$S3_BUCKET" >/dev/null 2>&1 || mc mb "local/$$S3_BUCKET"
+        mc stat "local/$$S3_BUCKET" >/dev/null
+    restart: "no"
+    logging: *default-logging
+
+  # Nightly database dump into a named volume, with retention. Opt-in:
+  #   docker compose --profile backup up -d backup
+  # Postgres holds pages, revisions and Yjs snapshots; attachment *bytes* live
+  # in the object store and are NOT covered here — back up the rustfs volume
+  # separately (see DEPLOY.md).
+  backup:
+    image: postgres:18
+    container_name: nilovon-wiki-backup
+    profiles: ["backup"]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example, or use the installer)}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - nilovon-wiki_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # A sleep loop rather than cron: one process, logs to stdout like every
+    # other service, and no second scheduler to keep alive inside the image.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        while true; do
+          file="/backups/wiki-$$(date +%F-%H%M).sql.gz"
+          if pg_dump -h postgres -U postgres nilovon-wiki | gzip > "$$file.part"; then
+            mv "$$file.part" "$$file"
+            echo "backup written: $$file"
+          else
+            rm -f "$$file.part"
+            echo "backup FAILED" >&2
+          fi
+          find /backups -name 'wiki-*.sql.gz' -mtime +$${BACKUP_KEEP_DAYS} -delete
+          sleep 86400
+        done
+    restart: unless-stopped
+    logging: *default-logging
+
+  # Dev-only mail catcher: `docker compose --profile dev up -d` starts it, then
+  # set SMTP_HOST=mailpit / SMTP_PORT=1025 and read the mails on :8025. Never
+  # enable this profile in production — it accepts mail and delivers none.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: nilovon-wiki-mailpit
+    profiles: ["dev"]
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+    logging: *default-logging
+
 volumes:
   nilovon-wiki_postgres_data:
+  nilovon-wiki_rustfs_data:
+  nilovon-wiki_backups:

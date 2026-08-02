@@ -124,6 +124,21 @@
   line-height: 0;
 }
 
+.tiptap img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1em auto;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--muted);
+}
+
+.tiptap img[data-unavailable="true"] {
+  min-height: 5rem;
+  padding: 1rem;
+}
+
 /* Tables */
 .tiptap .tableWrapper {
   overflow-x: auto;
@@ -171,6 +186,26 @@
 
 .tiptap a {
   cursor: pointer;
+}
+
+/* Links that leave the wiki carry a small arrow, so a reader can tell before
+   clicking. `target="_blank"` is set by the read view's link hardening
+   (`page-content.tsx`) and only ever on external destinations — internal
+   `/pages/<id>` links keep navigating in place and stay unmarked. */
+.tiptap a[target="_blank"]::after {
+  content: "↗";
+  margin-left: 0.15em;
+  font-size: 0.85em;
+  vertical-align: baseline;
+  text-decoration: none;
+}
+
+/* A link the renderer refused to trust (non-http scheme) keeps its text but is
+   no longer clickable — style it so it doesn't masquerade as a working link. */
+.tiptap a:not([href]) {
+  cursor: default;
+  color: var(--muted-foreground);
+  text-decoration: line-through;
 }
 
 .tiptap p.is-editor-empty:first-child::before {

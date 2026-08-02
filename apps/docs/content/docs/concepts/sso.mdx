@@ -1,0 +1,158 @@
+---
+title: Single Sign-On & SCIM
+description: Sign in through an identity provider, and let it manage the member list.
+icon: Fingerprint
+---
+
+Instead of a password per person, an organization can point Nilovon Wiki at its
+own **identity provider** — Entra ID, Okta, Keycloak, Authentik, Google
+Workspace, or anything else that speaks OpenID Connect.
+
+Two independent features, usually adopted in this order:
+
+| Feature                   | What it does                                                             | Optional? |
+| ------------------------- | ------------------------------------------------------------------------ | --------- |
+| **SSO** (OIDC)            | People sign in with their work account; a member is created on first use | —         |
+| **SCIM** (directory sync) | The provider creates, updates and deactivates members by itself          | yes       |
+
+Both are configured **in the app**, under **Settings → Single Sign-On** — not
+through environment variables — so adding a provider never needs a redeploy.
+
+<Callout title="Who may configure this">
+  Only the **owner** and **admins** of an organization. Unlike the rest of the settings area, a
+  custom group cannot grant it: Better Auth's SSO and SCIM plugins ship their own authorization that
+  only understands the static roles.
+</Callout>
+
+## Connecting an identity provider
+
+### 1. Create an application in the provider
+
+Create an **OIDC web application**. It will ask for a redirect URI (also called
+callback URL):
+
+```
+https://<your-server>/api/auth/sso/callback/<provider-id>
+```
+
+`<provider-id>` is a short name you choose — `okta`, `entra`, `keycloak`. The
+exact URL is shown, ready to copy, in the "Anbieter verbinden" dialog as soon as
+you type the ID.
+
+Note the **client ID** and **client secret** the provider issues.
+
+### 2. Fill in the dialog
+
+| Field         | Example                 | Notes                                                         |
+| ------------- | ----------------------- | ------------------------------------------------------------- |
+| Anbieter-ID   | `okta`                  | Immutable — it is part of the redirect URI and of every login |
+| E-Mail-Domain | `acme.com`              | Comma-separated for several domains behind one provider       |
+| Issuer-URL    | `https://acme.okta.com` | **Without** `/.well-known/openid-configuration`               |
+| Client-ID     | `0oa1b2c3…`             | From the provider                                             |
+| Client-Secret | `…`                     | Stored server-side, never shown again                         |
+
+Saving performs OIDC discovery against the issuer, so a wrong URL is rejected
+immediately rather than at the first sign-in attempt.
+
+### 3. Verify the domain
+
+A newly connected provider is **not yet live**. Sign-in stays refused until the
+e-mail domain is verified with a DNS TXT record:
+
+| Record | Value                                       |
+| ------ | ------------------------------------------- |
+| Name   | `_better-auth-token-<provider-id>.<domain>` |
+| Type   | `TXT`                                       |
+| Value  | shown in the "Domain bestätigen" dialog     |
+
+The exact name is shown ready to copy, once per domain. Then press **Jetzt
+prüfen**. The token is valid for seven days, and re-opening the dialog shows the
+same value rather than invalidating the record you already published.
+
+<Callout type="warn" title="Why this step is not optional">
+  Sign-in resolves the provider purely from the typed address' domain. Without proof of ownership,
+  an administrator of *any* organization on the instance could claim `gmail.com` and intercept those
+  sign-ins. Verification is also what allows an SSO login to adopt a **pre-existing** local account
+  with the same address instead of creating a second one for the same person.
+</Callout>
+
+<Callout type="info" title="The server must be able to resolve DNS">
+  The check runs from the server process (`dns.resolveTxt`). An air-gapped install that cannot
+  resolve the e-mail domain's public TXT records cannot complete this step — and therefore cannot
+  use SSO.
+</Callout>
+
+## Signing in
+
+The login screen has a **Mit Firmenkonto anmelden** button. It reuses the address
+already typed in the e-mail field, matches it against the configured domains, and
+redirects to the provider. The two ways this can fail are told apart rather than
+lumped into one message: no provider for that domain, and a provider whose domain
+is not verified yet — the second being the one people hit while a rollout is
+half-finished.
+
+Whoever signs in this way is added to the provider's organization as a
+**`member`**. Elevating them stays a deliberate act in Settings → Mitglieder.
+
+## Directory sync (SCIM)
+
+Without SCIM, an account appears the first time someone signs in, and removing
+someone from the provider does not remove them here. SCIM closes both gaps.
+
+1. **Settings → Single Sign-On → Verbindung erstellen**, pick an ID
+   (`okta-scim`).
+2. Copy the **base URL** and the **bearer token** — the token is shown exactly
+   once; only its hash is stored.
+3. Paste both into the provider's _Provisioning_ configuration.
+
+```
+Base URL:   https://<your-server>/api/auth/scim/v2
+Auth:       Authorization: Bearer <token>
+```
+
+Supported resources: `Users` (list, get, create, replace, patch, delete) plus the
+standard `ServiceProviderConfig`, `Schemas` and `ResourceTypes` discovery
+endpoints.
+
+Every token is bound to one organization — provisioned users land there. Tokens
+that belong to no organization are refused outright, because such a token could
+provision users instance-wide.
+
+**Rotating** a token replaces the old one immediately; sync stands still until the
+new one is stored in the provider. **Removing** a connection invalidates the token
+but leaves already-synced members untouched.
+
+## What is not exposed
+
+- **SAML.** The server supports it, but the settings UI is OIDC-only: SAML needs
+  certificates and assertion mappings that do not belong in a dialog. OIDC covers
+  every provider listed above.
+- **IdP-initiated sign-in.** Starting from the provider's dashboard tile is not
+  wired up; start from the wiki's login screen.
+- **SCIM `Groups`.** Only `Users` is implemented. Teams and groups stay managed
+  in the app.
+
+## Operational notes
+
+- **Rate limiting.** SCIM traffic is machine traffic — one request per directory
+  user, all from one IP. It gets its own ceiling, `RATE_LIMIT_SCIM_MAX`
+  (default 1200/minute), instead of the much tighter `RATE_LIMIT_AUTH_MAX`.
+- **Secrets at rest.** A provider's client secret is stored in the database in
+  plain text (`auth.sso_provider.oidc_config`). Treat database backups
+  accordingly — see [Backups](/docs/self-hosting/backups).
+- **Deleting an organization** removes its providers and SCIM connections with
+  it (`ON DELETE CASCADE`), so a deleted tenant cannot keep authenticating.
+- **Removing a provider** deletes every linked login. Someone who only ever
+  signed in through it keeps their account and content but needs a new way in —
+  the confirmation dialog says so, and requires typing the provider ID.
+
+## Related
+
+<Cards>
+  <Card title="Organizations & members" href="/docs/concepts/organizations">
+    Where provisioned users land, and how roles work.
+  </Card>
+  <Card title="Authentication" href="/docs/architecture/auth">
+    Better Auth setup, sessions, and the signing secret.
+  </Card>
+</Cards>

@@ -92,6 +92,7 @@ export const activityRouter = {
             and(
               eq(activity.spaceId, spaceId),
               input.pageId ? eq(activity.pageId, input.pageId) : undefined,
+              input.actorId ? eq(activity.actorId, input.actorId) : undefined,
             ),
           )
           .leftJoin(user, eq(activity.actorId, user.id))
@@ -113,6 +114,7 @@ export const activityRouter = {
         .where(
           and(
             eq(activity.organizationId, organizationId),
+            input.actorId ? eq(activity.actorId, input.actorId) : undefined,
             or(
               isNull(activity.spaceId),
               readable.length ? inArray(activity.spaceId, readable) : undefined,

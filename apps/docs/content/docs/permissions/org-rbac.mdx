@@ -31,9 +31,12 @@ export const statement = {
 ### Adding a permission
 
 <Steps>
-<Step>Add the resource/actions to `statement`.</Step>
-<Step>Grant it in the relevant static `roles` if needed.</Step>
-<Step>Done — `PermissionRequest` updates automatically, so backend guards and the frontend hook accept it and reject typos. No codegen, no DB change for the statement itself.</Step>
+  <Step>Add the resource/actions to `statement`.</Step>
+  <Step>Grant it in the relevant static `roles` if needed.</Step>
+  <Step>
+    Done — `PermissionRequest` updates automatically, so backend guards and the frontend hook accept
+    it and reject typos. No codegen, no DB change for the statement itself.
+  </Step>
 </Steps>
 
 ## Static roles
@@ -67,7 +70,7 @@ export const deletePage = requireOrgPermission({ page: ["delete"] })
 ### Gate on a resource's own org (preferred cross-org)
 
 `requireOrgPermission` checks the **active** org. If a request targets a resource
-in some *other* org, check against **that resource's** org id instead — otherwise
+in some _other_ org, check against **that resource's** org id instead — otherwise
 rights in the active org would authorize actions elsewhere.
 
 ```ts
@@ -131,9 +134,10 @@ const canDelete = checkStaticRolePermission({ page: ["delete"] }, "admin");
 ## Gotchas
 
 <Callout type="warn">
-- **Everything is org-scoped.** No active org ⇒ checks fail.
-- **Client `hasPermission` always uses the active org** — it takes no `organizationId`. Switch orgs with `setActive`.
-- **Cross-org safety is the backend's job.** Prefer `assertOrgPermission(headers, perms, resource.organizationId)` whenever the target may live in another org.
-- **`checkStaticRolePermission` ignores dynamic roles.** Use `usePermission` when groups matter.
-- **Type-checking won't catch the active-org and cross-org pitfalls** — exercise a real check.
+  - **Everything is org-scoped.** No active org ⇒ checks fail. - **Client `hasPermission` always
+  uses the active org** — it takes no `organizationId`. Switch orgs with `setActive`. - **Cross-org
+  safety is the backend's job.** Prefer `assertOrgPermission(headers, perms,
+  resource.organizationId)` whenever the target may live in another org. -
+  **`checkStaticRolePermission` ignores dynamic roles.** Use `usePermission` when groups matter. -
+  **Type-checking won't catch the active-org and cross-org pitfalls** — exercise a real check.
 </Callout>

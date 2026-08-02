@@ -2,11 +2,36 @@ import { describe, expect, it } from "vitest";
 
 import {
   CreatePageInputSchema,
+  ImportPagesInputSchema,
   ListPagesInputSchema,
   MovePageInputSchema,
-  SaveDraftInputSchema,
   UpdatePageInputSchema,
 } from "../../src/schemas/page";
+
+describe("ImportPagesInputSchema", () => {
+  const page = {
+    key: "guide/index.html",
+    sourcePath: "guide/index.html",
+    title: "Guide",
+    content: { type: "doc", content: [{ type: "paragraph" }] },
+    textContent: "Guide",
+  };
+
+  it("accepts a bounded batch and defaults to drafts", () => {
+    const parsed = ImportPagesInputSchema.parse({ spaceId: "space1", pages: [page] });
+    expect(parsed.status).toBe("draft");
+  });
+
+  it("rejects empty and oversized batches", () => {
+    expect(ImportPagesInputSchema.safeParse({ spaceId: "space1", pages: [] }).success).toBe(false);
+    expect(
+      ImportPagesInputSchema.safeParse({
+        spaceId: "space1",
+        pages: Array.from({ length: 101 }, (_, index) => ({ ...page, key: String(index) })),
+      }).success,
+    ).toBe(false);
+  });
+});
 
 describe("CreatePageInputSchema", () => {
   it("applies title/textContent/isTemplate defaults", () => {
@@ -53,12 +78,5 @@ describe("ListPagesInputSchema", () => {
   it("requires a spaceId and defaults includeArchived to false", () => {
     expect(ListPagesInputSchema.safeParse({}).success).toBe(false);
     expect(ListPagesInputSchema.parse({ spaceId: "s" }).includeArchived).toBe(false);
-  });
-});
-
-describe("SaveDraftInputSchema", () => {
-  it("requires a pageId", () => {
-    expect(SaveDraftInputSchema.safeParse({}).success).toBe(false);
-    expect(SaveDraftInputSchema.safeParse({ pageId: "p" }).success).toBe(true);
   });
 });

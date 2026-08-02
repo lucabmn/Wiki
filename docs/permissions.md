@@ -9,6 +9,8 @@ Authorization has **two layers**:
 
 Both are enforced **server-side**; the frontend only mirrors them for UI gating.
 
+For which right unlocks which settings tab, see [Settings](./settings.md).
+
 ---
 
 ## Concepts
@@ -28,13 +30,14 @@ A user's effective permissions come from **the roles on their member row in the 
 
 ## Where things live
 
-| File                                                                            | Contents                                                                                                                                                         |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`packages/auth/src/permissions.ts`](../packages/auth/src/permissions.ts)       | The `statement`, the `ac` instance, static `roles`, and the `PermissionRequest` type. **Single source of truth.** Server-free — safe to import from the browser. |
-| [`packages/auth/src/index.ts`](../packages/auth/src/index.ts)                   | Server org plugin wired with `ac`, `roles`, `dynamicAccessControl`.                                                                                              |
-| [`apps/web/src/lib/auth-client.ts`](../apps/web/src/lib/auth-client.ts)         | Client org plugin wired with the same `ac`/`roles`.                                                                                                              |
-| [`packages/api/src/index.ts`](../packages/api/src/index.ts)                     | Backend guards: `requireOrgPermission`, `assertOrgPermission`, `hasOrgPermission`.                                                                               |
-| [`apps/web/src/lib/use-permissions.ts`](../apps/web/src/lib/use-permissions.ts) | Frontend: `usePermission` hook, `checkStaticRolePermission`.                                                                                                     |
+| File                                                                                                              | Contents                                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`packages/auth/src/permissions.ts`](../packages/auth/src/permissions.ts)                                         | The `statement`, the `ac` instance, static `roles`, and the `PermissionRequest` type. **Single source of truth.** Server-free — safe to import from the browser. |
+| [`packages/auth/src/index.ts`](../packages/auth/src/index.ts)                                                     | Server org plugin wired with `ac`, `roles`, `dynamicAccessControl`.                                                                                              |
+| [`apps/web/src/lib/auth-client.ts`](../apps/web/src/lib/auth-client.ts)                                           | Client org plugin wired with the same `ac`/`roles`.                                                                                                              |
+| [`packages/api/src/index.ts`](../packages/api/src/index.ts)                                                       | Backend guards: `requireOrgPermission`, `assertOrgPermission`, `hasOrgPermission`.                                                                               |
+| [`apps/web/src/lib/permissions.ts`](../apps/web/src/lib/permissions.ts)                                           | Frontend: `usePermission` / `useAnyPermission` hooks, `checkStaticRolePermission`.                                                                               |
+| [`apps/web/src/components/settings/permission-gate.tsx`](../apps/web/src/components/settings/permission-gate.tsx) | `<PermissionGate>` — the gate every organization settings tab wraps itself in.                                                                                   |
 
 > **Why `permissions.ts` must stay server-free:** it is imported by both the server package and the browser bundle (via `@nilovon-wiki/auth/permissions`). Never import db, env, or `./index` into it, or the database gets pulled into the client build.
 
@@ -126,14 +129,14 @@ Both accept an optional `organizationId`; omit it to check the active org. `cont
 
 ## Frontend usage
 
-From [`apps/web/src/lib/use-permissions.ts`](../apps/web/src/lib/use-permissions.ts).
+From [`apps/web/src/lib/permissions.ts`](../apps/web/src/lib/permissions.ts).
 
 ### `usePermission` — the default
 
 Runs the check **server-side** (so it accounts for both static and dynamic roles) and caches the result in TanStack Query. Gating many elements off one permission fires a single request.
 
 ```tsx
-import { usePermission } from "@/lib/use-permissions";
+import { usePermission } from "@/lib/permissions";
 
 function DeleteButton() {
   const { allowed, isPending } = usePermission({ page: ["delete"] });
@@ -146,9 +149,37 @@ function DeleteButton() {
 - Checks the session's **active organization**. To check a different org, switch it first with `authClient.organization.setActive({ organizationId })`.
 - After changing roles/members, refresh gated UI:
   ```ts
-  import { PERMISSION_QUERY_KEY } from "@/lib/use-permissions";
+  import { PERMISSION_QUERY_KEY } from "@/lib/permissions";
   queryClient.invalidateQueries({ queryKey: PERMISSION_QUERY_KEY });
   ```
+
+### `useAnyPermission` — one settled answer for several rights
+
+Resolves an **OR** of permission requests in a single query, so a surface that admits more than one right (the settings area: manage people _or_ groups _or_ the org) settles as one unit instead of flickering between per-check pending states. Same fail-closed contract, same `PERMISSION_QUERY_KEY` prefix.
+
+```ts
+const { allowed, isPending } = useAnyPermission([
+  { member: ["update"] },
+  { ac: ["create"] },
+  { organization: ["update"] },
+]);
+```
+
+### `<PermissionGate>` — the settings-area gate
+
+Wraps a whole settings tab. Renders a skeleton while pending, a "no access" panel when denied, the children when allowed — deliberately **not** a redirect, because the organization tabs sit next to personal ones every user may open.
+
+```tsx
+const ORG_UPDATE: PermissionRequest[] = [{ organization: ["update"] }];
+
+export const Route = createFileRoute("/_auth/settings/organization")({
+  component: () => (
+    <PermissionGate permissions={ORG_UPDATE}>
+      <OrganizationSettings />
+    </PermissionGate>
+  ),
+});
+```
 
 ### `checkStaticRolePermission` — synchronous, static only
 

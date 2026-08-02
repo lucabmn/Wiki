@@ -2,10 +2,11 @@ import { relations } from "drizzle-orm";
 
 import { user, organization, team } from "../auth";
 import { space, spaceMember } from "./spaces";
-import { page, pageRevision, pageDraft, pageMember } from "./pages";
+import { page, pageRevision, pageMember } from "./pages";
 import { comment } from "./comments";
 import { attachment } from "./attachments";
 import { tag, pageTag } from "./tags";
+import { pageExternalLink } from "./external-links";
 import { pageLink } from "./links";
 import { activity } from "./activity";
 import { favorite, pageSubscription } from "./user-state";
@@ -37,13 +38,18 @@ export const pageRelations = relations(page, ({ one, many }) => ({
   }),
   children: many(page, { relationName: "page_tree" }),
   revisions: many(pageRevision),
-  drafts: many(pageDraft),
   comments: many(comment),
   attachments: many(attachment),
   tags: many(pageTag),
   members: many(pageMember),
   outgoingLinks: many(pageLink, { relationName: "page_outgoing" }),
   backlinks: many(pageLink, { relationName: "page_incoming" }),
+  externalLinks: many(pageExternalLink),
+}));
+
+export const pageExternalLinkRelations = relations(pageExternalLink, ({ one }) => ({
+  page: one(page, { fields: [pageExternalLink.pageId], references: [page.id] }),
+  creator: one(user, { fields: [pageExternalLink.createdBy], references: [user.id] }),
 }));
 
 export const pageMemberRelations = relations(pageMember, ({ one }) => ({
@@ -54,11 +60,6 @@ export const pageMemberRelations = relations(pageMember, ({ one }) => ({
 
 export const pageRevisionRelations = relations(pageRevision, ({ one }) => ({
   page: one(page, { fields: [pageRevision.pageId], references: [page.id] }),
-}));
-
-export const pageDraftRelations = relations(pageDraft, ({ one }) => ({
-  page: one(page, { fields: [pageDraft.pageId], references: [page.id] }),
-  user: one(user, { fields: [pageDraft.userId], references: [user.id] }),
 }));
 
 export const commentRelations = relations(comment, ({ one, many }) => ({

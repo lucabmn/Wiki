@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const { hasPermission } = vi.hoisted(() => ({ hasPermission: vi.fn() }));
 vi.mock("@nilovon-wiki/auth", () => ({ auth: { api: { hasPermission } } }));
 
-import { organization, user, member, space } from "@nilovon-wiki/db/schema/index";
+import { attachment, organization, user, member, page, space } from "@nilovon-wiki/db/schema/index";
 
 import { pageRouter } from "../../src/routers/page";
 import { linkRouter } from "../../src/routers/link";
@@ -45,6 +45,247 @@ afterAll(async () => {
 beforeEach(() => {
   hasPermission.mockReset();
   hasPermission.mockResolvedValue({ success: true });
+});
+
+describe("page.import", () => {
+  const paragraph = (text: string) => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  });
+
+  it("creates a hierarchy atomically and de-duplicates slugs", async () => {
+    const result = await call(
+      pageRouter.import,
+      {
+        spaceId: "sp",
+        pages: [
+          {
+            key: "guide/index.html",
+            title: "Migration Guide",
+            sourcePath: "guide/index.html",
+            content: paragraph("Guide"),
+            textContent: "Guide",
+          },
+          {
+            key: "guide/install.html",
+            parentKey: "guide/index.html",
+            title: "Migration Guide",
+            sourcePath: "guide/install.html",
+            content: paragraph("Install"),
+            textContent: "Install",
+          },
+        ],
+      },
+      { context: ctx() },
+    );
+
+    expect(result.imported.map((item) => item.slug)).toEqual([
+      "migration-guide",
+      "migration-guide-2",
+    ]);
+    const parent = await db.query.page.findFirst({
+      where: (row, { eq }) => eq(row.id, result.imported[0]!.id),
+    });
+    const child = await db.query.page.findFirst({
+      where: (row, { eq }) => eq(row.id, result.imported[1]!.id),
+    });
+    expect(parent?.status).toBe("draft");
+    expect(parent?.content).toEqual(paragraph("Guide"));
+    expect(child?.parentId).toBe(parent?.id);
+
+    const readerPage = await call(
+      pageRouter.get,
+      { id: result.imported[0]!.id },
+      { context: ctx() },
+    );
+    const readerList = await call(pageRouter.list, { spaceId: "sp" }, { context: ctx() });
+    expect(readerPage.content).toBeNull();
+    expect(readerPage.textContent).toBe("");
+    expect(readerList.find((item) => item.id === readerPage.id)?.content).toBeNull();
+  });
+
+  it("finalizes uploaded image and attachment placeholders", async () => {
+    const imagePlaceholder = "migration-asset:local%3Aimages%2Fdiagram.png";
+    const linkPlaceholder = "migration-asset:local%3Afiles%2Fguide.pdf";
+    const result = await call(
+      pageRouter.import,
+      {
+        spaceId: "sp",
+        pages: [
+          {
+            key: "assets.html",
+            title: "Imported Assets",
+            sourcePath: "assets.html",
+            content: {
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    { type: "image", attrs: { src: imagePlaceholder, alt: "Diagram" } },
+                    {
+                      type: "text",
+                      text: "Guide",
+                      marks: [{ type: "link", attrs: { href: linkPlaceholder } }],
+                    },
+                  ],
+                },
+              ],
+            },
+            textContent: "Guide",
+          },
+        ],
+      },
+      { context: ctx() },
+    );
+    const pageId = result.imported[0]!.id;
+    await db.insert(attachment).values([
+      {
+        id: "asset-image",
+        spaceId: "sp",
+        pageId,
+        fileName: "diagram.png",
+        mimeType: "image/png",
+        size: 12,
+        storageKey: "test/image",
+        uploadedBy: "u1",
+      },
+      {
+        id: "asset-pdf",
+        spaceId: "sp",
+        pageId,
+        fileName: "guide.pdf",
+        mimeType: "application/pdf",
+        size: 12,
+        storageKey: "test/pdf",
+        uploadedBy: "u1",
+      },
+    ]);
+
+    await call(
+      pageRouter.finalizeImportAssets,
+      {
+        pages: [
+          {
+            id: pageId,
+            assets: [
+              { placeholder: imagePlaceholder, attachmentId: "asset-image" },
+              { placeholder: linkPlaceholder, attachmentId: "asset-pdf" },
+            ],
+          },
+        ],
+      },
+      { context: ctx() },
+    );
+    const imported = await db.query.page.findFirst({
+      where: (row, { eq }) => eq(row.id, pageId),
+    });
+    const json = JSON.stringify(imported?.content);
+    expect(json).toContain("/attachments/asset-image/inline");
+    expect(json).toContain("/attachments/asset-pdf/download");
+    expect(json).not.toContain("migration-asset:");
+  });
+
+  it("publishes with an initial revision", async () => {
+    const result = await call(
+      pageRouter.import,
+      {
+        spaceId: "sp",
+        status: "published",
+        pages: [
+          {
+            key: "published.html",
+            title: "Imported Published Page",
+            sourcePath: "published.html",
+            content: paragraph("Published body"),
+            textContent: "Published body",
+          },
+        ],
+      },
+      { context: ctx() },
+    );
+    const imported = result.imported[0]!;
+    const revisions = await call(pageRouter.listRevisions, { id: imported.id }, { context: ctx() });
+    expect(imported.status).toBe("published");
+    expect(revisions).toHaveLength(1);
+    expect(revisions[0]?.summary).toContain("published.html");
+  });
+
+  it("rejects style-bearing attributes without creating partial rows", async () => {
+    const before = await db.$count(page);
+    await expect(
+      call(
+        pageRouter.import,
+        {
+          spaceId: "sp",
+          pages: [
+            {
+              key: "styled.html",
+              title: "Styled",
+              sourcePath: "styled.html",
+              content: {
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    attrs: { textAlign: "left;background-image:url(https://attacker.invalid)" },
+                    content: [{ type: "text", text: "Bad" }],
+                  },
+                ],
+              },
+              textContent: "Bad",
+            },
+          ],
+        },
+        { context: ctx() },
+      ),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(await db.$count(page)).toBe(before);
+  });
+
+  it("rejects unsafe documents without creating partial rows", async () => {
+    const before = await db.$count(page);
+    await expect(
+      call(
+        pageRouter.import,
+        {
+          spaceId: "sp",
+          pages: [
+            {
+              key: "safe.html",
+              title: "Safe before failure",
+              sourcePath: "safe.html",
+              content: paragraph("Safe"),
+              textContent: "Safe",
+            },
+            {
+              key: "unsafe.html",
+              title: "Unsafe",
+              sourcePath: "unsafe.html",
+              content: {
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [
+                      {
+                        type: "text",
+                        text: "Bad",
+                        marks: [{ type: "link", attrs: { href: "javascript:alert(1)" } }],
+                      },
+                    ],
+                  },
+                ],
+              },
+              textContent: "Bad",
+            },
+          ],
+        },
+        { context: ctx() },
+      ),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(await db.$count(page)).toBe(before);
+  });
 });
 
 describe("page.create", () => {
@@ -132,6 +373,72 @@ describe("page.publish", () => {
     expect(revisions[0]!.textContent).toBe("Body v1");
   });
 
+  it("promotes staged page attachments at the publication boundary", async () => {
+    const p = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "With image" },
+      { context: ctx() },
+    );
+    await db.insert(attachment).values([
+      {
+        id: "draft-asset",
+        spaceId: "sp",
+        pageId: p.id,
+        fileName: "draft.png",
+        mimeType: "image/png",
+        size: 10,
+        storageKey: "draft/key",
+        uploadedBy: "u1",
+        isDraft: true,
+      },
+      {
+        id: "removed-draft-asset",
+        spaceId: "sp",
+        pageId: p.id,
+        fileName: "removed.png",
+        mimeType: "image/png",
+        size: 10,
+        storageKey: "draft/removed",
+        uploadedBy: "u1",
+        isDraft: true,
+      },
+      {
+        id: "queued-sidebar-asset",
+        spaceId: "sp",
+        pageId: p.id,
+        fileName: "sidebar.pdf",
+        mimeType: "application/pdf",
+        size: 10,
+        storageKey: "draft/sidebar",
+        uploadedBy: "u1",
+        isDraft: true,
+        publishOnNextPublish: true,
+      },
+    ]);
+    const content = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "image",
+              attrs: { src: "https://api.example.com/attachments/draft-asset/inline" },
+            },
+          ],
+        },
+      ],
+    };
+
+    await call(pageRouter.publish, { id: p.id, content }, { context: ctx() });
+    const rows = await db.query.attachment.findMany({
+      where: (row, { eq }) => eq(row.pageId, p.id),
+    });
+    expect(rows.find((item) => item.id === "draft-asset")?.isDraft).toBe(false);
+    expect(rows.find((item) => item.id === "queued-sidebar-asset")?.isDraft).toBe(false);
+    expect(rows.find((item) => item.id === "removed-draft-asset")?.isDraft).toBe(true);
+  });
+
   it("re-publish without content keeps the last published projection", async () => {
     const p = await call(pageRouter.create, { spaceId: "sp", title: "T" }, { context: ctx() });
     await call(
@@ -147,6 +454,29 @@ describe("page.publish", () => {
 // Option B: reader-facing surfaces (search, backlinks) expose published pages
 // only — an unpublished draft is invisible even when its columns are populated.
 describe("draft invisibility on reader surfaces", () => {
+  it("keeps an archived, never-published draft body private", async () => {
+    const p = await call(
+      pageRouter.create,
+      {
+        spaceId: "sp",
+        title: "Private draft",
+        content: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "secret" }] }],
+        },
+        textContent: "secret",
+      },
+      { context: ctx() },
+    );
+    await call(pageRouter.archive, { id: p.id }, { context: ctx() });
+
+    const archived = await call(pageRouter.get, { id: p.id }, { context: ctx() });
+    expect(archived.status).toBe("archived");
+    expect(archived.publishedAt).toBeNull();
+    expect(archived.content).toBeNull();
+    expect(archived.textContent).toBe("");
+  });
+
   it("full-text search excludes a draft and includes it after publish", async () => {
     const p = await call(
       pageRouter.create,
