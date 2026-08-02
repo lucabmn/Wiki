@@ -117,6 +117,7 @@ function PageEditorForm({
 }) {
   const [title, setTitle] = useState(page.title);
   const [status, setStatus] = useState<WebSocketStatus>(WebSocketStatus.Connecting);
+  const [syncing, setSyncing] = useState(false);
   // Controlled by the route when it also drives the right rail's entry point;
   // otherwise the editor keeps the sheet's open state itself.
   const [ownHistoryOpen, setOwnHistoryOpen] = useState(false);
@@ -152,23 +153,41 @@ function PageEditorForm({
     };
   }, [provider, doc]);
 
-  const finish = () => {
-    invalidatePage();
+  const finish = async () => {
+    // Keep the editor mounted until the active detail query has the saved row.
+    // Otherwise a quick reopen receives the previous cached `page` prop and
+    // initializes its local title state from that stale value.
+    await invalidatePage();
     invalidateList();
     onDone();
+  };
+
+  const syncBody = async () => {
+    setSyncing(true);
+    try {
+      await waitForCollabSync(provider);
+      return true;
+    } catch {
+      toast.error("Änderungen konnten noch nicht synchronisiert werden. Bitte erneut versuchen.");
+      return false;
+    } finally {
+      setSyncing(false);
+    }
   };
 
   // "Speichern": persist only the title (the body is a collaborative draft,
   // continuously autosaved by the collab server) and close.
   const handleSave = async () => {
+    if (!(await syncBody())) return;
     await update.mutateAsync({ id: page.id, title: title.trim() || "Ohne Titel" });
     toast.success("Entwurf gespeichert");
-    finish();
+    await finish();
   };
 
   // "Veröffentlichen": promote the current working copy — body (read from the
   // live editor) plus title — into the published projection readers see.
   const handlePublish = async () => {
+    if (!(await syncBody())) return;
     const editor = editorRef.current;
     await publish.mutateAsync({
       id: page.id,
@@ -178,10 +197,10 @@ function PageEditorForm({
     toast.success(
       page.status === "published" ? "Änderungen veröffentlicht" : "Seite veröffentlicht",
     );
-    finish();
+    await finish();
   };
 
-  const busy = update.isPending || publish.isPending;
+  const busy = syncing || update.isPending || publish.isPending;
 
   // Publishing an already-published page doesn't publish it *again* — it
   // promotes the working copy into the projection readers see. Naming that
@@ -240,7 +259,7 @@ function PageEditorForm({
           />
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
-            <ConnectionIndicator status={status} saving={update.isPending} />
+            <ConnectionIndicator status={status} saving={busy} />
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -306,6 +325,37 @@ function PageEditorForm({
       />
     </>
   );
+}
+
+const COLLAB_SYNC_TIMEOUT_MS = 10_000;
+
+/** Wait until the server has acknowledged every local Yjs update. */
+function waitForCollabSync(provider: HocuspocusProvider): Promise<void> {
+  if (!provider.hasUnsyncedChanges) return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      provider.off("unsyncedChanges", onUnsyncedChanges);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onUnsyncedChanges = ({ number }: { number: number }) => {
+      if (number === 0) finish();
+    };
+    const timeout = setTimeout(
+      () => finish(new Error("Timed out waiting for collaborative changes to sync")),
+      COLLAB_SYNC_TIMEOUT_MS,
+    );
+
+    provider.on("unsyncedChanges", onUnsyncedChanges);
+    // Close the race where the final acknowledgement arrived before the
+    // listener was registered.
+    if (!provider.hasUnsyncedChanges) finish();
+  });
 }
 
 /** Deterministic HSL cursor color from a user id, so each editor is stable. */
