@@ -57,8 +57,11 @@ services:
   # built.
   migrate:
     image: ${WIKI_IMAGE_PREFIX:-ghcr.io/lucabmn/wiki}-server:${WIKI_VERSION:-latest}
-    working_dir: /app
-    command: ["pnpm", "--filter", "@nilovon-wiki/db", "db:migrate"]
+    # The server image runs as the unprivileged `node` user. Invoke the
+    # installed migration binary directly: pnpm 11 attempts to write workspace
+    # metadata under root-owned /app even for `pnpm run`, which fails at runtime.
+    working_dir: /app/packages/db
+    command: ["./node_modules/.bin/drizzle-kit", "migrate"]
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example, or use the installer)}@postgres:5432/nilovon-wiki
     depends_on:

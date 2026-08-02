@@ -5,6 +5,11 @@ allowBuilds:
   esbuild: true
   sharp: true
   lefthook: true
+overrides:
+  brace-expansion: 5.0.8
+  fast-uri: 3.1.4
+  js-yaml: 5.2.2
+  postcss: 8.5.18
 catalog:
   dotenv: ^17.4.2
   zod: ^4.4.3

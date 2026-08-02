@@ -18,4 +18,4 @@ USER node
 # collab service runs on Node. It executes its TypeScript entrypoint directly
 # via tsx (a runtime dependency) — no separate bundle step.
 WORKDIR /app/apps/collab
-CMD ["pnpm", "run", "start"]
+CMD ["node", "--import", "tsx", "src/index.ts"]
