@@ -57,6 +57,7 @@ jobs:
   build:
     needs: verify
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -109,25 +110,47 @@ jobs:
   # of building all three apps from source on every update.
   images:
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     permissions:
       contents: read
       packages: write
     strategy:
+      fail-fast: false
       matrix:
         include:
           - app: server
             dockerfile: apps/server/Dockerfile
+            runner: ubuntu-latest
+            platforms: linux/amd64,linux/arm64
+            suffix: ""
+            qemu: true
           - app: collab
             dockerfile: apps/collab/Dockerfile
+            runner: ubuntu-latest
+            platforms: linux/amd64,linux/arm64
+            suffix: ""
+            qemu: true
+          # Building Vite under QEMU can hang while rendering chunks. Build the
+          # web image once per native architecture and combine it in publish.
           - app: web
             dockerfile: apps/web/Dockerfile
+            runner: ubuntu-latest
+            platforms: linux/amd64
+            suffix: -amd64
+            qemu: false
+          - app: web
+            dockerfile: apps/web/Dockerfile
+            runner: ubuntu-24.04-arm
+            platforms: linux/arm64
+            suffix: -arm64
+            qemu: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up QEMU
+        if: matrix.qemu
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Buildx
@@ -145,14 +168,14 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platforms }}
           push: true
           # Immutable staging tags keep failed matrix runs from partially
           # replacing release tags or latest. The publish job promotes all
           # three only after every image and installer has succeeded.
-          tags: ghcr.io/lucabmn/wiki-${{ matrix.app }}:staging-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ghcr.io/lucabmn/wiki-${{ matrix.app }}:staging-${{ github.sha }}${{ matrix.suffix }}
+          cache-from: type=gha,scope=${{ matrix.app }}${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}${{ matrix.suffix }}
           # The web bundle bakes its public URLs at build time, so the published
           # image only fits a deployment that uses these. Self-hosters on custom
           # domains must still build web themselves (see DEPLOY.md).
@@ -192,9 +215,16 @@ jobs:
           stable=false
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && stable=true
           # Validate the complete set before changing any public tag.
-          for app in web server collab; do
+          for app in server collab; do
             docker buildx imagetools inspect "ghcr.io/lucabmn/wiki-$app:staging-$GITHUB_SHA" >/dev/null
           done
+          for arch in amd64 arm64; do
+            docker buildx imagetools inspect "ghcr.io/lucabmn/wiki-web:staging-$GITHUB_SHA-$arch" >/dev/null
+          done
+          docker buildx imagetools create \
+            -t "ghcr.io/lucabmn/wiki-web:staging-$GITHUB_SHA" \
+            "ghcr.io/lucabmn/wiki-web:staging-$GITHUB_SHA-amd64" \
+            "ghcr.io/lucabmn/wiki-web:staging-$GITHUB_SHA-arm64"
           for app in web server collab; do
             image="ghcr.io/lucabmn/wiki-$app"
             tags=(-t "$image:$version")
