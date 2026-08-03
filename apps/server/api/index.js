@@ -14,7 +14,12 @@
 // "Cannot read properties of undefined (reading 'readFile')". A JavaScript
 // entrypoint skips that path entirely. The file it imports is already built and
 // type-checked by `tsdown`/`tsc -b`.
-import { handle } from "hono/vercel";
+//
+// The adapter is `@hono/node-server/vercel`, not `hono/vercel`: the latter just
+// calls `app.fetch(req)` and assumes a web-standard `Request`, but a default-
+// exported Vercel function receives Node's `IncomingMessage`/`ServerResponse`
+// ("this.raw.headers.get is not a function"). This adapter bridges them.
+import { handle } from "@hono/node-server/vercel";
 import app from "../dist/index.mjs";
 
 export default handle(app);

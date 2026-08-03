@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.14",
     "@nilovon-wiki/api": "workspace:*",
     "@nilovon-wiki/auth": "workspace:*",
     "@nilovon-wiki/db": "workspace:*",
