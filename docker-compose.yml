@@ -86,8 +86,8 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env (see .env.example, or use the installer)}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example, or use the installer)}@postgres:5432/nilovon-wiki
-      # Mail. Unset SMTP_HOST disables delivery (mails are logged instead), so a
-      # single-user install boots without a mail server. Invitations and
+      # Mail. Unset SMTP_HOST disables delivery, so a single-user install boots
+      # without a mail server. Mail bodies are never logged; invitations and
       # password resets only reach their recipient once this points somewhere.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}

@@ -27,7 +27,7 @@ The codebase is a pnpm + Turborepo monorepo with a strict boundary between the H
 - **Tags** — space-scoped labels, created and applied inline from the page header.
 - **External links** — a curated, reorderable list of references outside the wiki per page; URLs are normalized and scheme-allowlisted to `http(s)` on the server, so a stored link can never become a `javascript:` href.
 - **Attachments** — files stored in any S3-compatible object store (a RustFS service ships with the compose stack); uploads and downloads are proxied by the API so the bucket never faces the internet.
-- **Email** — invitations, password reset and address verification over SMTP; optional, and mails are logged instead of sent when no SMTP host is configured.
+- **Email** — invitations, password reset and address verification over SMTP; optional, with delivery disabled when no SMTP host is configured.
 - **Favorites & subscriptions** — personal pins and per-page watch lists.
 - **Full-text search** — PostgreSQL `tsvector` generated columns with GIN indexes.
 - **Activity feed / audit log** — every mutation records an audit row, including destructive deletes.
@@ -206,7 +206,7 @@ Docker installs are configured entirely through the root **`.env`** (written by 
 | `BETTER_AUTH_URL` / `CORS_ORIGIN`                                   | production | Public API URL / web origin (derived from domains in the overlay) |
 | `VITE_SERVER_URL` / `VITE_COLLAB_URL`                               | production | URLs baked into the web bundle at build time                      |
 | `WEB_DOMAIN`, `API_DOMAIN`, `COLLAB_DOMAIN`, `ACME_EMAIL`           | production | Domains + Let's Encrypt email for the Caddy overlay               |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | no         | Mail delivery; without `SMTP_HOST` mails are logged, not sent     |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | no         | Mail delivery; without `SMTP_HOST` mails are not sent             |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`                          | yes        | Generated credentials for bundled RustFS attachment storage       |
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_FORCE_PATH_STYLE`      | no         | Override the bundled S3-compatible storage configuration          |
 | `BACKUP_KEEP_DAYS`                                                  | no         | Retention for the opt-in `backup` compose profile (default 14)    |
@@ -225,7 +225,7 @@ For local development (`pnpm dev`), each app reads its own `.env` file instead:
 | `APP_NAME`                               | no       | Display name used by auth flows (white-labeling)    |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_AUTH_MAX` | no       | Per-IP requests/minute for the API / auth routes    |
 | `RATE_LIMIT_SCIM_MAX`                    | no       | Per-IP requests/minute for SCIM (default `1200`)    |
-| `SMTP_*`                                 | no       | SMTP delivery; unset `SMTP_HOST` logs mails instead |
+| `SMTP_*`                                 | no       | SMTP delivery; unset `SMTP_HOST` disables delivery  |
 | `S3_*`                                   | no       | S3-compatible attachment storage                    |
 | `ATTACHMENT_MAX_MB`                      | no       | Per-file upload ceiling (default 25)                |
 

@@ -116,15 +116,15 @@ describe("sendMail", () => {
     expect(raw).toContain("inv_123");
   });
 
-  it("logs instead of throwing when SMTP is not configured", async () => {
+  it("does not log authentication links when SMTP is not configured", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { sendMail } = await loadMailer({ SMTP_HOST: "" });
 
     await expect(
       sendMail({ to: "a@example.test", subject: "s", ...invitation() }),
     ).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalled();
-    expect(warn.mock.calls[0]?.[0]).toContain("inv_123");
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith("[mail] SMTP_HOST is not configured — mail not sent");
     warn.mockRestore();
   });
 

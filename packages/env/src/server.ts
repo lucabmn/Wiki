@@ -26,9 +26,9 @@ export const env = createEnv({
     RATE_LIMIT_SCIM_MAX: z.coerce.number().int().positive().default(1200),
 
     // ── SMTP ────────────────────────────────────────────────────────────────
-    // Optional as a whole: with SMTP_HOST unset the app still boots and mail is
-    // written to the log instead of sent, so a single-user install needs no
-    // mail server. Invitations and password resets only *work* once it is set.
+    // Optional as a whole: with SMTP_HOST unset the app still boots but mail is
+    // not sent, so a single-user install needs no mail server. Message bodies
+    // are never logged; invitations and password resets only work once it is set.
     SMTP_HOST: z.string().min(1).optional(),
     SMTP_PORT: z.coerce.number().int().positive().default(587),
     // Implicit TLS (port 465). Port 587 upgrades via STARTTLS and stays false.

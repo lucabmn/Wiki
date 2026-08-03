@@ -7,9 +7,8 @@ import { createTransport, type Transporter } from "nodemailer";
  *
  * SMTP is optional on purpose: a single-user self-host has no mail server, and
  * refusing to boot without one would be hostile. With `SMTP_HOST` unset the
- * transport degrades to logging the mail — including the action link — so an
- * operator can still complete a flow by copying the URL out of `docker compose
- * logs server`. Everything that *needs* delivery says so in the log line.
+ * mail is not delivered and only a content-free warning is logged. Message
+ * bodies must never reach logs because they contain authentication links.
  */
 
 let transporter: Transporter | null | undefined;
@@ -46,10 +45,7 @@ export type Mail = {
 export async function sendMail(mail: Mail): Promise<void> {
   const transport = getTransporter();
   if (!transport) {
-    console.warn(
-      `[mail] SMTP_HOST is not configured — not sending "${mail.subject}" to ${mail.to}.\n` +
-        `${mail.text}`,
-    );
+    console.warn("[mail] SMTP_HOST is not configured — mail not sent");
     return;
   }
   try {
