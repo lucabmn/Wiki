@@ -37,7 +37,7 @@ function Menu({ onOpen, onQuit }: { onOpen: (screen: Screen) => void; onQuit: ()
   return (
     <box flexDirection="column" flexGrow={1} padding={1} gap={1}>
       <box flexDirection="column">
-        <ascii-font font="tiny" text="Nilovon Wiki" />
+        <ascii-font font="tiny" text="Wiki" />
         <text attributes={TextAttributes.DIM}>
           Self-Hosted · Installieren, Konfigurieren, Updaten
         </text>

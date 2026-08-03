@@ -11,7 +11,7 @@ export default defineConfig({
       BETTER_AUTH_SECRET: "vitest-integration-signing-key-0123456789abcdef",
       BETTER_AUTH_URL: "http://localhost:3000",
       CORS_ORIGIN: "http://localhost:3001",
-      SMTP_FROM: "Nilovon Wiki <wiki@example.test>",
+      SMTP_FROM: "Wiki <wiki@example.test>",
     },
   },
 });

@@ -94,7 +94,7 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM: ${SMTP_FROM:-Nilovon Wiki <no-reply@localhost>}
+      SMTP_FROM: ${SMTP_FROM:-Wiki <no-reply@localhost>}
       # Object storage for attachments — defaults to the bundled RustFS.
       S3_ENDPOINT: ${S3_ENDPOINT:-http://rustfs:9000}
       S3_REGION: ${S3_REGION:-us-east-1}

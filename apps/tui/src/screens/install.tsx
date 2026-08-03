@@ -94,7 +94,7 @@ export function InstallWizard({ onExit }: { onExit: () => void }) {
     <box flexDirection="column" flexGrow={1} padding={1} gap={1}>
       <box flexDirection="column">
         <text fg={theme.accent} attributes={TextAttributes.BOLD}>
-          Installation — Self-Hosted Nilovon Wiki
+          Installation — Self-Hosted Wiki
         </text>
         <text fg={theme.dim}>{stageHint(stage)}</text>
       </box>

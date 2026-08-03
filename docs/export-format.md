@@ -1,6 +1,6 @@
 # Space export format
 
-Nilovon Wiki exports a complete Space as a ZIP archive. The format is intended for backups,
+Wiki exports a complete Space as a ZIP archive. The format is intended for backups,
 migrations, self-hosting portability, and third-party importers.
 
 ## Versioning
@@ -51,7 +51,7 @@ Markdown and HTML are portable projections of the same TipTap document. Unsuppor
 or mark types degrade to their child text rather than being discarded wholesale. Malformed legacy
 documents fall back to their plain-text projection and record a warning in the page manifest.
 
-Known links to exported Nilovon pages and attachments are rewritten to relative archive paths.
+Known links to exported pages and attachments are rewritten to relative archive paths.
 External URLs remain unchanged.
 
 ## Attachments and access
@@ -70,7 +70,7 @@ GET /exports/spaces/:spaceId?format=markdown|html|json
 ```
 
 The response is `application/zip`, uses `Content-Disposition: attachment`, and is marked
-`private, no-store`. Authentication uses the normal Nilovon session cookie.
+`private, no-store`. Authentication uses the normal session cookie.
 
 ## Import guidance
 

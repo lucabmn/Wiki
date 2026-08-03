@@ -1,5 +1,5 @@
 <!--
-  Thanks for contributing to Nilovon Wiki!
+  Thanks for contributing to Wiki!
   Keep PRs focused — one logical change per PR. See CONTRIBUTING.md.
 -->
 

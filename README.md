@@ -1,6 +1,6 @@
 <div align="center">
 
-# Nilovon Wiki
+# Wiki
 
 **A self-hostable, organization-scoped knowledge base — spaces, hierarchical pages, comments, and fine-grained role-based access, built on an end-to-end type-safe TypeScript stack.**
 
@@ -14,7 +14,7 @@
 
 ## Overview
 
-Nilovon Wiki is a multi-tenant wiki for teams. Every piece of content lives inside an **organization**; content is grouped into **spaces**, and spaces hold a tree of **pages**. Access is governed by Better Auth's organization plugin with dynamic access control, so permissions are enforced server-side and mirrored in the UI.
+Wiki is a multi-tenant wiki for teams. Every piece of content lives inside an **organization**; content is grouped into **spaces**, and spaces hold a tree of **pages**. Access is governed by Better Auth's organization plugin with dynamic access control, so permissions are enforced server-side and mirrored in the UI.
 
 The codebase is a pnpm + Turborepo monorepo with a strict boundary between the HTTP surface (`apps/server`), the business logic and data contracts (`packages/api`), and the clients that consume them (`apps/web`, `apps/tui`). A single oRPC router definition drives both the type-safe RPC surface and a generated OpenAPI document.
 

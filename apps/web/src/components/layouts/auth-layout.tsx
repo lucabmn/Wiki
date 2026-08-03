@@ -37,7 +37,7 @@ export default function AuthLayout({
             N
           </div>
           <div className="text-[15px] leading-tight font-semibold">
-            Nilovon Wiki
+            Wiki
             <span className="block text-xs font-normal text-white/70">Wissens-Hub</span>
           </div>
         </div>
@@ -60,22 +60,6 @@ export default function AuthLayout({
             ))}
           </ul>
         </div>
-
-        <figure className="relative max-w-md rounded-2xl bg-white/10 p-5 ring-1 ring-white/15 backdrop-blur">
-          <blockquote className="text-[14.5px] leading-relaxed text-white/90">
-            „Seit wir alles im Hub haben, findet jede:r im Team die Antwort selbst – Onboarding
-            dauert halb so lang.“
-          </blockquote>
-          <figcaption className="mt-3 flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-full bg-white/20 text-[11px] font-bold ring-1 ring-white/25">
-              SK
-            </span>
-            <span className="text-[13px]">
-              <span className="font-semibold">Sarah König</span>
-              <span className="block text-white/60">People &amp; Culture</span>
-            </span>
-          </figcaption>
-        </figure>
       </div>
 
       {/* ---- form panel ---- */}
@@ -87,7 +71,7 @@ export default function AuthLayout({
               N
             </div>
             <div className="text-[15px] leading-tight font-semibold">
-              Nilovon Wiki
+              Wiki
               <span className="block text-xs font-normal text-muted-foreground">Wissens-Hub</span>
             </div>
           </div>

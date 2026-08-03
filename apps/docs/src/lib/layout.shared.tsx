@@ -1,7 +1,7 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 import { appName, docsRoute, githubUrl } from "./shared";
 
-/** The Nilovon glyph — a stylized stacked-pages "N" that doubles as the favicon. */
+/** The glyph — a stylized stacked-pages "N" that doubles as the favicon. */
 export function Logo({ className }: { className?: string }) {
   return (
     <svg

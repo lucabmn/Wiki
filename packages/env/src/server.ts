@@ -12,7 +12,7 @@ export const env = createEnv({
     NODE_ENV: nodeEnvSchema,
     // Display name used by Better Auth (emails, passkey prompts). Lets
     // self-hosters white-label without patching source.
-    APP_NAME: z.string().min(1).default("Nilovon Wiki"),
+    APP_NAME: z.string().min(1).default("Wiki"),
     // Port the real-time collaboration service (`apps/collab`) listens on.
     COLLAB_PORT: z.coerce.number().int().positive().default(1234),
     // Per-IP request ceilings (requests per minute). The general limit covers
@@ -38,7 +38,7 @@ export const env = createEnv({
       .transform((value) => value === "true"),
     SMTP_USER: z.string().optional(),
     SMTP_PASSWORD: z.string().optional(),
-    SMTP_FROM: z.string().min(1).default("Nilovon Wiki <no-reply@localhost>"),
+    SMTP_FROM: z.string().min(1).default("Wiki <no-reply@localhost>"),
 
     // ── Object storage (S3-compatible: RustFS, MinIO, AWS S3, …) ────────────
     // Optional for the same reason: attachments stay disabled until configured.

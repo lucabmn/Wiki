@@ -9,7 +9,7 @@
 
 /*
  * Brand tokens. Fumadocs exposes its own `--color-fd-*` design tokens; we only
- * override what carries the Nilovon identity (primary blue + type) and leave the
+ * override what carries the identity (primary blue + type) and leave the
  * neutral scale from the preset untouched so light/dark contrast stays correct.
  */
 :root {

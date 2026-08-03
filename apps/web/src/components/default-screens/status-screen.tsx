@@ -26,7 +26,7 @@ export default function StatusScreen({
             N
           </div>
           <div className="text-left text-[15px] leading-tight font-semibold">
-            Nilovon Wiki
+            Wiki
             <span className="block text-xs font-normal text-muted-foreground">Wissens-Hub</span>
           </div>
         </div>

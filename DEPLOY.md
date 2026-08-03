@@ -1,6 +1,6 @@
 # Deployment
 
-Nilovon Wiki is a self-hosted docker-compose stack: **web** (:3001), **server**
+Wiki is a self-hosted docker-compose stack: **web** (:3001), **server**
 (:3000), **collab** (:1234) and **postgres**. There is no managed/cloud target —
 you run it on your own host.
 

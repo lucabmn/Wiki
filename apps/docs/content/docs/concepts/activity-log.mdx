@@ -4,7 +4,7 @@ description: Every mutation leaves a trail — in the same transaction that made
 icon: History
 ---
 
-Nilovon Wiki records an **audit row for every mutation** — creating a page,
+Wiki records an **audit row for every mutation** — creating a page,
 changing a role, deleting a space. The row is written **inside the same database
 transaction** as the change itself, so the log can never disagree with reality:
 if the write commits, the audit row commits with it; if it rolls back, so does the

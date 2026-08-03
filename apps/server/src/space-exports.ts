@@ -321,12 +321,12 @@ function safePortableUrl(url: string): string {
   return value;
 }
 
-const ARCHIVE_FORMAT_README = `# Nilovon Space Export v1
+const ARCHIVE_FORMAT_README = `# Space Export v1
 
 This archive is self-contained and uses the documented \`nilovon-space-export\` format.
 See \`manifest.json\` for space metadata, page hierarchy, tags, attachment metadata and paths.
 Page bodies live below \`pages/\` in the selected content format. Attachment bytes live below
-\`attachments/\`; links to known Nilovon pages and attachments are rewritten to relative paths.
+\`attachments/\`; links to known pages and attachments are rewritten to relative paths.
 
-The canonical specification is in \`docs/export-format.md\` in the Nilovon Wiki repository.
+The canonical specification is in \`docs/export-format.md\` in the Wiki repository.
 `;

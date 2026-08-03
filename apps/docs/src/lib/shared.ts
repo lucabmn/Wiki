@@ -1,4 +1,4 @@
-export const appName = "Nilovon Wiki";
+export const appName = "Wiki";
 export const appTagline =
   "A self-hostable, organization-scoped knowledge base built on an end-to-end type-safe TypeScript stack.";
 
