@@ -19,6 +19,8 @@ export const space = wikiSchema.table(
     visibility: spaceVisibility("visibility").notNull().default("private"),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
+    // A failed object-storage cleanup leaves this marker for a safe retry.
+    deletionPendingAt: timestamp("deletion_pending_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [

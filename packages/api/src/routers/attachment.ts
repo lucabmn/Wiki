@@ -114,11 +114,21 @@ export const attachmentRouter = {
         capability: "write",
       });
       const organizationId = space.organizationId;
-      // Drop the object first: if this fails the row survives and the delete can
-      // be retried, whereas the reverse order would orphan the bytes for good.
-      await getStorage()
-        ?.delete(existing.storageKey)
-        .catch(() => {});
+      // Persist intent before touching object storage. If storage or the final
+      // DB transaction fails, repeating this request safely resumes deletion.
+      await context.db
+        .update(attachment)
+        .set({ deletionPendingAt: existing.deletionPendingAt ?? new Date() })
+        .where(eq(attachment.id, input.id));
+      const storage = getStorage();
+      if (!storage) {
+        throw new ORPCError("NOT_IMPLEMENTED", {
+          message: "Cannot delete attachment: no object storage is configured.",
+        });
+      }
+      // S3 DeleteObject is idempotent, so retrying after an uncertain response
+      // or a later DB failure is safe.
+      await storage.delete(existing.storageKey);
       await context.db.transaction(async (tx) => {
         await tx.delete(attachment).where(eq(attachment.id, input.id));
         // The attachment row is hard-deleted, so keep identifying info in

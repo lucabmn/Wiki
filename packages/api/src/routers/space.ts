@@ -2,7 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { space, spaceMember } from "@nilovon-wiki/db/schema/index";
+import { attachment, space, spaceMember } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg, requireOrgPermission } from "../index";
 import { assertSpaceRead, buildSpaceReadFilter } from "../lib/access";
@@ -11,6 +11,7 @@ import { recordActivity } from "../lib/activity";
 import { loadSpace } from "../lib/loaders";
 import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
+import { getStorage } from "../lib/storage";
 import { slugify, uniqueSlug } from "../lib/slug";
 import {
   CreateSpaceInputSchema,
@@ -204,6 +205,32 @@ export const spaceRouter = {
       await requireSpaceManage(context.db, context, context.headers, existing, {
         space: ["delete"],
       });
+      // Mark the whole operation before touching storage. The marker and all
+      // attachment markers commit together, making a partial cleanup retryable.
+      const pendingAttachments = await context.db.transaction(async (tx) => {
+        await tx
+          .update(space)
+          .set({ deletionPendingAt: existing.deletionPendingAt ?? new Date() })
+          .where(eq(space.id, input.id));
+        return tx
+          .update(attachment)
+          .set({ deletionPendingAt: new Date() })
+          .where(eq(attachment.spaceId, input.id))
+          .returning({ storageKey: attachment.storageKey });
+      });
+
+      if (pendingAttachments.length > 0) {
+        const storage = getStorage();
+        if (!storage) {
+          throw new ORPCError("NOT_IMPLEMENTED", {
+            message: "Cannot delete space attachments: no object storage is configured.",
+          });
+        }
+        // DeleteObject is idempotent. On failure the space and attachment rows
+        // remain pending, and repeating this request resumes the cleanup.
+        for (const item of pendingAttachments) await storage.delete(item.storageKey);
+      }
+
       await context.db.transaction(async (tx) => {
         await tx.delete(space).where(eq(space.id, input.id));
         // `activity.spaceId` is set-null on delete, so keep the id/name in

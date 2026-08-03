@@ -1,5 +1,7 @@
 import { call } from "@orpc/server";
 import { and, eq } from "drizzle-orm";
+import { Files } from "files-sdk";
+import { memory } from "files-sdk/memory";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the auth module so permission checks are controllable and no db/env is
@@ -8,6 +10,7 @@ const { hasPermission } = vi.hoisted(() => ({ hasPermission: vi.fn() }));
 vi.mock("@nilovon-wiki/auth", () => ({ auth: { api: { hasPermission } } }));
 
 import {
+  attachment,
   organization,
   user,
   member,
@@ -17,11 +20,13 @@ import {
   teamMember,
 } from "@nilovon-wiki/db/schema/index";
 
+import { setStorage } from "../../src/lib/storage";
 import { spaceRouter } from "../../src/routers/space";
 import { createTestDb, type TestDb } from "./db";
 import { testContext } from "./context";
 
 let db: TestDb;
+let storage: Files;
 const now = new Date();
 
 beforeAll(async () => {
@@ -38,11 +43,14 @@ beforeAll(async () => {
   await db.insert(member).values({ id: "mA", organizationId: "oA", userId: "u1", createdAt: now });
 });
 afterAll(async () => {
+  setStorage(null);
   await db.$end();
 });
 beforeEach(() => {
   hasPermission.mockClear();
   hasPermission.mockResolvedValue({ success: true });
+  storage = new Files({ adapter: memory() });
+  setStorage(storage);
 });
 
 const ctx = (userId = "u1", org: string | null = "oA") =>
@@ -160,6 +168,45 @@ describe("space.get visibility gating", () => {
 });
 
 describe("space.delete", () => {
+  it("keeps the space and attachment metadata when object deletion fails", async () => {
+    const created = await call(
+      spaceRouter.create,
+      { name: "Retryable", visibility: "public" },
+      { context: ctx() },
+    );
+    const storageKey = `spaces/${created.id}/file.pdf`;
+    await storage.upload(storageKey, new Blob(["hello"]));
+    await db.insert(attachment).values({
+      id: "attachment-to-retry",
+      spaceId: created.id,
+      fileName: "file.pdf",
+      mimeType: "application/pdf",
+      size: 5,
+      storageKey,
+      uploadedBy: "u1",
+    });
+    vi.spyOn(storage, "delete").mockRejectedValueOnce(new Error("storage unavailable"));
+
+    await expect(call(spaceRouter.delete, { id: created.id }, { context: ctx() })).rejects.toThrow(
+      "storage unavailable",
+    );
+
+    const survivingSpace = await db.query.space.findFirst({ where: eq(space.id, created.id) });
+    const survivingAttachment = await db.query.attachment.findFirst({
+      where: eq(attachment.id, "attachment-to-retry"),
+    });
+    expect(survivingSpace?.deletionPendingAt).toBeInstanceOf(Date);
+    expect(survivingAttachment?.deletionPendingAt).toBeInstanceOf(Date);
+    expect(await storage.exists(storageKey)).toBe(true);
+
+    await call(spaceRouter.delete, { id: created.id }, { context: ctx() });
+    expect(await db.query.space.findFirst({ where: eq(space.id, created.id) })).toBeUndefined();
+    expect(
+      await db.query.attachment.findFirst({ where: eq(attachment.id, "attachment-to-retry") }),
+    ).toBeUndefined();
+    expect(await storage.exists(storageKey)).toBe(false);
+  });
+
   it("hard-deletes the space and records space.deleted with identifying metadata", async () => {
     const created = await call(
       spaceRouter.create,
@@ -173,7 +220,11 @@ describe("space.delete", () => {
 
     // The audit row survives the space, so the id/name live in metadata.
     const acts = await db.query.activity.findMany();
-    const deleted = acts.find((a) => a.action === "space.deleted");
+    const deleted = acts.find(
+      (a) =>
+        a.action === "space.deleted" &&
+        (a.metadata as { spaceId?: string } | null)?.spaceId === created.id,
+    );
     expect(deleted?.spaceId).toBeNull();
     expect(deleted?.metadata).toMatchObject({ spaceId: created.id, name: "Doomed" });
   });

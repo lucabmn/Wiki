@@ -6,7 +6,7 @@ import type { AuthedContext } from "../context";
 import type { Attachment } from "../schemas/attachment";
 import { recordActivity } from "./activity";
 import { requirePageCapability, requireSpaceCapabilityById } from "./authz";
-import { loadPage } from "./loaders";
+import { loadPage, loadSpace } from "./loaders";
 import { firstRow } from "./rows";
 import { buildStorageKey, getStorage } from "./storage";
 
@@ -66,6 +66,13 @@ export async function createAttachment(
       "write",
     ));
     spaceId = input.spaceId;
+  }
+
+  // A pending space deletion must not accept new objects after its cleanup
+  // snapshot was persisted, or the final cascade could orphan those bytes.
+  const targetSpace = await loadSpace(context.db, spaceId);
+  if (targetSpace.deletionPendingAt) {
+    throw new ORPCError("CONFLICT", { message: "Space deletion is already in progress." });
   }
 
   const storageKey = buildStorageKey(spaceId, input.file.name);

@@ -1,4 +1,4 @@
-import { text, bigint, boolean, index } from "drizzle-orm/pg-core";
+import { text, bigint, boolean, index, timestamp } from "drizzle-orm/pg-core";
 
 import { wikiSchema } from "./_schema";
 import { id, timestamps } from "../_helpers";
@@ -26,6 +26,8 @@ export const attachment = wikiSchema.table(
     // Sidebar attachments added before first publication become public with the
     // page even when they are not embedded in rich text.
     publishOnNextPublish: boolean("publish_on_next_publish").default(false).notNull(),
+    // Persisted before touching object storage so failed deletes are retryable.
+    deletionPendingAt: timestamp("deletion_pending_at", { withTimezone: true }),
     createdAt: timestamps.createdAt,
   },
   (t) => [

@@ -219,6 +219,28 @@ describe("attachment.delete", () => {
     expect(deleted?.metadata).toMatchObject({ fileName: "spec.pdf" });
   });
 
+  it("keeps the metadata row when object deletion fails", async () => {
+    const created = await upload();
+    vi.spyOn(storage, "delete").mockRejectedValueOnce(new Error("storage unavailable"));
+
+    await expect(
+      call(attachmentRouter.delete, { id: created.id }, { context: ctx() }),
+    ).rejects.toThrow("storage unavailable");
+
+    const surviving = await db.query.attachment.findFirst({
+      where: eq(attachment.id, created.id),
+    });
+    expect(surviving?.storageKey).toBe(created.storageKey);
+    expect(surviving?.deletionPendingAt).toBeInstanceOf(Date);
+    expect(await storage.exists(created.storageKey)).toBe(true);
+
+    await call(attachmentRouter.delete, { id: created.id }, { context: ctx() });
+    expect(
+      await db.query.attachment.findFirst({ where: eq(attachment.id, created.id) }),
+    ).toBeUndefined();
+    expect(await storage.exists(created.storageKey)).toBe(false);
+  });
+
   it("denies a non-uploader without attachment:delete", async () => {
     const created = await upload();
     hasPermission.mockResolvedValue({ success: false });
