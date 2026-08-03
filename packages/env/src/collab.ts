@@ -15,6 +15,19 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: authSecretSchema,
     NODE_ENV: nodeEnvSchema,
     COLLAB_PORT: z.coerce.number().int().positive().default(1234),
+    /**
+     * Optional. Only needed when collab runs on more than one instance —
+     * Hocuspocus keeps each document in memory, so without Redis pub/sub two
+     * clients served by different instances would never see each other's
+     * edits. Mandatory on serverless platforms (see `src/vercel.ts`), unused
+     * for the single-container docker-compose deploy.
+     */
+    REDIS_URL: z
+      .string()
+      .refine((value) => /^rediss?:\/\//.test(value), {
+        message: "REDIS_URL must be a redis:// or rediss:// URL",
+      })
+      .optional(),
   },
   runtimeEnv: process.env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

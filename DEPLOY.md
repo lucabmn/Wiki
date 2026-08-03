@@ -205,6 +205,43 @@ Keep the `.env` file (especially `BETTER_AUTH_SECRET`, `POSTGRES_PASSWORD`,
 `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`) with your backups — sessions and
 collab tokens are signed with it, and RustFS needs the original credentials.
 
+## Collab on Vercel
+
+The compose deploy above runs collab as a long-lived container, which is what
+Hocuspocus is built for. It can also run as a Vercel Function
+(`apps/collab/src/vercel.ts`), at a cost — read the limits before choosing it.
+
+**Redis is mandatory.** Hocuspocus holds each document in memory and Vercel
+gives no connection affinity, so two people editing the same page routinely land
+on different function instances. `@hocuspocus/extension-redis` mirrors updates
+and awareness between them over pub/sub; without it the deployment looks healthy
+while silently splitting editors into isolated copies. The serverless entry
+refuses to boot when `REDIS_URL` is unset for exactly this reason.
+
+Setup:
+
+1. New Vercel project, root directory `apps/collab`. `vercel.json` there already
+   sets the build command and rewrites every path to the function.
+2. Add a Redis with a **TCP** endpoint (`rediss://…`) — Upstash's REST API
+   cannot do pub/sub. Budget two connections per warm instance (pub + sub).
+3. Environment variables: `DATABASE_URL`, `BETTER_AUTH_SECRET` (byte-identical
+   to the API's — it verifies the collab-token HMAC), `REDIS_URL`.
+4. Raise `maxDuration` for the function on your plan (Pro allows 800s). This is
+   the reconnect interval, so the default 5 minutes is the floor, not a target.
+5. Rebuild the web app with `VITE_COLLAB_URL=wss://<project>.vercel.app`. It is
+   baked in at build time — changing the variable without redeploying web does
+   nothing.
+
+Limits you own after this:
+
+- Every socket is closed when the function hits `maxDuration`. The editor
+  reconnects on its own (`page-editor.tsx` passes `token` as an async function,
+  so it re-mints a collab token each time) — expect a brief "connecting" blip.
+- Instances are frozen without `SIGTERM`. The serverless entry compensates with
+  a 400 ms / 2 s store debounce and an explicit flush on socket close instead of
+  the graceful shutdown the container path uses.
+- Every cross-instance edit takes a Redis round trip.
+
 ## Health & monitoring
 
 - `GET http://<api>/health` — deep health check (verifies database

@@ -1,33 +1,28 @@
-import { Database } from "@hocuspocus/extension-database";
 import { Server } from "@hocuspocus/server";
-import { TiptapTransformer } from "@hocuspocus/transformer";
-import { eq } from "drizzle-orm";
 import { initLogger, log, parseError } from "evlog";
-import * as Y from "yjs";
 
-import { pageIdFromDocName } from "@nilovon-wiki/api/lib/collab-token";
-import { db } from "@nilovon-wiki/db";
-import { page } from "@nilovon-wiki/db/schema/index";
-import { pageEditorExtensions } from "@nilovon-wiki/editor";
 import { env } from "@nilovon-wiki/env/collab";
 
-import { authorizeCollab } from "./authorize";
+import { createCollabConfiguration } from "./hocuspocus";
 
 /**
- * Real-time collaboration server for page bodies.
+ * Real-time collaboration server for page bodies — long-lived process entry.
  *
  * Runs as a standalone Node process (Hocuspocus is built on `ws`/crossws and
  * refuses to run under Bun), separate from the Bun/Hono API. One Yjs document
  * per page (`page:<id>`); the Yjs CRDT is the source of truth for the *working
  * copy* while a page is open.
  *
+ * This is the entry used by `apps/collab/Dockerfile` and docker-compose. The
+ * serverless variant lives in `src/vercel.ts`; both share the persistence and
+ * authorization rules from `src/hocuspocus.ts`.
+ *
  * Publish model: the shared doc is the private working draft. The server
  * persists it as `yjsState` ONLY — it does NOT project into `content` /
  * `textContent`. Those columns are the *published* projection and are written
  * exclusively by `pages.publish`, so in-progress edits stay invisible to
  * readers, search, and backlinks until an editor explicitly publishes. On first
- * connect the doc is seeded from the last published `content` (see
- * `fetchDocument`).
+ * connect the doc is seeded from the last published `content`.
  *
  * Authorization is delegated to the API server: a client presents a short-lived,
  * page-scoped token minted by `pages.collabToken` only after a full `page:write`
@@ -37,73 +32,12 @@ import { authorizeCollab } from "./authorize";
 
 initLogger({ env: { service: "nilovon-wiki-collab" } });
 
-// The Yjs fragment field the TipTap Collaboration extension writes to; must
-// match the browser's `Collaboration.configure({ field })` default.
-const FIELD = "default";
-
-/** Load the page's Yjs snapshot (or seed one from its stored JSON content). */
-async function fetchDocument(pageId: string): Promise<Uint8Array | null> {
-  const row = await db.query.page.findFirst({
-    where: eq(page.id, pageId),
-    columns: { yjsState: true, content: true },
-  });
-  if (!row) return null;
-  if (row.yjsState && row.yjsState.byteLength > 0) return row.yjsState;
-
-  // First time this page is opened collaboratively: seed the working-copy Yjs
-  // doc from the last published `content` so editing resumes from what readers
-  // currently see (empty for a page that has never been published).
-  if (row.content) {
-    const ydoc = TiptapTransformer.toYdoc(row.content, FIELD, pageEditorExtensions());
-    return Y.encodeStateAsUpdate(ydoc);
-  }
-  return null;
-}
-
-/**
- * Persist the working-copy CRDT snapshot ONLY. The published projection
- * (`content` / `textContent` + backlinks) is written solely by `pages.publish`,
- * so debounced edits never leak into any reader-facing surface.
- */
-async function storeDocument(pageId: string, state: Uint8Array): Promise<void> {
-  // A no-op WHERE (page deleted while open) simply updates nothing.
-  await db.update(page).set({ yjsState: state }).where(eq(page.id, pageId));
-}
-
 const server = new Server({
   port: env.COLLAB_PORT,
-  name: "nilovon-wiki-collab",
-
-  // The returned identity is exposed to awareness (collaboration cursors) and
-  // to hooks as `context`; its `exp` drives the periodic re-auth sweep below.
-  onAuthenticate: ({ token, documentName }) =>
-    authorizeCollab(env.BETTER_AUTH_SECRET, token, documentName),
-
-  extensions: [
-    new Database({
-      fetch: async ({ documentName }) => {
-        const pageId = pageIdFromDocName(documentName);
-        if (!pageId) return null;
-        return fetchDocument(pageId);
-      },
-      store: async ({ documentName, state, document }) => {
-        const pageId = pageIdFromDocName(documentName);
-        if (!pageId) return;
-        try {
-          await storeDocument(pageId, state);
-        } catch (error) {
-          log.error({ source: "collab", op: "store", documentName, ...parseError(error) });
-          // Persisting failed: without this, users keep typing into a document
-          // that will never be saved. Closing the connections surfaces the
-          // problem in the client UI ("connection lost") and triggers its
-          // reconnect loop instead of silent data loss.
-          for (const connection of document.getConnections()) {
-            connection.close();
-          }
-        }
-      },
-    }),
-  ],
+  ...createCollabConfiguration({
+    authSecret: env.BETTER_AUTH_SECRET,
+    redisUrl: env.REDIS_URL,
+  }),
 });
 
 /**
@@ -117,6 +51,9 @@ const server = new Server({
  * can no longer obtain a token and is evicted. This makes the revocation bound
  * documented on `COLLAB_TOKEN_TTL_SECONDS` real for long-lived connections,
  * without duplicating any authorization logic here.
+ *
+ * Deliberately absent from `src/vercel.ts`: there the platform's function
+ * duration cap tears every socket down far more often than the token TTL.
  */
 const REVALIDATE_INTERVAL_MS = 60_000;
 const revalidator = setInterval(() => {

@@ -112,14 +112,17 @@ importers:
   apps/collab:
     dependencies:
       '@hocuspocus/extension-database':
-        specifier: ^4.3.0
-        version: 4.3.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+        specifier: ^4.4.0
+        version: 4.4.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+      '@hocuspocus/extension-redis':
+        specifier: ^4.4.0
+        version: 4.4.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
       '@hocuspocus/server':
-        specifier: ^4.3.0
-        version: 4.3.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+        specifier: ^4.4.0
+        version: 4.4.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
       '@hocuspocus/transformer':
-        specifier: ^4.3.0
-        version: 4.3.0(@tiptap/core@3.27.3(@tiptap/pm@3.27.3))(@tiptap/pm@3.27.3)(y-prosemirror@1.3.7(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-view@1.42.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31))(yjs@13.6.31)
+        specifier: ^4.4.0
+        version: 4.4.0(@tiptap/core@3.27.3(@tiptap/pm@3.27.3))(@tiptap/pm@3.27.3)(y-prosemirror@1.3.7(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-view@1.42.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31))(yjs@13.6.31)
       '@nilovon-wiki/api':
         specifier: workspace:*
         version: link:../../packages/api
@@ -135,15 +138,24 @@ importers:
       '@tiptap/core':
         specifier: ^3.0.7
         version: 3.27.3(@tiptap/pm@3.27.3)
+      '@vercel/functions':
+        specifier: ^3.7.6
+        version: 3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0)
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0)
       evlog:
         specifier: 'catalog:'
         version: 2.20.0(@orpc/server@1.14.7(crossws@0.4.9(srvx@0.11.22))(ws@8.21.0))(@tanstack/start-client-core@1.170.13)(express@5.2.1)(hono@4.12.28)(react@19.2.7)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.0))
+      ioredis:
+        specifier: ~5.6.1
+        version: 5.6.1
       tsx:
         specifier: ^4.20.3
         version: 4.23.0
+      ws:
+        specifier: ^8.18.3
+        version: 8.21.0
       yjs:
         specifier: ^13.6.27
         version: 13.6.31
@@ -154,6 +166,12 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      tsdown:
+        specifier: ^0.22.3
+        version: 0.22.3(tsx@4.23.0)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -226,7 +244,7 @@ importers:
         version: 6.0.3(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
       nitro:
         specifier: ^3.0.260610-beta
-        version: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
+        version: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.2
@@ -277,7 +295,7 @@ importers:
         version: 0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0)
       evlog:
         specifier: 'catalog:'
-        version: 2.20.0(@orpc/server@1.14.7(crossws@0.4.9(srvx@0.11.22))(ws@8.21.0))(@tanstack/start-client-core@1.170.13)(express@5.2.1)(hono@4.12.28)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)))(react@19.2.7)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
+        version: 2.20.0(@orpc/server@1.14.7(crossws@0.4.9(srvx@0.11.22))(ws@8.21.0))(@tanstack/start-client-core@1.170.13)(express@5.2.1)(hono@4.12.28)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)))(react@19.2.7)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
       hono:
         specifier: 'catalog:'
         version: 4.12.28
@@ -474,7 +492,7 @@ importers:
         version: 17.4.2
       evlog:
         specifier: 'catalog:'
-        version: 2.20.0(@orpc/server@1.14.7(crossws@0.4.9(srvx@0.11.22))(ws@8.21.0))(@tanstack/start-client-core@1.170.13)(express@5.2.1)(hono@4.12.28)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)))(react@19.2.7)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
+        version: 2.20.0(@orpc/server@1.14.7(crossws@0.4.9(srvx@0.11.22))(ws@8.21.0))(@tanstack/start-client-core@1.170.13)(express@5.2.1)(hono@4.12.28)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)))(react@19.2.7)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
       lucide-react:
         specifier: 'catalog:'
         version: 1.23.0(react@19.2.7)
@@ -483,7 +501,7 @@ importers:
         version: 0.4.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       nitro:
         specifier: ^3.0.260610-beta
-        version: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
+        version: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
       qrcode.react:
         specifier: ^4.2.0
         version: 4.2.0(react@19.2.7)
@@ -1878,9 +1896,18 @@ packages:
   '@hocuspocus/common@4.3.0':
     resolution: {integrity: sha512-8USsMvso01aMKOSSyvb8oTAlfES/nBM+Y74XjW5Fy5ovmOaVpoRRBrktIrEVwydrp8Cr6C66ivc0orcW/3P+Kg==}
 
-  '@hocuspocus/extension-database@4.3.0':
-    resolution: {integrity: sha512-iiFU2l+/lxXVREXS9VUMDJQCOzM3LWOlFs0ezNkFIrXUf7u4LyagCR5v5y8zoBxMGNE5NwzMkP4xBiDX/Tc90A==}
+  '@hocuspocus/common@4.4.0':
+    resolution: {integrity: sha512-cPSlPu/ws2JzBHW6OzctyaQMyDCq/YUS4nhXSbyMdkQwJzhjCkvfmmRnVtcmgLR3TBLaNwToNDwR/mNaJFOYsg==}
+
+  '@hocuspocus/extension-database@4.4.0':
+    resolution: {integrity: sha512-N7ZP29cEqK5JWQQIkuSxnAYND9MB2EmrM9neFlHXz60VJ6L4zhvqAtG+m3XHPXPxx1sGKVcljhLlg1xba4E/DQ==}
     peerDependencies:
+      yjs: ^13.6.8
+
+  '@hocuspocus/extension-redis@4.4.0':
+    resolution: {integrity: sha512-DUqfWSoFF/+snpm2nBXc3uanG6/X7olGK75Tx+T/SPwtKTmpURXwK3UgT2Bt9VyTonTDLp+pCHM/yqEXNAWWhA==}
+    peerDependencies:
+      y-protocols: ^1.0.6
       yjs: ^13.6.8
 
   '@hocuspocus/provider@4.3.0':
@@ -1889,15 +1916,15 @@ packages:
       y-protocols: ^1.0.6
       yjs: ^13.6.8
 
-  '@hocuspocus/server@4.3.0':
-    resolution: {integrity: sha512-GX9ohUJAr6aIa2ewS0EPeyf3w12wLCBBSGfc76ZMOuZJZPUzDH6BJWFjkVlaVW3OmwZ5+jxdXXFUf6sAi4EIrg==}
+  '@hocuspocus/server@4.4.0':
+    resolution: {integrity: sha512-eVSnx+76CN81vaRol+OlT8FyyGFOBF9Z+kdJQhjVXRpj3kIAI1TzuRHKiZN1vkUogdHfmOAN5Bhs5v7V/qhMkQ==}
     engines: {node: '>=22'}
     peerDependencies:
       y-protocols: ^1.0.6
       yjs: ^13.6.8
 
-  '@hocuspocus/transformer@4.3.0':
-    resolution: {integrity: sha512-f372W+BaAAD4mgXITe/qHh53T35Cd8sxnsokBHwfuubu1wB6YUZZ3fKasI4yEw9UoX8pIRqtClA8nExXCfgZGA==}
+  '@hocuspocus/transformer@4.4.0':
+    resolution: {integrity: sha512-wvHgbiWfU1QERIMd37aImtb4xbHRGwek+66VPgFaSx3POgxCKmkZH5iVY25j/T0PBmloofPoV1XYbwLwJZMtJw==}
     peerDependencies:
       '@tiptap/core': ^3.0.1
       '@tiptap/pm': ^3.0.1
@@ -1909,6 +1936,9 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@ioredis/commands@1.11.0':
+    resolution: {integrity: sha512-tuMmOu6dtyGFv/fzCjtapCJj/zgoHaFsqs3wKsroJSRXtlLmyL/t+B7uaQiavGk1F3WWFQcUqZwk92bpp9jKcA==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -2831,6 +2861,12 @@ packages:
   '@sec-ant/readable-stream@0.4.1':
     resolution: {integrity: sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg==}
 
+  '@sesamecare-oss/redlock@1.4.0':
+    resolution: {integrity: sha512-2z589R+yxKLN4CgKxP1oN4dsg6Y548SE4bVYam/R0kHk7Q9VrQ9l66q+k1ehhSLLY4or9hcchuF9/MhuuZdjJg==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      ioredis: '>=5'
+
   '@shadcn/react@0.2.0':
     resolution: {integrity: sha512-g/LMtyL0eiHCHkOCelhYf32RC5nTMdtUNag1ZQRhSDCW+jnHxDY1Dajk7P6zJosOg8z2N4wzfKOY5sh54QTDYA==}
     peerDependencies:
@@ -3649,6 +3685,9 @@ packages:
   '@types/validate-npm-package-name@4.0.2':
     resolution: {integrity: sha512-lrpDziQipxCEeK5kWxvljWYhUvOiB2A9izZd9B2AFarYAkqZshb4lPbRs7zKEic6eGtH8V/2qJW+dPp9OtF6bw==}
 
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+
   '@typescript/typescript-aix-ppc64@7.0.2':
     resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
     engines: {node: '>=16.20.0'}
@@ -3771,6 +3810,29 @@ packages:
 
   '@ungap/structured-clone@1.3.2':
     resolution: {integrity: sha512-5jsZFwgR5rTdKwidH9Qmat75RKwqfpKlWWB1frDkljN127mwqBu8K0PYo7/hFpF03IEJpfVPpCQDY/eDx3iHvA==}
+
+  '@vercel/cli-config@0.2.1':
+    resolution: {integrity: sha512-RhfyXmRLHdbnry8RJqHDc+5rGxMZ0bu+fpysZjtv3bE+BubpuwxTancHOKiH5zKQREsdwFVr3mOI2kOvxlOyxA==}
+
+  '@vercel/cli-exec@1.0.0':
+    resolution: {integrity: sha512-kQF8LGie/Hbdq9/psJxLE7owRTcqMQMhgybU04gCeR7cbQAr5t8OrjefDNColJv1QSSucFt4pLwRiARVmlOnug==}
+    engines: {node: '>= 18'}
+
+  '@vercel/functions@3.7.6':
+    resolution: {integrity: sha512-QKlSfrgvo4pGEnzHw8Dha9GRTb5hhLBbImKi4rL4CmxClaVs+36hxgjW0MOqez57wWShstpKOWZY/mU8KuYoUQ==}
+    engines: {node: '>= 20'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-web-identity': '*'
+      ws: '>=8'
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-web-identity':
+        optional: true
+      ws:
+        optional: true
+
+  '@vercel/oidc@3.8.1':
+    resolution: {integrity: sha512-ufdalm2MWOYksyj8KVpWjoOFPJO6zoYpuyvIggIQ2bB0CFCjTCiTkGXHqAKwG77GVRjOaN3/8S5ITlZpXWmqOw==}
+    engines: {node: '>= 20'}
 
   '@vitejs/plugin-react@6.0.3':
     resolution: {integrity: sha512-vmFvco5/QuC2f9Oj+wTk0+9XeDFkHxSamwZKYc7MxYwKICfvUvlMhqKI0VuICPltGqh1neqBKDvO4kes1ya8vg==}
@@ -4204,6 +4266,10 @@ packages:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
     engines: {node: '>=6'}
 
+  cluster-key-slot@1.1.2:
+    resolution: {integrity: sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA==}
+    engines: {node: '>=0.10.0'}
+
   cmdk@1.1.1:
     resolution: {integrity: sha512-Vsv7kFaXm+ptHDMZ7izaRsP70GgrW9NBNGswt9OZaVBLlE0SNpDq8eu/VGXyF9r7M0azK3Wy7OlYXsuyYLFzHg==}
     peerDependencies:
@@ -4459,6 +4525,10 @@ packages:
 
   defu@6.1.7:
     resolution: {integrity: sha512-7z22QmUWiQ/2d0KkdYmANbRUVABpZ9SNYyH5vx6PZ+nE5bcC0l7uFvEfHlyld/HcGBFTL536ClDt3DEcSlEJAQ==}
+
+  denque@2.1.0:
+    resolution: {integrity: sha512-HVQE3AAb/pxF8fQAoiqpvg9i3evqug3hoiwakOyZAwJm+6vZehbkYXZ0l4JxS+I3QxM97v5aaRNhj8v5oBhekw==}
+    engines: {node: '>=0.10'}
 
   depd@2.0.0:
     resolution: {integrity: sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==}
@@ -5388,6 +5458,10 @@ packages:
     resolution: {integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==}
     engines: {node: '>=12'}
 
+  ioredis@5.6.1:
+    resolution: {integrity: sha512-UxC0Yv1Y4WRJiGQxQkP0hfdL0/5/6YvdfOOClRgJ0qppSarkhneSa6UvkMkms0AkdGimSH3Ikqm+6mkMmX7vGA==}
+    engines: {node: '>=12.22.0'}
+
   ip-address@10.2.0:
     resolution: {integrity: sha512-/+S6j4E9AHvW9SWMSEY9Xfy66O5PWvVEJ08O0y5JGyEKQpojb0K0GKpz/v5HJ/G0vi3D2sjGK78119oXZeE0qA==}
     engines: {node: '>= 12'}
@@ -5515,6 +5589,9 @@ packages:
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
+
+  jose@5.10.0:
+    resolution: {integrity: sha512-s+3Al/p9g32Iq+oqXxkW//7jk2Vig6FF1CFqzVXoTUXt2qz89YWbL+OwS17NFYEvxC35n0FKeGO2LGYSxeM2Gg==}
 
   jose@6.2.3:
     resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
@@ -5721,6 +5798,12 @@ packages:
   locate-path@3.0.0:
     resolution: {integrity: sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A==}
     engines: {node: '>=6'}
+
+  lodash.defaults@4.2.0:
+    resolution: {integrity: sha512-qjxPLHd3r5DnsdGacqOMU6pb/avJzdh9tFX2ymgoZE27BmjXrNy/y4LoaiTeAb+O3gL8AfpJGtqfX/ae2leYYQ==}
+
+  lodash.isarguments@3.1.0:
+    resolution: {integrity: sha512-chi4NHZlZqZD18a0imDHnZPrDeBbTtVN7GXMwuGdRH9qotxAjYs3aVLKc7zNOG9eddR5Ksd8rvFEBc9SsggPpg==}
 
   log-symbols@6.0.0:
     resolution: {integrity: sha512-i24m8rpwhmPIS4zscNzK6MSEhk0DUWa/8iYQWxhffV8jkI4Phvs3F+quL5xvS0gdQR0FyTCMMH33Y78dDTzzIw==}
@@ -6132,6 +6215,10 @@ packages:
   orderedmap@2.1.1:
     resolution: {integrity: sha512-TvAWxi0nDe1j/rtMcWcIj94+Ffe6n7zhow33h40SKxmsmozs6dz/e+EajymfoFcHd7sxNn8yHM8839uixMOV6g==}
 
+  os-paths@4.4.0:
+    resolution: {integrity: sha512-wrAwOeXp1RRMFfQY8Sy7VaGVmPocaLwSFOYCGKSyo8qmJ+/yaafCl5BCA1IQZWqFSRBrKDYFeR9d/VyQzfH/jg==}
+    engines: {node: '>= 6.0'}
+
   oxfmt@0.57.0:
     resolution: {integrity: sha512-ZB7Bi+rGDSqmVIo9jwcLyFgjxXvQhDdU+jx+ZrVy6VRiVXK2+CHc4hO3J4dUQjHe7V0ymHB+MDuv5z+NhK07HA==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -6537,6 +6624,14 @@ packages:
   recma-stringify@1.0.0:
     resolution: {integrity: sha512-cjwII1MdIIVloKvC9ErQ+OgAtwHBmcZ0Bg4ciz78FtbT8In39aAYbaA7zvxQ61xVMSPE8WxhLwLbhif4Js2C+g==}
 
+  redis-errors@1.2.0:
+    resolution: {integrity: sha512-1qny3OExCf0UvUV/5wpYKf2YwPcOqXzkwKKSmKHiE6ZMQs5heeE/c8eXK+PNllPvmjgAbfnsbpkGZWy8cBpn9w==}
+    engines: {node: '>=4'}
+
+  redis-parser@3.0.0:
+    resolution: {integrity: sha512-DJnGAeenTdpMEH6uAJRK/uiyEIH9WVsUmoLwzudwGJUwZPp80PDBWPHXSAGNPwNvIXAbe7MSUB1zQFugFml66A==}
+    engines: {node: '>=4'}
+
   redux-thunk@3.1.0:
     resolution: {integrity: sha512-NW2r5T6ksUKXCabzhL9z+h206HQw/NJkcLm1GPImRQ8IzfXwRGqjVhKJGauHirT0DAuyy6hjdnMZaRoAcy0Klw==}
     peerDependencies:
@@ -6808,6 +6903,9 @@ packages:
 
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
+
+  standard-as-callback@2.1.0:
+    resolution: {integrity: sha512-qoRRSyROncaz1z0mvYqIE4lCd9p2R90i6GxW3uZv5ucSu8tU7B5HXUP1gG8pVZsYNVaXjk8ClXHPttLyxAL48A==}
 
   statuses@2.0.2:
     resolution: {integrity: sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==}
@@ -7483,6 +7581,14 @@ packages:
     resolution: {integrity: sha512-g/eziiSUNBSsdDJtCLB8bdYEUMj4jR7AGeUo96p/3dTafgjHhpF4RiCFPiRILwjQoDXx5MqkBr4fwWtR3Ky4Wg==}
     engines: {node: '>=20'}
 
+  xdg-app-paths@5.5.1:
+    resolution: {integrity: sha512-hI3flOB4PLZIy5prbtTpirobtPE2ZtZ52szO+2mM9Efp6ErM398La+C1lIpNWDfNoQk+6Lsi6nMcCwVB7pxeMQ==}
+    engines: {node: '>= 6.0'}
+
+  xdg-portable@7.3.0:
+    resolution: {integrity: sha512-sqMMuL1rc0FmMBOzCpd0yuy9trqF2yTTVe+E9ogwCSWQCdDEtQUwrZPT6AxqtsFGRNxycgncbP/xmOOSPw5ZUw==}
+    engines: {node: '>= 6.0'}
+
   xml-crypto@6.1.2:
     resolution: {integrity: sha512-leBOVQdVi8FvPJrMYoum7Ici9qyxfE4kVi+AkpUoYCSXaQF4IlBm1cneTK9oAxR61LpYxTx7lNcsnBIeRpGW2w==}
     engines: {node: '>=16'}
@@ -7566,6 +7672,9 @@ packages:
 
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
+  zod@4.1.11:
+    resolution: {integrity: sha512-WPsqwxITS2tzx1bzhIKsEs19ABD5vmCVa4xBo2tq/SrV4RNZtfws1EnCWQXM6yh8bD08a1idvkB5MZSBiZsjwg==}
 
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
@@ -8530,13 +8639,30 @@ snapshots:
     dependencies:
       lib0: 0.2.117
 
-  '@hocuspocus/extension-database@4.3.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)':
+  '@hocuspocus/common@4.4.0':
     dependencies:
-      '@hocuspocus/server': 4.3.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+      lib0: 0.2.117
+
+  '@hocuspocus/extension-database@4.4.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)':
+    dependencies:
+      '@hocuspocus/server': 4.4.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
       yjs: 13.6.31
     transitivePeerDependencies:
       - srvx
       - y-protocols
+
+  '@hocuspocus/extension-redis@4.4.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)':
+    dependencies:
+      '@hocuspocus/common': 4.4.0
+      '@hocuspocus/server': 4.4.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+      '@sesamecare-oss/redlock': 1.4.0(ioredis@5.6.1)
+      ioredis: 5.6.1
+      kleur: 4.1.5
+      y-protocols: 1.0.7(yjs@13.6.31)
+      yjs: 13.6.31
+    transitivePeerDependencies:
+      - srvx
+      - supports-color
 
   '@hocuspocus/provider@4.3.0(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)':
     dependencies:
@@ -8546,9 +8672,9 @@ snapshots:
       y-protocols: 1.0.7(yjs@13.6.31)
       yjs: 13.6.31
 
-  '@hocuspocus/server@4.3.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)':
+  '@hocuspocus/server@4.4.0(srvx@0.11.22)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)':
     dependencies:
-      '@hocuspocus/common': 4.3.0
+      '@hocuspocus/common': 4.4.0
       async-mutex: 0.5.0
       crossws: 0.4.9(srvx@0.11.22)
       kleur: 4.1.5
@@ -8558,7 +8684,7 @@ snapshots:
     transitivePeerDependencies:
       - srvx
 
-  '@hocuspocus/transformer@4.3.0(@tiptap/core@3.27.3(@tiptap/pm@3.27.3))(@tiptap/pm@3.27.3)(y-prosemirror@1.3.7(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-view@1.42.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31))(yjs@13.6.31)':
+  '@hocuspocus/transformer@4.4.0(@tiptap/core@3.27.3(@tiptap/pm@3.27.3))(@tiptap/pm@3.27.3)(y-prosemirror@1.3.7(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-view@1.42.0)(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31))(yjs@13.6.31)':
     dependencies:
       '@tiptap/core': 3.27.3(@tiptap/pm@3.27.3)
       '@tiptap/pm': 3.27.3
@@ -8569,6 +8695,8 @@ snapshots:
   '@hono/node-server@1.19.14(hono@4.12.28)':
     dependencies:
       hono: 4.12.28
+
+  '@ioredis/commands@1.11.0': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -9423,6 +9551,10 @@ snapshots:
     optional: true
 
   '@sec-ant/readable-stream@0.4.1': {}
+
+  '@sesamecare-oss/redlock@1.4.0(ioredis@5.6.1)':
+    dependencies:
+      ioredis: 5.6.1
 
   '@shadcn/react@0.2.0(@types/react@19.2.17)(react@19.2.7)':
     optionalDependencies:
@@ -10452,6 +10584,10 @@ snapshots:
 
   '@types/validate-npm-package-name@4.0.2': {}
 
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 24.13.3
+
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true
 
@@ -10513,6 +10649,28 @@ snapshots:
     optional: true
 
   '@ungap/structured-clone@1.3.2': {}
+
+  '@vercel/cli-config@0.2.1':
+    dependencies:
+      xdg-app-paths: 5.5.1
+      zod: 4.1.11
+
+  '@vercel/cli-exec@1.0.0':
+    dependencies:
+      execa: 5.1.1
+
+  '@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0)':
+    dependencies:
+      '@vercel/oidc': 3.8.1
+    optionalDependencies:
+      '@aws-sdk/credential-provider-web-identity': 3.972.65
+      ws: 8.21.0
+
+  '@vercel/oidc@3.8.1':
+    dependencies:
+      '@vercel/cli-config': 0.2.1
+      '@vercel/cli-exec': 1.0.0
+      jose: 5.10.0
 
   '@vitejs/plugin-react@6.0.3(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))':
     dependencies:
@@ -10898,6 +11056,8 @@ snapshots:
 
   clsx@2.1.1: {}
 
+  cluster-key-slot@1.1.2: {}
+
   cmdk@1.1.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.7)
@@ -11097,6 +11257,8 @@ snapshots:
   define-lazy-prop@3.0.0: {}
 
   defu@6.1.7: {}
+
+  denque@2.1.0: {}
 
   depd@2.0.0: {}
 
@@ -11370,13 +11532,13 @@ snapshots:
     dependencies:
       eventsource-parser: 3.1.0
 
-  evlog@2.20.0(@orpc/server@1.14.7(crossws@0.4.9(srvx@0.11.22))(ws@8.21.0))(@tanstack/start-client-core@1.170.13)(express@5.2.1)(hono@4.12.28)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)))(react@19.2.7)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)):
+  evlog@2.20.0(@orpc/server@1.14.7(crossws@0.4.9(srvx@0.11.22))(ws@8.21.0))(@tanstack/start-client-core@1.170.13)(express@5.2.1)(hono@4.12.28)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)))(react@19.2.7)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)):
     optionalDependencies:
       '@orpc/server': 1.14.7(crossws@0.4.9(srvx@0.11.22))(ws@8.21.0)
       '@tanstack/start-client-core': 1.170.13
       express: 5.2.1
       hono: 4.12.28
-      nitro: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
+      nitro: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0))
       react: 19.2.7
       vite: 8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)
 
@@ -11886,6 +12048,20 @@ snapshots:
 
   internmap@2.0.3: {}
 
+  ioredis@5.6.1:
+    dependencies:
+      '@ioredis/commands': 1.11.0
+      cluster-key-slot: 1.1.2
+      debug: 4.4.3
+      denque: 2.1.0
+      lodash.defaults: 4.2.0
+      lodash.isarguments: 3.1.0
+      redis-errors: 1.2.0
+      redis-parser: 3.0.0
+      standard-as-callback: 2.1.0
+    transitivePeerDependencies:
+      - supports-color
+
   ip-address@10.2.0: {}
 
   ipaddr.js@1.9.1: {}
@@ -11964,6 +12140,8 @@ snapshots:
   isomorphic.js@0.2.5: {}
 
   jiti@2.7.0: {}
+
+  jose@5.10.0: {}
 
   jose@6.2.3: {}
 
@@ -12133,6 +12311,10 @@ snapshots:
     dependencies:
       p-locate: 3.0.0
       path-exists: 3.0.0
+
+  lodash.defaults@4.2.0: {}
+
+  lodash.isarguments@3.1.0: {}
 
   log-symbols@6.0.0:
     dependencies:
@@ -12656,7 +12838,7 @@ snapshots:
 
   nf3@0.3.19: {}
 
-  nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)):
+  nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)):
     dependencies:
       consola: 3.4.2
       crossws: 0.4.9(srvx@0.11.21)
@@ -12671,7 +12853,7 @@ snapshots:
       rolldown: 1.1.4
       srvx: 0.11.21
       unenv: 2.0.0-rc.24
-      unstorage: 2.0.0-alpha.7(aws4fetch@1.0.20)(chokidar@5.0.0)(db0@0.3.4(@electric-sql/pglite@0.5.4)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0)))(lru-cache@11.5.1)(ofetch@2.0.0-alpha.3)
+      unstorage: 2.0.0-alpha.7(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(db0@0.3.4(@electric-sql/pglite@0.5.4)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0)))(lru-cache@11.5.1)(ofetch@2.0.0-alpha.3)
     optionalDependencies:
       dotenv: 17.4.2
       jiti: 2.7.0
@@ -12709,7 +12891,7 @@ snapshots:
       - uploadthing
       - wrangler
 
-  nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)):
+  nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)):
     dependencies:
       consola: 3.4.2
       crossws: 0.4.9(srvx@0.11.21)
@@ -12724,7 +12906,7 @@ snapshots:
       rolldown: 1.1.4
       srvx: 0.11.21
       unenv: 2.0.0-rc.24
-      unstorage: 2.0.0-alpha.7(aws4fetch@1.0.20)(chokidar@5.0.0)(db0@0.3.4(@electric-sql/pglite@0.5.4)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0)))(lru-cache@11.5.1)(ofetch@2.0.0-alpha.3)
+      unstorage: 2.0.0-alpha.7(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(db0@0.3.4(@electric-sql/pglite@0.5.4)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0)))(lru-cache@11.5.1)(ofetch@2.0.0-alpha.3)
     optionalDependencies:
       dotenv: 17.4.2
       jiti: 2.7.0
@@ -12851,6 +13033,8 @@ snapshots:
       strip-ansi: 7.2.0
 
   orderedmap@2.1.1: {}
+
+  os-paths@4.4.0: {}
 
   oxfmt@0.57.0:
     dependencies:
@@ -13319,6 +13503,12 @@ snapshots:
       unified: 11.0.5
       vfile: 6.0.3
 
+  redis-errors@1.2.0: {}
+
+  redis-parser@3.0.0:
+    dependencies:
+      redis-errors: 1.2.0
+
   redux-thunk@3.1.0(redux@5.0.1):
     dependencies:
       redux: 5.0.1
@@ -13700,6 +13890,8 @@ snapshots:
 
   stackback@0.0.2: {}
 
+  standard-as-callback@2.1.0: {}
+
   statuses@2.0.2: {}
 
   std-env@3.10.0: {}
@@ -14047,8 +14239,9 @@ snapshots:
       rollup: 4.62.2
       vite: 8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)
 
-  unstorage@2.0.0-alpha.7(aws4fetch@1.0.20)(chokidar@5.0.0)(db0@0.3.4(@electric-sql/pglite@0.5.4)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0)))(lru-cache@11.5.1)(ofetch@2.0.0-alpha.3):
+  unstorage@2.0.0-alpha.7(@vercel/functions@3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0))(aws4fetch@1.0.20)(chokidar@5.0.0)(db0@0.3.4(@electric-sql/pglite@0.5.4)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0)))(lru-cache@11.5.1)(ofetch@2.0.0-alpha.3):
     optionalDependencies:
+      '@vercel/functions': 3.7.6(@aws-sdk/credential-provider-web-identity@3.972.65)(ws@8.21.0)
       aws4fetch: 1.0.20
       chokidar: 5.0.0
       db0: 0.3.4(@electric-sql/pglite@0.5.4)(drizzle-orm@0.45.2(@electric-sql/pglite@0.5.4)(@types/pg@8.20.0)(bun-types@1.3.14)(kysely@0.29.3)(pg@8.22.0))
@@ -14364,6 +14557,15 @@ snapshots:
       is-wsl: 3.1.1
       powershell-utils: 0.1.0
 
+  xdg-app-paths@5.5.1:
+    dependencies:
+      os-paths: 4.4.0
+      xdg-portable: 7.3.0
+
+  xdg-portable@7.3.0:
+    dependencies:
+      os-paths: 4.4.0
+
   xml-crypto@6.1.2:
     dependencies:
       '@xmldom/is-dom-node': 1.0.1
@@ -14437,6 +14639,8 @@ snapshots:
     optional: true
 
   zod@3.25.76: {}
+
+  zod@4.1.11: {}
 
   zod@4.4.3: {}
 
