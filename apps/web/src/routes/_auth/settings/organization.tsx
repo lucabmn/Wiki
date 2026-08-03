@@ -70,7 +70,7 @@ function OrganizationSettings() {
 const formSchema = z.object({
   name: z.string().min(1, "Name darf nicht leer sein"),
   slug: slugSchema,
-  logo: z.url("Ungültige URL").optional().or(z.literal("")),
+  logo: z.url("Ungültige URL").or(z.literal("")),
 });
 
 function GeneralForm({
@@ -115,7 +115,7 @@ function GeneralForm({
       logo,
     },
     validators: {
-      onSubmit: formSchema.safeParse,
+      onSubmit: formSchema,
     },
     onSubmit(props) {
       save.mutate(props.value);
@@ -222,7 +222,7 @@ function GeneralForm({
           </FieldGroup>
 
           <Field orientation="horizontal" className="flex justify-end">
-            <Button type="submit" size="sm" form="bug-report-form">
+            <Button type="submit" size="sm" form="org-settings-form">
               Speichern
             </Button>
           </Field>

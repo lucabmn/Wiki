@@ -42,7 +42,7 @@ function ProfileSettings() {
 
 const formSchema = z.object({
   name: z.string().min(1, "Der Name darf nicht leer sein"),
-  image: z.url("Bitte eine gültige URL eingeben").optional(),
+  image: z.url("Bitte eine gültige URL eingeben").or(z.literal("")),
 });
 
 function ProfileForm({ name, image }: { name: string; image: string }) {
@@ -62,7 +62,6 @@ function ProfileForm({ name, image }: { name: string; image: string }) {
       // The sidebar and every member list read the user off SSR route context,
       // not the session query — invalidate the router so they repaint too.
       await router.invalidate();
-      toast.success("Profil gespeichert");
     },
     onError: toastError,
   });
@@ -73,10 +72,14 @@ function ProfileForm({ name, image }: { name: string; image: string }) {
       image,
     },
     validators: {
-      onSubmit: formSchema.safeParse,
+      onSubmit: formSchema,
     },
     onSubmit(props) {
-      save.mutate(props.value);
+      save.mutate(props.value, {
+        onSuccess: () => {
+          toast.success("Profil gespeichert");
+        },
+      });
     },
   });
 
@@ -91,7 +94,7 @@ function ProfileForm({ name, image }: { name: string; image: string }) {
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
-            form.handleSubmit(event);
+            form.handleSubmit();
           }}
         >
           <FieldGroup>
@@ -144,7 +147,7 @@ function ProfileForm({ name, image }: { name: string; image: string }) {
                       onBlur={field.handleBlur}
                       onChange={(event) => field.handleChange(event.target.value)}
                       aria-invalid={isInvalid}
-                      placeholder="Name der Organisation"
+                      placeholder="Dein Anzeigename"
                       autoComplete="off"
                     />
                     {isInvalid && <FieldError errors={field.state.meta.errors} />}
@@ -155,7 +158,7 @@ function ProfileForm({ name, image }: { name: string; image: string }) {
           </FieldGroup>
 
           <Field orientation="horizontal" className="flex justify-end">
-            <Button type="submit" size="sm" form="bug-report-form">
+            <Button type="submit" size="sm" form="profile-form">
               Speichern
             </Button>
           </Field>
