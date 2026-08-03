@@ -1,4 +1,4 @@
-import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { open, readFile } from "node:fs/promises";
 import { envPath } from "./paths";
 import { generatePassword, generateSecret } from "./secrets";
 
@@ -252,6 +252,23 @@ export function renderEnvFiles(config: InstallConfig): EnvFile[] {
   ];
 }
 
+const SECRET_FILE_MODE = 0o600;
+
+/**
+ * Write secret-bearing files through their open handle so the mode applies to
+ * newly-created files and is repaired on the same file before updating it.
+ */
+async function writeSecretFile(path: string, content: string, flag: "w" | "a"): Promise<void> {
+  const file = await open(path, flag, SECRET_FILE_MODE);
+  try {
+    const { mode } = await file.stat();
+    if ((mode & 0o7777) !== SECRET_FILE_MODE) await file.chmod(SECRET_FILE_MODE);
+    await file.writeFile(content, "utf8");
+  } finally {
+    await file.close();
+  }
+}
+
 /**
  * Add credentials required by the bundled object store to a legacy root env.
  * Appending preserves optional SMTP/custom-S3 settings that the installer does
@@ -266,10 +283,10 @@ export async function ensureStorageCredentials(): Promise<boolean> {
     root.S3_ACCESS_KEY_ID ? null : `S3_ACCESS_KEY_ID=${accessKey}`,
     root.S3_SECRET_ACCESS_KEY ? null : `S3_SECRET_ACCESS_KEY=${secretKey}`,
   ].filter((line): line is string => line !== null);
-  await appendFile(
+  await writeSecretFile(
     envPath(".env"),
     `\n# Added by the v1 storage credential migration\n${additions.join("\n")}\n`,
-    "utf8",
+    "a",
   );
   return true;
 }
@@ -277,7 +294,7 @@ export async function ensureStorageCredentials(): Promise<boolean> {
 /** Write all env files to disk. Returns the relative paths written. */
 export async function writeEnvFiles(config: InstallConfig): Promise<string[]> {
   const files = renderEnvFiles(config);
-  await Promise.all(files.map((f) => writeFile(envPath(f.rel), f.content, "utf8")));
+  await Promise.all(files.map((f) => writeSecretFile(envPath(f.rel), f.content, "w")));
   return files.map((f) => f.rel);
 }
 
