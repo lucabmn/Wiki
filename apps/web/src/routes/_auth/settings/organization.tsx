@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
@@ -22,8 +22,15 @@ import {
   AlertDialogTitle,
 } from "@nilovon-wiki/ui/components/alert-dialog";
 import { Button } from "@nilovon-wiki/ui/components/button";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@nilovon-wiki/ui/components/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@nilovon-wiki/ui/components/field";
 import { Input } from "@nilovon-wiki/ui/components/input";
+import { useForm } from "@tanstack/react-form";
 
 const ORG_UPDATE: PermissionRequest[] = [{ organization: ["update"] }];
 
@@ -60,6 +67,12 @@ function OrganizationSettings() {
   );
 }
 
+const formSchema = z.object({
+  name: z.string().min(1, "Name darf nicht leer sein"),
+  slug: slugSchema,
+  logo: z.url("Ungültige URL").optional().or(z.literal("")),
+});
+
 function GeneralForm({
   organizationId,
   name,
@@ -73,23 +86,15 @@ function GeneralForm({
 }) {
   const router = useRouter();
   const refresh = useOrgRefresh();
-  const [nextName, setNextName] = useState(name);
-  const [nextSlug, setNextSlug] = useState(slug);
-  const [nextLogo, setNextLogo] = useState(logo);
-  const [slugError, setSlugError] = useState<string | null>(null);
-
-  useEffect(() => setNextName(name), [name]);
-  useEffect(() => setNextSlug(slug), [slug]);
-  useEffect(() => setNextLogo(logo), [logo]);
 
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ name, slug, logo }: { name: string; slug: string; logo: string }) => {
       const result = await authClient.organization.update({
         organizationId,
         data: {
-          name: nextName.trim(),
-          slug: nextSlug.trim(),
-          logo: nextLogo.trim() === "" ? null : nextLogo.trim(),
+          name,
+          slug,
+          logo: logo.trim() === "" ? null : logo.trim(),
         },
       });
       if (result.error) throw new Error(result.error.message ?? "Speichern fehlgeschlagen");
@@ -103,17 +108,19 @@ function GeneralForm({
     onError: toastError,
   });
 
-  const submit = () => {
-    const parsed = slugSchema.safeParse(nextSlug.trim());
-    if (!parsed.success) {
-      setSlugError(parsed.error.issues[0]?.message ?? "Ungültiger Slug");
-      return;
-    }
-    setSlugError(null);
-    save.mutate();
-  };
-
-  const dirty = nextName.trim() !== name || nextSlug.trim() !== slug || nextLogo.trim() !== logo;
+  const form = useForm({
+    defaultValues: {
+      name,
+      slug,
+      logo,
+    },
+    validators: {
+      onSubmit: formSchema.safeParse,
+    },
+    onSubmit(props) {
+      save.mutate(props.value);
+    },
+  });
 
   return (
     <SettingsSection
@@ -122,61 +129,103 @@ function GeneralForm({
     >
       <SettingsCard>
         <form
+          id="org-settings-form"
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
-            submit();
+            form.handleSubmit();
           }}
         >
-          <Field>
-            <FieldLabel htmlFor="org-name">Name</FieldLabel>
-            <Input
-              id="org-name"
-              value={nextName}
-              onChange={(event) => setNextName(event.target.value)}
-            />
-          </Field>
+          <FieldGroup>
+            <form.Field
+              name="name"
+              children={(field) => {
+                const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
 
-          <Field data-invalid={slugError ? true : undefined}>
-            <FieldLabel htmlFor="org-slug">Kurzname (Slug)</FieldLabel>
-            <Input
-              id="org-slug"
-              value={nextSlug}
-              onChange={(event) => {
-                setNextSlug(event.target.value);
-                if (slugError) setSlugError(null);
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel htmlFor={field.name}>Name</FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      aria-invalid={isInvalid}
+                      placeholder="Name der Organisation"
+                      autoComplete="off"
+                    />
+                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                  </Field>
+                );
               }}
-              aria-invalid={slugError ? true : undefined}
             />
-            {slugError ? (
-              <FieldError>{slugError}</FieldError>
-            ) : (
-              <FieldDescription>
-                Muss organisationsübergreifend eindeutig sein. Nur Kleinbuchstaben, Ziffern und
-                Bindestriche.
-              </FieldDescription>
-            )}
-          </Field>
+          </FieldGroup>
 
-          <Field>
-            <FieldLabel htmlFor="org-logo">Logo-URL</FieldLabel>
-            <Input
-              id="org-logo"
-              type="url"
-              value={nextLogo}
-              onChange={(event) => setNextLogo(event.target.value)}
-              placeholder="https://…/logo.png"
+          <FieldGroup>
+            <form.Field
+              name="slug"
+              children={(field) => {
+                const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel htmlFor={field.name}>Kurzname (Slug)</FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      aria-invalid={isInvalid}
+                      placeholder="Kurzname der Organisation"
+                      autoComplete="off"
+                    />
+                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                    <FieldDescription>
+                      Muss organisationsübergreifend eindeutig sein. Nur Kleinbuchstaben, Ziffern
+                      und Bindestriche.
+                    </FieldDescription>
+                  </Field>
+                );
+              }}
             />
-            <FieldDescription>
-              Optional. Leer lassen für den Initialen-Platzhalter.
-            </FieldDescription>
-          </Field>
+          </FieldGroup>
 
-          <div className="flex justify-end">
-            <Button type="submit" size="sm" disabled={!dirty || save.isPending || !nextName.trim()}>
-              {save.isPending ? "Speichern …" : "Speichern"}
+          <FieldGroup>
+            <form.Field
+              name="logo"
+              children={(field) => {
+                const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel htmlFor={field.name}>Logo-URL</FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      aria-invalid={isInvalid}
+                      placeholder="https://…/logo.png"
+                      autoComplete="off"
+                    />
+                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                    <FieldDescription>
+                      Optional. Leer lassen für den Initialen-Platzhalter.
+                    </FieldDescription>
+                  </Field>
+                );
+              }}
+            />
+          </FieldGroup>
+
+          <Field orientation="horizontal" className="flex justify-end">
+            <Button type="submit" size="sm" form="bug-report-form">
+              Speichern
             </Button>
-          </div>
+          </Field>
         </form>
       </SettingsCard>
     </SettingsSection>
