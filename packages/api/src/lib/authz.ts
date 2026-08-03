@@ -113,12 +113,16 @@ export async function requirePageManage(
   context: AuthedContext,
   headers: Headers,
   pageRow: PageRowInput,
-): Promise<void> {
+): Promise<{ organizationId: string }> {
   const spaceRow = await loadSpace(db, pageRow.spaceId);
   const manager = await isOrgManager(headers, spaceRow.organizationId);
   const spaceRole = await loadSpaceRole(db, context, spaceRow, manager);
-  if (roleAllows(spaceRole, "manage")) return;
-  if (pageRow.createdBy === context.session.user.id && roleAllows(spaceRole, "write")) return;
+  if (
+    roleAllows(spaceRole, "manage") ||
+    (pageRow.createdBy === context.session.user.id && roleAllows(spaceRole, "write"))
+  ) {
+    return { organizationId: spaceRow.organizationId };
+  }
   throw new ORPCError("FORBIDDEN");
 }
 

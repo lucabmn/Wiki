@@ -47,7 +47,7 @@ beforeAll(async () => {
       slug: "pub",
       name: "Pub",
       visibility: "public",
-      createdBy: "u1",
+      createdBy: null,
     },
     {
       id: "sPriv",
@@ -77,6 +77,15 @@ beforeAll(async () => {
       textContent: "engineer roadmap",
       status: "published",
     },
+    {
+      id: "pRestricted",
+      spaceId: "sPub",
+      slug: "restricted",
+      title: "Restricted Page",
+      textContent: "",
+      status: "published",
+      visibility: "private",
+    },
   ]);
   // content in each space so the read paths have something to return / hide
   await db.insert(comment).values([
@@ -103,7 +112,7 @@ beforeAll(async () => {
   ]);
   await db.insert(tag).values({ id: "tPriv", spaceId: "sPriv", name: "roadmap" });
   await db.insert(pageTag).values({ pageId: "pPriv", tagId: "tPriv" });
-  // activity rows: one org-level (no space), one in each space
+  // Activity rows cover org-, space-, and page-level access boundaries.
   await db.insert(activity).values([
     { id: "actOrg", organizationId: "oA", action: "space.created", spaceId: null },
     { id: "actPub", organizationId: "oA", action: "page.created", spaceId: "sPub", pageId: "pPub" },
@@ -113,6 +122,22 @@ beforeAll(async () => {
       action: "page.created",
       spaceId: "sPriv",
       pageId: "pPriv",
+    },
+    {
+      id: "actRestricted",
+      organizationId: "oA",
+      action: "page.created",
+      spaceId: "sPub",
+      pageId: "pRestricted",
+      metadata: { title: "Restricted Page" },
+    },
+    {
+      id: "actDeletedPage",
+      organizationId: "oA",
+      action: "page.deleted",
+      spaceId: "sPub",
+      pageId: null,
+      metadata: { title: "Formerly Restricted Page" },
     },
   ]);
 });
@@ -180,11 +205,14 @@ describe("cross-space read filtering", () => {
     expect(ids).not.toContain("pPriv");
   });
 
-  it("org-wide activity feed hides private-space events but keeps org-level ones", async () => {
+  it("org-wide activity feed applies both space and page ACLs", async () => {
+    hasPermission.mockResolvedValue({ success: false });
     const feed = await call(activityRouter.list, {}, { context: ctx() });
     const ids = feed.map((a) => a.id);
     expect(ids).toContain("actOrg");
     expect(ids).toContain("actPub");
     expect(ids).not.toContain("actPriv");
+    expect(ids).not.toContain("actRestricted");
+    expect(ids).not.toContain("actDeletedPage");
   });
 });

@@ -9,6 +9,7 @@ import { isOrgManager, protectedProcedure } from "../index";
 import { assertSpaceRead, loadSpaceRole } from "../lib/access";
 import { requireSpaceManage } from "../lib/authz";
 import { loadSpace } from "../lib/loaders";
+import { assertPermissionSubjectInOrganization } from "../lib/permission-subject";
 import { IdSchema } from "../schemas/shared";
 import {
   AddSpaceMemberInputSchema,
@@ -111,6 +112,7 @@ export const spaceMemberRouter = {
       await requireSpaceManage(context.db, context, context.headers, spaceRow, {
         space: ["update"],
       });
+      await assertPermissionSubjectInOrganization(context.db, spaceRow.organizationId, input);
       const rows = await context.db
         .insert(spaceMember)
         .values({

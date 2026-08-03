@@ -37,29 +37,32 @@ const activityFeedColumns = {
  * `visibility` override — activity metadata carries page titles. Space-level
  * read access is already established for every row's space by the callers.
  */
-async function dropRestrictedPageRows<T extends { pageId: string | null }>(
+async function dropRestrictedPageRows<T extends { pageId: string | null; action: string }>(
   db: Database,
   context: AuthedContext,
   headers: Headers,
   rows: T[],
 ): Promise<T[]> {
   const pageIds = [...new Set(rows.flatMap((r) => (r.pageId ? [r.pageId] : [])))];
-  if (pageIds.length === 0) return rows;
-  const pages = await db
-    .select({
-      id: page.id,
-      spaceId: page.spaceId,
-      visibility: page.visibility,
-      createdBy: page.createdBy,
-    })
-    .from(page)
-    .where(inArray(page.id, pageIds));
+  const pages = pageIds.length
+    ? await db
+        .select({
+          id: page.id,
+          spaceId: page.spaceId,
+          visibility: page.visibility,
+          createdBy: page.createdBy,
+        })
+        .from(page)
+        .where(inArray(page.id, pageIds))
+    : [];
   const readable = new Set(
     (await filterReadablePagesAcrossSpaces(db, context, headers, pages)).map((p) => p.id),
   );
-  // Rows whose page row no longer exists can't happen (the FK nulls pageId on
-  // delete), so an unknown id is treated as unreadable.
-  return rows.filter((r) => !r.pageId || readable.has(r.pageId));
+  // Once a page is hard-deleted its FK becomes null, so its former ACL can no
+  // longer be checked. Keep only definitely space-scoped events in that case;
+  // suppressing ambiguous comment/attachment events is safer than exposing
+  // metadata that used to belong to a restricted page.
+  return rows.filter((r) => (r.pageId ? readable.has(r.pageId) : r.action.startsWith("space.")));
 }
 
 export const activityRouter = {
@@ -126,6 +129,6 @@ export const activityRouter = {
         .orderBy(desc(activity.createdAt))
         .limit(input.limit);
 
-      return data;
+      return dropRestrictedPageRows(context.db, context, context.headers, data);
     }),
 };

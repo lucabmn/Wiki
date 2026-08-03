@@ -8,6 +8,7 @@ import { page, pageMember, team, user } from "@nilovon-wiki/db/schema/index";
 import { protectedProcedure } from "../index";
 import { requirePageCapability, requirePageManage, resolveMyPageAccess } from "../lib/authz";
 import { loadPage } from "../lib/loaders";
+import { assertPermissionSubjectInOrganization } from "../lib/permission-subject";
 import { IdSchema } from "../schemas/shared";
 import {
   AddPageMemberInputSchema,
@@ -107,7 +108,13 @@ export const pageAccessRouter = {
     .output(PageMemberSchema)
     .handler(async ({ input, context }) => {
       const pageRow = await loadPage(context.db, input.pageId);
-      await requirePageManage(context.db, context, context.headers, pageRow);
+      const { organizationId } = await requirePageManage(
+        context.db,
+        context,
+        context.headers,
+        pageRow,
+      );
+      await assertPermissionSubjectInOrganization(context.db, organizationId, input);
       const rows = await context.db
         .insert(pageMember)
         .values({
