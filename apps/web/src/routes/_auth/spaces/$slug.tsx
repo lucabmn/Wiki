@@ -330,6 +330,7 @@ function RouteComponent() {
             name: space.name,
             visibility: space.visibility,
             color: space.color,
+            icon: space.icon,
           }}
           organizationId={auth.organization.id}
         />

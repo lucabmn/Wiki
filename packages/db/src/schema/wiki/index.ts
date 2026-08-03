@@ -6,6 +6,7 @@ export * from "./comments";
 export * from "./enums";
 export * from "./external-links";
 export * from "./links";
+export * from "./notifications";
 export * from "./pages";
 export * from "./spaces";
 export * from "./tags";

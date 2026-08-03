@@ -7,6 +7,7 @@ import { commentRouter } from "./comment";
 import { dashboardRouter } from "./dashboard";
 import { externalLinkRouter } from "./external-link";
 import { linkRouter } from "./link";
+import { notificationRouter } from "./notification";
 import { onboardingRouter } from "./onboarding";
 import { pageRouter } from "./page";
 import { pageAccessRouter } from "./page-access";
@@ -38,6 +39,7 @@ export const appRouter = {
   links: linkRouter,
   externalLinks: externalLinkRouter,
   activity: activityRouter,
+  notifications: notificationRouter,
   search: searchRouter,
   users: userRouter,
   me: userStateRouter,

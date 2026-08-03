@@ -132,6 +132,48 @@ and destructive schema diffs can no longer be auto-applied (the previous
 > recreate the database volume (`docker compose down -v`), start fresh, and
 > restore your data — or baseline manually before updating.
 
+## Bundled notifications (digests)
+
+Instead of a mail per change, each member gets one summary per period. An
+organization admin sets the defaults under **Einstellungen → Organisation →
+Benachrichtigungen** (rhythm, time, time zone, which content, how much of the
+wiki); every member can override them for themselves under **Einstellungen →
+Benachrichtigungen**, unless the admin turns overrides off.
+
+Operationally there is nothing to install — the `server` container runs the
+schedule itself. Two things matter:
+
+- **SMTP must be configured**, or nothing is delivered. This is safe to fix
+  later: while `SMTP_HOST` is unset the runner claims no work and moves no
+  cursor, so the first digest after configuring mail still reports everything
+  since each member was onboarded.
+- **Access is re-checked at send time**, not at write time. A digest never lists
+  a space or page the recipient cannot open at the moment the mail goes out.
+- **Unpublished pages stay out.** A page that has never been published is only
+  reported to its own author; for everyone else it appears in the digest when it
+  is published, under "Neue Seiten".
+
+| Variable                   | Default | Purpose                                                     |
+| -------------------------- | ------- | ----------------------------------------------------------- |
+| `DIGEST_SCHEDULER_ENABLED` | `true`  | In-process ticker. Turn off for serverless or external cron |
+| `DIGEST_TICK_SECONDS`      | `300`   | How often to look for due digests (minimum 30)              |
+| `DIGEST_RUN_TOKEN`         | unset   | Enables `POST /internal/digests/run`; unset = disabled      |
+
+### Driving it from an external scheduler
+
+Where the process is not long-lived, or where several replicas run and only one
+scheduler should own the cadence, set `DIGEST_SCHEDULER_ENABLED=false`, generate
+a token (`openssl rand -base64 32`) and call the endpoint on your own schedule:
+
+```sh
+curl -X POST https://api.example.com/internal/digests/run \
+  -H "Authorization: Bearer $DIGEST_RUN_TOKEN"
+```
+
+The runner claims its work in the database, so calling it from several places —
+or leaving the ticker on as well — cannot send anything twice. A call that
+arrives while a run is in progress returns `202` and does nothing.
+
 ## Backups
 
 Two things need backing up: **Postgres** (pages, revisions, Yjs snapshots,

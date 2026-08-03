@@ -16,6 +16,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { attachmentRoutes } from "./attachments";
+import { digestRoutes, startDigestScheduler, stopDigestScheduler } from "./digests";
 import { rateLimit } from "./rate-limit";
 import { spaceExportRoutes } from "./space-exports";
 
@@ -108,6 +109,12 @@ app.on(["POST", "GET", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.han
 app.route("/attachments", attachmentRoutes);
 app.route("/exports", spaceExportRoutes);
 
+// Machine-triggered maintenance work. Guarded by a shared secret rather than a
+// session, and rate-limited like the rest of the API so a leaked token cannot
+// be used to hammer the database.
+app.use("/internal/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "internal" }));
+app.route("/internal", digestRoutes);
+
 export const apiHandler = new OpenAPIHandler(appRouter, {
   plugins: [
     new OpenAPIReferencePlugin({
@@ -181,6 +188,7 @@ async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   log.info({ source: "server", msg: "shutting down", signal });
+  stopDigestScheduler();
   try {
     await closeDb();
   } catch (error) {
@@ -190,5 +198,9 @@ async function shutdown(signal: string): Promise<void> {
 }
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
+
+// Bundled notifications. A no-op where the ticker is disabled (serverless, or
+// an install that drives /internal/digests/run from an external scheduler).
+startDigestScheduler();
 
 export default app;

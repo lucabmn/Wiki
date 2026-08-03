@@ -31,6 +31,8 @@ import { Route as AuthSettingsSsoRouteImport } from './routes/_auth/settings/sso
 import { Route as AuthSettingsSecurityRouteImport } from './routes/_auth/settings/security'
 import { Route as AuthSettingsProfileRouteImport } from './routes/_auth/settings/profile'
 import { Route as AuthSettingsOrganizationRouteImport } from './routes/_auth/settings/organization'
+import { Route as AuthSettingsNotificationsRouteImport } from './routes/_auth/settings/notifications'
+import { Route as AuthSettingsNotificationDefaultsRouteImport } from './routes/_auth/settings/notification-defaults'
 import { Route as AuthSettingsMembersRouteImport } from './routes/_auth/settings/members'
 import { Route as AuthSettingsGroupsRouteImport } from './routes/_auth/settings/groups'
 import { Route as AuthSettingsAppearanceRouteImport } from './routes/_auth/settings/appearance'
@@ -146,6 +148,18 @@ const AuthSettingsOrganizationRoute =
     path: '/organization',
     getParentRoute: () => AuthSettingsRouteRoute,
   } as any)
+const AuthSettingsNotificationsRoute =
+  AuthSettingsNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AuthSettingsRouteRoute,
+  } as any)
+const AuthSettingsNotificationDefaultsRoute =
+  AuthSettingsNotificationDefaultsRouteImport.update({
+    id: '/notification-defaults',
+    path: '/notification-defaults',
+    getParentRoute: () => AuthSettingsRouteRoute,
+  } as any)
 const AuthSettingsMembersRoute = AuthSettingsMembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -183,6 +197,8 @@ export interface FileRoutesByFullPath {
   '/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/settings/groups': typeof AuthSettingsGroupsRoute
   '/settings/members': typeof AuthSettingsMembersRoute
+  '/settings/notification-defaults': typeof AuthSettingsNotificationDefaultsRoute
+  '/settings/notifications': typeof AuthSettingsNotificationsRoute
   '/settings/organization': typeof AuthSettingsOrganizationRoute
   '/settings/profile': typeof AuthSettingsProfileRoute
   '/settings/security': typeof AuthSettingsSecurityRoute
@@ -209,6 +225,8 @@ export interface FileRoutesByTo {
   '/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/settings/groups': typeof AuthSettingsGroupsRoute
   '/settings/members': typeof AuthSettingsMembersRoute
+  '/settings/notification-defaults': typeof AuthSettingsNotificationDefaultsRoute
+  '/settings/notifications': typeof AuthSettingsNotificationsRoute
   '/settings/organization': typeof AuthSettingsOrganizationRoute
   '/settings/profile': typeof AuthSettingsProfileRoute
   '/settings/security': typeof AuthSettingsSecurityRoute
@@ -238,6 +256,8 @@ export interface FileRoutesById {
   '/_auth/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/_auth/settings/groups': typeof AuthSettingsGroupsRoute
   '/_auth/settings/members': typeof AuthSettingsMembersRoute
+  '/_auth/settings/notification-defaults': typeof AuthSettingsNotificationDefaultsRoute
+  '/_auth/settings/notifications': typeof AuthSettingsNotificationsRoute
   '/_auth/settings/organization': typeof AuthSettingsOrganizationRoute
   '/_auth/settings/profile': typeof AuthSettingsProfileRoute
   '/_auth/settings/security': typeof AuthSettingsSecurityRoute
@@ -267,6 +287,8 @@ export interface FileRouteTypes {
     | '/settings/appearance'
     | '/settings/groups'
     | '/settings/members'
+    | '/settings/notification-defaults'
+    | '/settings/notifications'
     | '/settings/organization'
     | '/settings/profile'
     | '/settings/security'
@@ -293,6 +315,8 @@ export interface FileRouteTypes {
     | '/settings/appearance'
     | '/settings/groups'
     | '/settings/members'
+    | '/settings/notification-defaults'
+    | '/settings/notifications'
     | '/settings/organization'
     | '/settings/profile'
     | '/settings/security'
@@ -321,6 +345,8 @@ export interface FileRouteTypes {
     | '/_auth/settings/appearance'
     | '/_auth/settings/groups'
     | '/_auth/settings/members'
+    | '/_auth/settings/notification-defaults'
+    | '/_auth/settings/notifications'
     | '/_auth/settings/organization'
     | '/_auth/settings/profile'
     | '/_auth/settings/security'
@@ -500,6 +526,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSettingsOrganizationRouteImport
       parentRoute: typeof AuthSettingsRouteRoute
     }
+    '/_auth/settings/notifications': {
+      id: '/_auth/settings/notifications'
+      path: '/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof AuthSettingsNotificationsRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
+    '/_auth/settings/notification-defaults': {
+      id: '/_auth/settings/notification-defaults'
+      path: '/notification-defaults'
+      fullPath: '/settings/notification-defaults'
+      preLoaderRoute: typeof AuthSettingsNotificationDefaultsRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
     '/_auth/settings/members': {
       id: '/_auth/settings/members'
       path: '/members'
@@ -535,6 +575,8 @@ interface AuthSettingsRouteRouteChildren {
   AuthSettingsAppearanceRoute: typeof AuthSettingsAppearanceRoute
   AuthSettingsGroupsRoute: typeof AuthSettingsGroupsRoute
   AuthSettingsMembersRoute: typeof AuthSettingsMembersRoute
+  AuthSettingsNotificationDefaultsRoute: typeof AuthSettingsNotificationDefaultsRoute
+  AuthSettingsNotificationsRoute: typeof AuthSettingsNotificationsRoute
   AuthSettingsOrganizationRoute: typeof AuthSettingsOrganizationRoute
   AuthSettingsProfileRoute: typeof AuthSettingsProfileRoute
   AuthSettingsSecurityRoute: typeof AuthSettingsSecurityRoute
@@ -547,6 +589,8 @@ const AuthSettingsRouteRouteChildren: AuthSettingsRouteRouteChildren = {
   AuthSettingsAppearanceRoute: AuthSettingsAppearanceRoute,
   AuthSettingsGroupsRoute: AuthSettingsGroupsRoute,
   AuthSettingsMembersRoute: AuthSettingsMembersRoute,
+  AuthSettingsNotificationDefaultsRoute: AuthSettingsNotificationDefaultsRoute,
+  AuthSettingsNotificationsRoute: AuthSettingsNotificationsRoute,
   AuthSettingsOrganizationRoute: AuthSettingsOrganizationRoute,
   AuthSettingsProfileRoute: AuthSettingsProfileRoute,
   AuthSettingsSecurityRoute: AuthSettingsSecurityRoute,

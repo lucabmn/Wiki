@@ -51,6 +51,25 @@ export const env = createEnv({
     SMTP_PASSWORD: z.string().optional(),
     SMTP_FROM: z.string().min(1).default("Wiki <no-reply@localhost>"),
 
+    // ── Bundled notifications (digests) ─────────────────────────────────────
+    // Delivery needs SMTP; without it the runner is a no-op and no cursor moves,
+    // so configuring mail later loses nothing.
+    //
+    // The in-process ticker suits the long-lived container this ships as. Turn
+    // it off where the process is not long-lived (serverless) or where several
+    // replicas run and only an external scheduler should drive it — the runner
+    // itself is idempotent either way, this only avoids pointless wake-ups.
+    DIGEST_SCHEDULER_ENABLED: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
+    // How often the ticker looks for due digests. Sub-minute granularity buys
+    // nothing for a daily mail, and every tick is a database round-trip.
+    DIGEST_TICK_SECONDS: z.coerce.number().int().min(30).default(300),
+    // Bearer token for POST /internal/digests/run. Unset leaves the endpoint
+    // disabled — an unauthenticated trigger would let anyone drain the queue.
+    DIGEST_RUN_TOKEN: z.string().min(16).optional(),
+
     // ── Object storage (S3-compatible: RustFS, MinIO, AWS S3, …) ────────────
     // Optional for the same reason: attachments stay disabled until configured.
     S3_ENDPOINT: z.url().optional(),

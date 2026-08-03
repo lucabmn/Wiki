@@ -1,5 +1,7 @@
 import { Link, Outlet, createFileRoute } from "@tanstack/react-router";
 import {
+  Bell,
+  BellRing,
   Building2,
   Fingerprint,
   KeyRound,
@@ -22,6 +24,7 @@ export const Route = createFileRoute("/_auth/settings")({
 
 const PERSONAL_TABS = [
   { to: "/settings/profile", label: "Profil", icon: User },
+  { to: "/settings/notifications", label: "Benachrichtigungen", icon: Bell },
   { to: "/settings/security", label: "Sicherheit", icon: ShieldCheck },
   { to: "/settings/appearance", label: "Darstellung", icon: Palette },
 ] as const;
@@ -31,6 +34,7 @@ const ORGANIZATION_TABS = [
   { to: "/settings/members", label: "Mitglieder", icon: Users },
   { to: "/settings/groups", label: "Gruppen", icon: KeyRound },
   { to: "/settings/teams", label: "Teams", icon: UsersRound },
+  { to: "/settings/notification-defaults", label: "Benachrichtigungen", icon: BellRing },
 ] as const;
 
 /**
