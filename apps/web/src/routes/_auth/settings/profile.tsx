@@ -12,8 +12,15 @@ import { SettingsCard, SettingsSection } from "@/components/settings/settings-se
 import { Avatar, AvatarFallback, AvatarImage } from "@nilovon-wiki/ui/components/avatar";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Button } from "@nilovon-wiki/ui/components/button";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@nilovon-wiki/ui/components/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@nilovon-wiki/ui/components/field";
 import { Input } from "@nilovon-wiki/ui/components/input";
+import { useForm } from "@tanstack/react-form";
 
 export const Route = createFileRoute("/_auth/settings/profile")({
   component: ProfileSettings,
@@ -33,22 +40,20 @@ function ProfileSettings() {
   );
 }
 
+const formSchema = z.object({
+  name: z.string().min(1, "Der Name darf nicht leer sein"),
+  image: z.url("Bitte eine gültige URL eingeben").optional(),
+});
+
 function ProfileForm({ name, image }: { name: string; image: string }) {
   const router = useRouter();
-  const [nextName, setNextName] = useState(name);
-  const [nextImage, setNextImage] = useState(image);
-
-  // The session arrives after the first paint (`ssr: false` on the layout), so
-  // seed the inputs again once it lands instead of leaving them empty.
-  useEffect(() => setNextName(name), [name]);
-  useEffect(() => setNextImage(image), [image]);
 
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ name, image }: { name: string; image: string }) => {
       const result = await authClient.updateUser({
-        name: nextName.trim(),
+        name,
         // An empty field means "no avatar" — send null, not "".
-        image: nextImage.trim() === "" ? null : nextImage.trim(),
+        image: image.trim() === "" ? null : image.trim(),
       });
       if (result.error) throw new Error(result.error.message ?? "Speichern fehlgeschlagen");
       return result.data;
@@ -62,8 +67,18 @@ function ProfileForm({ name, image }: { name: string; image: string }) {
     onError: toastError,
   });
 
-  const dirty = nextName.trim() !== name || nextImage.trim() !== image;
-  const valid = nextName.trim().length > 0;
+  const form = useForm({
+    defaultValues: {
+      name,
+      image,
+    },
+    validators: {
+      onSubmit: formSchema.safeParse,
+    },
+    onSubmit(props) {
+      save.mutate(props.value);
+    },
+  });
 
   return (
     <SettingsSection
@@ -72,48 +87,78 @@ function ProfileForm({ name, image }: { name: string; image: string }) {
     >
       <SettingsCard>
         <form
+          id="profile-form"
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
-            if (dirty && valid) save.mutate();
+            form.handleSubmit(event);
           }}
         >
-          <div className="flex items-center gap-4">
-            <Avatar className="size-14">
-              {nextImage.trim() ? <AvatarImage src={nextImage.trim()} alt="" /> : null}
-              <AvatarFallback>{initials(nextName || "?")}</AvatarFallback>
-            </Avatar>
-            <Field className="min-w-0 flex-1">
-              <FieldLabel htmlFor="profile-image">Bild-URL</FieldLabel>
-              <Input
-                id="profile-image"
-                type="url"
-                value={nextImage}
-                onChange={(event) => setNextImage(event.target.value)}
-                placeholder="https://…/avatar.png"
-              />
-              <FieldDescription>
-                Ein öffentlich erreichbarer Link. Leer lassen, um die Initialen zu zeigen.
-              </FieldDescription>
-            </Field>
-          </div>
+          <FieldGroup>
+            <form.Field
+              name="image"
+              children={(field) => {
+                const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
 
-          <Field data-invalid={!valid ? true : undefined}>
-            <FieldLabel htmlFor="profile-name">Anzeigename</FieldLabel>
-            <Input
-              id="profile-name"
-              value={nextName}
-              onChange={(event) => setNextName(event.target.value)}
-              aria-invalid={!valid ? true : undefined}
+                return (
+                  <div className="flex items-center gap-4">
+                    <Avatar className="size-14">
+                      {form.getFieldValue("image").trim() ? (
+                        <AvatarImage src={form.getFieldValue("image").trim()} alt="" />
+                      ) : null}
+                      <AvatarFallback>{initials(form.getFieldValue("name") || "?")}</AvatarFallback>
+                    </Avatar>
+                    <Field data-invalid={isInvalid} className="min-w-0 flex-1">
+                      <FieldLabel htmlFor={field.name}>Bild-URL</FieldLabel>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(event) => field.handleChange(event.target.value)}
+                        aria-invalid={isInvalid}
+                        placeholder="https://…/avatar.png"
+                        autoComplete="off"
+                      />
+                      {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                    </Field>
+                  </div>
+                );
+              }}
             />
-            {!valid ? <FieldError>Der Name darf nicht leer sein.</FieldError> : null}
-          </Field>
+          </FieldGroup>
 
-          <div className="flex justify-end">
-            <Button type="submit" size="sm" disabled={!dirty || !valid || save.isPending}>
-              {save.isPending ? "Speichern …" : "Speichern"}
+          <FieldGroup>
+            <form.Field
+              name="name"
+              children={(field) => {
+                const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel htmlFor={field.name}>Anzeigename</FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      aria-invalid={isInvalid}
+                      placeholder="Name der Organisation"
+                      autoComplete="off"
+                    />
+                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                  </Field>
+                );
+              }}
+            />
+          </FieldGroup>
+
+          <Field orientation="horizontal" className="flex justify-end">
+            <Button type="submit" size="sm" form="bug-report-form">
+              Speichern
             </Button>
-          </div>
+          </Field>
         </form>
       </SettingsCard>
     </SettingsSection>
