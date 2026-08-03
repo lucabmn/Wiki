@@ -1,0 +1,55 @@
+---
+title: Space exports
+description: Export a complete Space as a portable Markdown, HTML, or JSON archive.
+---
+
+Space admins can open **Space settings → Data export** and download a ZIP archive in Markdown,
+HTML, or JSON format. Every archive includes page hierarchy, metadata, tags, and attachment bytes.
+
+## Archive contract
+
+The root `manifest.json` identifies the format:
+
+```json
+{
+  "format": "nilovon-space-export",
+  "version": 1,
+  "contentFormat": "markdown"
+}
+```
+
+The archive layout is:
+
+```text
+manifest.json
+FORMAT.md
+pages/<slug>--<page-id>/content.md
+pages/<slug>--<page-id>/index.html
+pages/<slug>--<page-id>/content.json
+attachments/<attachment-id>/<filename>
+```
+
+Only the page extension matching `contentFormat` is present. `pages[].parentId` and
+`pages[].position` in the manifest preserve the tree and sibling order. Known links to exported
+pages and attachments use relative archive paths; safe external URLs remain unchanged. Curated
+external links from the page sidebar are included as page metadata.
+
+JSON page files contain the page's lossless TipTap document plus its manifest metadata. Markdown
+and HTML are portable projections and may use inline HTML for rich-text features that Markdown
+cannot represent directly.
+
+## API
+
+```http
+GET /exports/spaces/:spaceId?format=markdown|html|json
+```
+
+The endpoint requires Space management access and returns `application/zip`. If attachment storage
+is unavailable, an export containing attachments fails rather than producing an incomplete archive.
+
+The export reads the latest rich-text content persisted in PostgreSQL. Edits that exist only in an
+active collaboration session may not appear until they are projected back to the page row. Use the
+normal coordinated database and object-storage backup for disaster recovery.
+
+For the complete versioning, security, and importer guidance, see
+[`docs/export-format.md`](https://github.com/lucabmn/Wiki/blob/main/docs/export-format.md).

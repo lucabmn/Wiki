@@ -1,5 +1,14 @@
 {
   "title": "Self-hosting",
   "icon": "Server",
-  "pages": ["docker", "production", "installer", "configuration", "updates", "backups", "health"]
+  "pages": [
+    "docker",
+    "production",
+    "installer",
+    "configuration",
+    "updates",
+    "backups",
+    "exports",
+    "health"
+  ]
 }

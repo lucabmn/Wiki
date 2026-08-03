@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, Globe, Lock, Users } from "lucide-react";
+import { Check, Download, Globe, Lock, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { MemberAccessManager } from "@/components/access/member-access-manager";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { VISIBILITY_LABEL } from "@/lib/labels";
+import { spaceExportUrl } from "@/lib/space-export";
+import { env } from "@nilovon-wiki/env/web";
 import { membersQueryOptions, rolesQueryOptions } from "@/lib/org-queries";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
@@ -321,6 +323,31 @@ export function SpaceSettingsSheet({
               removeTitle="Mitglied entfernen?"
               removeDescription={(label) => `„${label}" verliert den Zugriff auf diesen Space.`}
             />
+          </section>
+
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h3 className="text-sm font-semibold">Datenexport</h3>
+              <p className="text-xs text-muted-foreground">
+                Lädt Seiten, Hierarchie, Tags, Metadaten und Attachments als portables ZIP-Archiv.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(["markdown", "html", "json"] as const).map((format) => (
+                <Button
+                  key={format}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    window.location.assign(spaceExportUrl(env.VITE_SERVER_URL, space.id, format));
+                  }}
+                >
+                  <Download className="size-3.5" />
+                  {format === "markdown" ? "Markdown" : format.toUpperCase()}
+                </Button>
+              ))}
+            </div>
           </section>
 
           {/* Gefahrenzone: der Sheet wird vom Aufrufer nur für Space-Admins

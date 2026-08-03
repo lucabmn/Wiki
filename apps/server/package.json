@@ -18,14 +18,17 @@
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
+    "archiver": "^8.0.0",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.2",
     "evlog": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@nilovon-wiki/config": "workspace:*",
+    "@types/archiver": "^8.0.0",
     "@types/bun": "catalog:",
     "tsdown": "^0.22.3",
     "typescript": "catalog:",

@@ -17,6 +17,7 @@ import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { attachmentRoutes } from "./attachments";
 import { rateLimit } from "./rate-limit";
+import { spaceExportRoutes } from "./space-exports";
 
 initLogger({
   env: { service: "nilovon-wiki-server" },
@@ -95,14 +96,17 @@ app.use(
 app.use("/v1/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
 app.use("/attachments/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
+app.use("/exports/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
 // PUT/PATCH/DELETE are not optional here: SCIM 2.0 replaces (`PUT`), patches
 // (`PATCH`) and deprovisions (`DELETE`) users over these very routes, and
 // without them an identity provider's sync silently 404s.
 app.on(["POST", "GET", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
-// Binary transfer for attachments; the metadata lives on the oRPC router.
+// Binary transfer for attachments and streamed Space export archives live
+// outside oRPC because their response bodies are files rather than JSON.
 app.route("/attachments", attachmentRoutes);
+app.route("/exports", spaceExportRoutes);
 
 export const apiHandler = new OpenAPIHandler(appRouter, {
   plugins: [
