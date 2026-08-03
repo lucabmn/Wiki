@@ -53,6 +53,9 @@ services:
       # disagree about the public origins.
       CORS_ORIGIN: https://${WEB_DOMAIN}
       BETTER_AUTH_URL: https://${API_DOMAIN}
+      # Not derived: WEB_DOMAIN and API_DOMAIN need not share a parent, and a
+      # guessed `Domain` the browser rejects would drop the cookie outright.
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
 
   collab:
     restart: always

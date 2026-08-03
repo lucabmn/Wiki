@@ -9,6 +9,17 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: authSecretSchema,
     BETTER_AUTH_URL: z.url(),
     CORS_ORIGIN: z.url(),
+    // Parent domain to scope auth cookies to, e.g. `.example.com`. Set this
+    // when the web app and the API live on different subdomains *and* the web
+    // app resolves the session server-side: its SSR middleware forwards the
+    // browser's cookies for its own host, which never include a cookie the API
+    // host issued host-only. Leave unset for a same-origin deployment, or when
+    // the two hosts share no registrable parent — a `Domain` the browser
+    // rejects (a public suffix like `co.uk`) drops the cookie entirely.
+    COOKIE_DOMAIN: z
+      .string()
+      .regex(/^\.?([a-z0-9-]+\.)+[a-z]{2,}$/i, "must be a domain, e.g. .example.com")
+      .optional(),
     NODE_ENV: nodeEnvSchema,
     // Display name used by Better Auth (emails, passkey prompts). Lets
     // self-hosters white-label without patching source.

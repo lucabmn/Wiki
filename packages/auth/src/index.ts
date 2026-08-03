@@ -119,6 +119,22 @@ export function createAuth() {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     advanced: {
+      // Without this the cookie is host-only on whatever host issued it (the
+      // API's). That is enough for the browser's own calls to the API — they
+      // are cross-site but carry the cookie via `SameSite=None` + credentials.
+      // It is *not* enough for the web app's SSR middleware, which forwards the
+      // cookies the browser sent to the *web* host and would never see one
+      // scoped to the API host. `domain` must be given explicitly: better-auth
+      // otherwise falls back to `baseURL`'s hostname, which re-scopes to the
+      // API host and changes nothing.
+      ...(env.COOKIE_DOMAIN
+        ? {
+            crossSubDomainCookies: {
+              enabled: true,
+              domain: env.COOKIE_DOMAIN,
+            },
+          }
+        : {}),
       defaultCookieAttributes: {
         sameSite: isHttps ? "none" : "lax",
         secure: isHttps,
