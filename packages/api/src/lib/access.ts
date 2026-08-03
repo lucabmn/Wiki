@@ -3,11 +3,31 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 
 import type { Database } from "@nilovon-wiki/db";
 import { pageMember, space, spaceMember } from "@nilovon-wiki/db/schema/index";
-import { member, teamMember } from "@nilovon-wiki/db/schema/auth";
+import { member, organizationRole, teamMember } from "@nilovon-wiki/db/schema/auth";
 
 import type { AuthedContext } from "../context";
 
 export type SpaceVisibility = "public" | "private" | "restricted";
+
+/**
+ * Who access is being resolved *for*. Every rule below needs exactly these two
+ * facts, which is why they are named rather than taken from a session: the
+ * digest runner evaluates the same rules for a user who has no request, no
+ * headers and no active organization. `AuthedContext`-shaped callers keep their
+ * signatures; those functions now just project the context onto a principal.
+ */
+export type Principal = {
+  userId: string;
+  /** The org the rules are evaluated in — a session's *active* org for requests. */
+  organizationId: string | null;
+};
+
+function principalOf(context: AuthedContext): Principal {
+  return {
+    userId: context.session.user.id,
+    organizationId: context.session.session.activeOrganizationId ?? null,
+  };
+}
 
 export type SpaceAccessInput = {
   id: string;
@@ -90,18 +110,18 @@ async function isSpaceMember(
   return !!row;
 }
 
-/** Whether the caller may read this space (and thus its pages/comments/etc). */
-export async function canReadSpace(
+/** Whether `principal` may read this space (and thus its pages/comments/etc). */
+export async function canReadSpaceAs(
   db: Database,
-  context: AuthedContext,
+  principal: Principal,
   target: SpaceAccessInput,
 ): Promise<boolean> {
-  // Cross-org reads are denied outright — active-org rights never reach another
-  // org's spaces.
-  if (target.organizationId !== context.session.session.activeOrganizationId) {
+  // Cross-org reads are denied outright — rights in one org never reach
+  // another org's spaces.
+  if (target.organizationId !== principal.organizationId) {
     return false;
   }
-  const userId = context.session.user.id;
+  const { userId } = principal;
   if (target.visibility === "public") {
     return true;
   }
@@ -109,6 +129,15 @@ export async function canReadSpace(
   const roleNames = await orgRoleNames(db, userId, target.organizationId);
   const isMember = await isSpaceMember(db, target.id, userId, teamIds, roleNames);
   return resolveSpaceAccess(target.visibility, isMember, target.createdBy === userId);
+}
+
+/** Whether the caller may read this space (and thus its pages/comments/etc). */
+export async function canReadSpace(
+  db: Database,
+  context: AuthedContext,
+  target: SpaceAccessInput,
+): Promise<boolean> {
+  return canReadSpaceAs(db, principalOf(context), target);
 }
 
 /** Throwing variant used at the top of space-scoped read handlers. */
@@ -217,14 +246,7 @@ export async function loadSpaceRole(
   target: SpaceAccessInput,
   isOrgManager: boolean,
 ): Promise<WikiRole | null> {
-  if (target.organizationId !== context.session.session.activeOrganizationId) {
-    return null;
-  }
-  const userId = context.session.user.id;
-  const teamIds = await userTeamIds(db, userId);
-  const roleNames = await orgRoleNames(db, userId, target.organizationId);
-  const memberRole = await memberRoleInSpace(db, target.id, userId, teamIds, roleNames);
-  return resolveSpaceRole(target.visibility, memberRole, target.createdBy === userId, isOrgManager);
+  return loadSpaceRoleAs(db, principalOf(context), target, isOrgManager);
 }
 
 /** Throws FORBIDDEN unless the caller has `capability` in the space. */
@@ -363,9 +385,9 @@ export async function loadPageRole(
  * respecting per-page overrides. `spaceRole` is the caller's role in that space.
  * One extra query only when some page carries an override.
  */
-export async function filterReadablePages<T extends PageAccessInput>(
+export async function filterReadablePagesAs<T extends PageAccessInput>(
   db: Database,
-  context: AuthedContext,
+  principal: Principal,
   pages: T[],
   spaceRole: WikiRole | null,
 ): Promise<T[]> {
@@ -373,8 +395,7 @@ export async function filterReadablePages<T extends PageAccessInput>(
   if (spaceRole === "admin") return pages; // admins see everything in the space
   const overridden = pages.filter((p) => p.visibility !== null);
   if (overridden.length === 0) return pages; // no page ACLs → all inherit space
-  const userId = context.session.user.id;
-  const activeOrg = context.session.session.activeOrganizationId;
+  const { userId, organizationId: activeOrg } = principal;
   const teamIds = await userTeamIds(db, userId);
   const roleNames = activeOrg ? await orgRoleNames(db, userId, activeOrg) : [];
   const rows = await db.query.pageMember.findMany({
@@ -408,20 +429,31 @@ export async function filterReadablePages<T extends PageAccessInput>(
   });
 }
 
-/**
- * Builds a synchronous read predicate after loading the caller's memberships
- * once — use it to filter a batch of already-fetched spaces without a query per
- * row. Only spaces in the caller's active org can pass.
- */
-export async function buildSpaceReadFilter(
+/** Session-bound wrapper around `filterReadablePagesAs`. */
+export async function filterReadablePages<T extends PageAccessInput>(
   db: Database,
   context: AuthedContext,
-): Promise<(target: SpaceAccessInput) => boolean> {
-  const userId = context.session.user.id;
-  const activeOrg = context.session.session.activeOrganizationId;
+  pages: T[],
+  spaceRole: WikiRole | null,
+): Promise<T[]> {
+  return filterReadablePagesAs(db, principalOf(context), pages, spaceRole);
+}
+
+/**
+ * Space ids the principal holds an *explicit* grant on — directly, via a team,
+ * or via an org group. This is membership, not readability: a public space the
+ * principal was never added to is absent. Exposed because "my spaces" is a
+ * meaningful scope on its own (digest filters), separate from "spaces I may
+ * read".
+ */
+export async function loadSpaceMembershipIds(
+  db: Database,
+  principal: Principal,
+): Promise<Set<string>> {
+  const { userId, organizationId } = principal;
   const teamIds = await userTeamIds(db, userId);
-  const roleNames = activeOrg ? await orgRoleNames(db, userId, activeOrg) : [];
-  const memberRows = await db
+  const roleNames = organizationId ? await orgRoleNames(db, userId, organizationId) : [];
+  const rows = await db
     .select({ spaceId: spaceMember.spaceId })
     .from(spaceMember)
     .where(
@@ -431,21 +463,57 @@ export async function buildSpaceReadFilter(
         roleNames.length ? inArray(spaceMember.roleName, roleNames) : undefined,
       ),
     );
-  const memberSet = new Set(memberRows.map((r) => r.spaceId));
+  return new Set(rows.map((row) => row.spaceId));
+}
+
+/**
+ * Builds a synchronous read predicate after loading the principal's memberships
+ * once — use it to filter a batch of already-fetched spaces without a query per
+ * row. Only spaces in the principal's organization can pass.
+ */
+export async function buildSpaceReadFilterAs(
+  db: Database,
+  principal: Principal,
+): Promise<(target: SpaceAccessInput) => boolean> {
+  const { userId, organizationId: activeOrg } = principal;
+  const memberSet = await loadSpaceMembershipIds(db, principal);
   return (target) =>
     target.organizationId === activeOrg &&
     resolveSpaceAccess(target.visibility, memberSet.has(target.id), target.createdBy === userId);
 }
 
-/**
- * The set of space ids in `organizationId` the caller may read. Used to filter
- * cross-space reads (search, activity feed, favorites) to accessible spaces.
- */
-export async function readableSpaceIds(
+/** Session-bound wrapper around `buildSpaceReadFilterAs`. */
+export async function buildSpaceReadFilter(
   db: Database,
   context: AuthedContext,
+): Promise<(target: SpaceAccessInput) => boolean> {
+  return buildSpaceReadFilterAs(db, principalOf(context));
+}
+
+/**
+ * The set of space ids in `organizationId` the principal may read. Used to
+ * filter cross-space reads (search, activity feed, favorites, digests) to
+ * accessible spaces.
+ */
+export async function readableSpaceIdsAs(
+  db: Database,
+  principal: Principal,
   organizationId: string,
 ): Promise<string[]> {
+  const spaces = await loadReadableSpacesAs(db, principal, organizationId);
+  return spaces.map((s) => s.id);
+}
+
+/**
+ * Like `readableSpaceIdsAs`, but keeps the rows. Callers that afterwards need
+ * to resolve *page*-level access want the space's visibility and creator, and
+ * re-fetching them per space would be a query per row.
+ */
+export async function loadReadableSpacesAs(
+  db: Database,
+  principal: Principal,
+  organizationId: string,
+): Promise<SpaceAccessInput[]> {
   const [spaces, canRead] = await Promise.all([
     db
       .select({
@@ -456,7 +524,76 @@ export async function readableSpaceIds(
       })
       .from(space)
       .where(and(eq(space.organizationId, organizationId), isNull(space.archivedAt))),
-    buildSpaceReadFilter(db, context),
+    buildSpaceReadFilterAs(db, principal),
   ]);
-  return spaces.filter(canRead).map((s) => s.id);
+  return spaces.filter(canRead);
+}
+
+/** Session-bound wrapper around `readableSpaceIdsAs`. */
+export async function readableSpaceIds(
+  db: Database,
+  context: AuthedContext,
+  organizationId: string,
+): Promise<string[]> {
+  return readableSpaceIdsAs(db, principalOf(context), organizationId);
+}
+
+/**
+ * Session-free counterpart to `isOrgManager` (which needs the caller's headers
+ * to ask better-auth). Resolves the same question — does this user hold
+ * `member:["update"]` in the org — from the stored role assignment alone, so a
+ * background job can answer it.
+ *
+ * Static `owner`/`admin` carry the grant by definition. A dynamic role (group)
+ * carries it when its stored permission document lists it; better-auth keeps
+ * that document as JSON in `organization_role.permission`.
+ */
+export async function isOrgManagerAs(
+  db: Database,
+  userId: string,
+  organizationId: string,
+): Promise<boolean> {
+  const roleNames = await orgRoleNames(db, userId, organizationId);
+  if (roleNames.some((name) => name === "owner" || name === "admin")) return true;
+  const dynamic = roleNames.filter((name) => name !== "member");
+  if (dynamic.length === 0) return false;
+  const rows = await db
+    .select({ permission: organizationRole.permission })
+    .from(organizationRole)
+    .where(
+      and(
+        eq(organizationRole.organizationId, organizationId),
+        inArray(organizationRole.role, dynamic),
+      ),
+    );
+  return rows.some((row) => {
+    try {
+      const parsed: unknown = JSON.parse(row.permission);
+      const actions = (parsed as Record<string, unknown> | null)?.member;
+      return Array.isArray(actions) && actions.includes("update");
+    } catch {
+      // A malformed document must not hand out rights.
+      return false;
+    }
+  });
+}
+
+/**
+ * The principal's effective role in a space, resolved without a session. Mirrors
+ * `loadSpaceRole`; the org-manager override is resolved via `isOrgManagerAs`.
+ */
+export async function loadSpaceRoleAs(
+  db: Database,
+  principal: Principal,
+  target: SpaceAccessInput,
+  isOrgManager: boolean,
+): Promise<WikiRole | null> {
+  if (target.organizationId !== principal.organizationId) {
+    return null;
+  }
+  const { userId } = principal;
+  const teamIds = await userTeamIds(db, userId);
+  const roleNames = await orgRoleNames(db, userId, target.organizationId);
+  const memberRole = await memberRoleInSpace(db, target.id, userId, teamIds, roleNames);
+  return resolveSpaceRole(target.visibility, memberRole, target.createdBy === userId, isOrgManager);
 }

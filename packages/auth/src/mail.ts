@@ -42,19 +42,48 @@ export type Mail = {
   html: string;
 };
 
-export async function sendMail(mail: Mail): Promise<void> {
+/**
+ * Whether this install can send mail at all. Callers that would otherwise burn
+ * irreversible state on a no-op — the digest runner advancing its cursor past
+ * events nobody was told about — check this first instead of "sending" into
+ * the void.
+ */
+export function isMailConfigured(): boolean {
+  return !!env.SMTP_HOST;
+}
+
+export type MailResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Sends and *reports* the outcome. Use this when the result changes what the
+ * caller does next; `sendMail` below is the fire-and-forget variant Better Auth
+ * hooks use.
+ */
+export async function deliverMail(mail: Mail): Promise<MailResult> {
   const transport = getTransporter();
   if (!transport) {
-    console.warn("[mail] SMTP_HOST is not configured — mail not sent");
-    return;
+    return { ok: false, error: "SMTP_HOST is not configured" };
   }
   try {
     await transport.sendMail({ from: env.SMTP_FROM, ...mail });
+    return { ok: true };
   } catch (error) {
+    // Never include the message body: it may carry authentication links.
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function sendMail(mail: Mail): Promise<void> {
+  if (!isMailConfigured()) {
+    console.warn("[mail] SMTP_HOST is not configured — mail not sent");
+    return;
+  }
+  const result = await deliverMail(mail);
+  if (!result.ok) {
     // Better Auth surfaces a thrown error to the caller as a failed request.
     // A bounced invitation must not roll back the invitation row, so log and
     // swallow: the operator sees the failure, the user sees a normal result.
-    console.error(`[mail] failed to send "${mail.subject}" to ${mail.to}:`, error);
+    console.error(`[mail] failed to send "${mail.subject}" to ${mail.to}:`, result.error);
   }
 }
 

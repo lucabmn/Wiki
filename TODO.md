@@ -97,7 +97,13 @@ Entweder Audit-Abdeckung vervollständigen oder die Produktbeschreibung einschr�
 
 ### Subscriptions tatsächlich benachrichtigen
 
-„Abonnieren“ speichert derzeit anscheinend nur Datenbankzeilen. Ein Versand-/Notification-Prozess für Änderungen oder Kommentare fehlt.
+Teilweise erledigt: Gebündelte Benachrichtigungen (Digests) verschicken periodische Zusammenfassungen per E-Mail, wahlweise mit Umfang „Nur abonnierte Seiten“ — Abonnements und Favoriten lösen damit erstmals einen Versand aus. Admins setzen Vorgaben für die Organisation, Benutzer können sie für sich überschreiben.
+
+Offen bleibt:
+
+- Sofortbenachrichtigung bei einzelnen Ereignissen (heute nur periodisch gebündelt),
+- In-App-Benachrichtigungen bzw. ein Posteingang (es gibt bisher nur E-Mail),
+- gezielte Benachrichtigung bei @-Erwähnungen und Antworten auf eigene Kommentare.
 
 ### Accessibility
 
