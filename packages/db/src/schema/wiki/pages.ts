@@ -58,10 +58,12 @@ export const page = wikiSchema.table(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     ...timestamps,
-    // Generated FTS vector: title weighted higher (A) than body (B).
+    // Generated German FTS vector: title weighted higher (A) than body (B).
+    // Keep this configuration aligned with the query and headline functions in
+    // packages/api/src/routers/search.ts.
     searchVector: tsvector("search_vector").generatedAlwaysAs(
       (): SQL =>
-        sql`setweight(to_tsvector('english', coalesce(${page.title}, '')), 'A') || setweight(to_tsvector('english', coalesce(${page.textContent}, '')), 'B')`,
+        sql`setweight(to_tsvector('german', coalesce(${page.title}, '')), 'A') || setweight(to_tsvector('german', coalesce(${page.textContent}, '')), 'B')`,
     ),
   },
   (t) => [

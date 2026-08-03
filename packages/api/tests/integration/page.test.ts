@@ -495,6 +495,23 @@ describe("draft invisibility on reader surfaces", () => {
     expect(afterHits.map((h) => h.pageId)).toContain(p.id);
   });
 
+  it("uses German stemming for full-text search", async () => {
+    const p = await call(
+      pageRouter.create,
+      { spaceId: "sp", title: "Handbuch" },
+      { context: ctx() },
+    );
+    await call(
+      pageRouter.publish,
+      { id: p.id, textContent: "Hier stehen hilfreiche Anleitungen." },
+      { context: ctx() },
+    );
+
+    const hits = await call(searchRouter.pages, { query: "Anleitung" }, { context: ctx() });
+
+    expect(hits.map((hit) => hit.pageId)).toContain(p.id);
+  });
+
   it("backlinks exclude a draft source and include it after publish", async () => {
     const target = await call(
       pageRouter.create,

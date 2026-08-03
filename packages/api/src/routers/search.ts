@@ -35,7 +35,8 @@ export const searchRouter = {
         return [];
       }
 
-      const tsquery = sql`websearch_to_tsquery('english', ${input.query})`;
+      // This must match the generated search vector in the page schema.
+      const tsquery = sql`websearch_to_tsquery('german', ${input.query})`;
       const hits = await context.db
         .select({
           pageId: page.id,
@@ -43,7 +44,7 @@ export const searchRouter = {
           title: page.title,
           slug: page.slug,
           icon: page.icon,
-          snippet: sql<string>`ts_headline('english', ${page.textContent}, ${tsquery}, 'MaxFragments=1, MaxWords=30, MinWords=10')`,
+          snippet: sql<string>`ts_headline('german', ${page.textContent}, ${tsquery}, 'MaxFragments=1, MaxWords=30, MinWords=10')`,
           rank: sql<number>`ts_rank(${page.searchVector}, ${tsquery})`,
           // Only needed to evaluate per-page ACLs below; stripped by the output
           // schema before the response leaves the server.

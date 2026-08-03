@@ -1,0 +1,3 @@
+ALTER TABLE "wiki"."page" drop column "search_vector";--> statement-breakpoint
+ALTER TABLE "wiki"."page" ADD COLUMN "search_vector" "tsvector" GENERATED ALWAYS AS (setweight(to_tsvector('german', coalesce("wiki"."page"."title", '')), 'A') || setweight(to_tsvector('german', coalesce("wiki"."page"."text_content", '')), 'B')) STORED;--> statement-breakpoint
+CREATE INDEX "page_search_idx" ON "wiki"."page" USING gin ("search_vector");
