@@ -1,3 +1,4 @@
+import { SpaceIconPicker } from "@/components/spaces/space-icon-picker";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
 import { Button } from "@nilovon-wiki/ui/components/button";
@@ -25,6 +26,7 @@ export function CreateSpaceDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [name, setName] = useState("");
+  const [icon, setIcon] = useState<string | null>(null);
   const invalidateSpaces = useInvalidate(orpc.spaces.list.key());
 
   const create = useMutation(
@@ -32,6 +34,7 @@ export function CreateSpaceDialog({
       onSuccess: () => {
         invalidateSpaces();
         setName("");
+        setIcon(null);
         onOpenChange(false);
       },
       onError: toastError,
@@ -41,7 +44,7 @@ export function CreateSpaceDialog({
   const submit = () => {
     const trimmed = name.trim();
     if (trimmed) {
-      create.mutate({ name: trimmed, visibility: "private" });
+      create.mutate({ name: trimmed, icon, visibility: "private" });
     }
   };
 
@@ -67,6 +70,16 @@ export function CreateSpaceDialog({
             placeholder="Space-Name"
             maxLength={120}
           />
+          <div className="mt-3 space-y-1.5">
+            <div className="text-xs text-muted-foreground">Icon</div>
+            <SpaceIconPicker
+              value={icon}
+              onChange={setIcon}
+              name={name.trim() || "Space"}
+              color={null}
+              disabled={create.isPending}
+            />
+          </div>
           <DialogFooter className="mt-4">
             <Button
               type="button"

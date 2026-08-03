@@ -5,6 +5,7 @@ import { Check, Download, Globe, Lock, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { MemberAccessManager } from "@/components/access/member-access-manager";
+import { SpaceIconPicker } from "@/components/spaces/space-icon-picker";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { VISIBILITY_LABEL } from "@/lib/labels";
 import { spaceExportUrl } from "@/lib/space-export";
@@ -64,7 +65,13 @@ export function SpaceSettingsSheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  space: { id: string; name: string; visibility: string; color: string | null };
+  space: {
+    id: string;
+    name: string;
+    visibility: string;
+    color: string | null;
+    icon: string | null;
+  };
   organizationId: string;
 }) {
   const navigate = useNavigate();
@@ -93,6 +100,7 @@ export function SpaceSettingsSheet({
   // sheet opens (and after a save, when the fresh space props arrive).
   const [name, setName] = useState(space.name);
   const [color, setColor] = useState<string | null>(space.color);
+  const [icon, setIcon] = useState<string | null>(space.icon);
   // The visibility cards switch on click, before the mutation resolves —
   // otherwise the selection appears stuck. Reverted in the mutation's onError.
   const [visibility, setVisibility] = useState(space.visibility);
@@ -100,9 +108,10 @@ export function SpaceSettingsSheet({
     if (open) {
       setName(space.name);
       setColor(space.color);
+      setIcon(space.icon);
       setVisibility(space.visibility);
     }
-  }, [open, space.name, space.color, space.visibility]);
+  }, [open, space.name, space.color, space.icon, space.visibility]);
 
   const refresh = () => {
     invalidateMembers();
@@ -186,7 +195,10 @@ export function SpaceSettingsSheet({
   );
 
   const trimmedName = name.trim();
-  const generalDirty = trimmedName !== space.name || (color ?? null) !== (space.color ?? null);
+  const generalDirty =
+    trimmedName !== space.name ||
+    (color ?? null) !== (space.color ?? null) ||
+    (icon ?? null) !== (space.icon ?? null);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -211,6 +223,14 @@ export function SpaceSettingsSheet({
               onChange={(event) => setName(event.target.value)}
               placeholder="Name des Spaces"
             />
+            <div className="text-xs text-muted-foreground">Icon</div>
+            <SpaceIconPicker
+              value={icon}
+              onChange={setIcon}
+              name={trimmedName || space.name}
+              color={color}
+              disabled={updateGeneral.isPending}
+            />
             <div className="text-xs text-muted-foreground">Farbe</div>
             <div className="flex flex-wrap items-center gap-1.5">
               {SPACE_COLORS.map((c) => (
@@ -232,7 +252,9 @@ export function SpaceSettingsSheet({
               <Button
                 size="sm"
                 disabled={!trimmedName || !generalDirty || updateGeneral.isPending}
-                onClick={() => updateGeneral.mutate({ id: space.id, name: trimmedName, color })}
+                onClick={() =>
+                  updateGeneral.mutate({ id: space.id, name: trimmedName, color, icon })
+                }
               >
                 {updateGeneral.isPending ? "Speichern …" : "Speichern"}
               </Button>
