@@ -1,11 +1,11 @@
 import { Hocuspocus } from "@hocuspocus/server";
-import { experimental_upgradeWebSocket } from "@vercel/functions";
+import { experimental_upgradeWebSocket, waitUntil } from "@vercel/functions";
 import { initLogger, log, parseError } from "evlog";
 import type { RawData, WebSocket } from "ws";
 
 import { env } from "@nilovon-wiki/env/collab";
 
-import { createCollabConfiguration } from "./hocuspocus";
+import { createCollabConfiguration, settleStores } from "./hocuspocus";
 
 /**
  * Serverless entry: serves the collab WebSocket from a Vercel Function.
@@ -85,8 +85,11 @@ function attach(ws: WebSocket, request: Request): void {
   ws.on("close", (code: number, reason: Buffer) => {
     connection.handleClose({ code, reason: reason.toString() } as CloseEvent);
     // The instance may be frozen the moment this invocation returns, so do not
-    // leave the last edits sitting in the debouncer.
+    // leave the last edits sitting in the debouncer. `flushPendingStores` only
+    // *starts* the writes (it returns `void`), so hand the resulting queries to
+    // `waitUntil` — otherwise the freeze can land mid-UPDATE and lose them.
     hocuspocus.flushPendingStores();
+    waitUntil(settleStores());
   });
 }
 

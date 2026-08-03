@@ -54,6 +54,27 @@ async function storeDocument(pageId: string, state: Uint8Array): Promise<void> {
   await db.update(page).set({ yjsState: state }).where(eq(page.id, pageId));
 }
 
+/**
+ * Writes that have been started but not yet acknowledged by Postgres.
+ *
+ * `Hocuspocus.flushPendingStores()` returns `void`: it kicks the debouncer and
+ * returns immediately, so the `UPDATE` it triggers is in flight with nobody
+ * holding its promise. On a long-lived process that is harmless. On a
+ * serverless one the instance can be frozen the moment the invocation returns,
+ * killing the query mid-write — so `src/vercel.ts` needs something to await.
+ */
+const inflightStores = new Set<Promise<unknown>>();
+
+/** Resolves once every store started so far has hit the database. */
+export function settleStores(): Promise<unknown> {
+  return Promise.all(inflightStores);
+}
+
+function trackStore(write: Promise<void>): Promise<void> {
+  inflightStores.add(write);
+  return write.finally(() => inflightStores.delete(write));
+}
+
 export type CollabConfigurationOptions = {
   /** Shared secret used to verify page-scoped collab tokens minted by the API. */
   authSecret: string;
@@ -89,7 +110,7 @@ export function createCollabConfiguration({
         const pageId = pageIdFromDocName(documentName);
         if (!pageId) return;
         try {
-          await storeDocument(pageId, state);
+          await trackStore(storeDocument(pageId, state));
         } catch (error) {
           log.error({ source: "collab", op: "store", documentName, ...parseError(error) });
           // Persisting failed: without this, users keep typing into a document
