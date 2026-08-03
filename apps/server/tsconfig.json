@@ -8,9 +8,5 @@
     },
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"
-  },
-  // `api/` is the Vercel serverless entry. It imports the tsdown bundle in
-  // `dist/`, which carries no declarations and is absent on a fresh clone, so
-  // typechecking it would fail CI for a file Vercel compiles on its own.
-  "exclude": ["node_modules", "dist", "api"]
+  }
 }
