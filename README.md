@@ -5,7 +5,7 @@
 **A self-hostable, organization-scoped knowledge base — spaces, hierarchical pages, comments, and fine-grained role-based access, built on an end-to-end type-safe TypeScript stack.**
 
 [![CI](https://github.com/lucabmn/Wiki/actions/workflows/ci.yml/badge.svg)](https://github.com/lucabmn/Wiki/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: GPL-3.0](https://choosealicense.com/licenses/gpl-3.0/)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 </div>
@@ -257,4 +257,4 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the develo
 
 ## License
 
-[MIT](LICENSE) © Nilovon
+[GPL-3.0](LICENSE) © Nilovon
