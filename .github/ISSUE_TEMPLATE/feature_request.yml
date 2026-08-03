@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for the suggestion! Please search [existing issues](https://github.com/Nilovon/Wiki/issues) first, and for larger changes open an issue to discuss before sending a PR.
+        Thanks for the suggestion! Please search [existing issues](https://github.com/lucabmn/Wiki/issues) first, and for larger changes open an issue to discuss before sending a PR.
 
   - type: textarea
     id: problem
