@@ -5,7 +5,11 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["dist/**"]
+      // Vite bakes `VITE_*` into the bundle at build time, so these must both
+      // reach the task (turbo runs in strict env mode) and be part of the cache
+      // key — otherwise a changed URL replays a stale bundle.
+      "env": ["VITE_*", "NODE_ENV"],
+      "outputs": ["dist/**", ".output/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]
