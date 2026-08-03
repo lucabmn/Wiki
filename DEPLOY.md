@@ -226,8 +226,15 @@ Setup:
    cannot do pub/sub. Budget two connections per warm instance (pub + sub).
 3. Environment variables: `DATABASE_URL`, `BETTER_AUTH_SECRET` (byte-identical
    to the API's — it verifies the collab-token HMAC), `REDIS_URL`.
-4. Raise `maxDuration` for the function on your plan (Pro allows 800s). This is
-   the reconnect interval, so the default 5 minutes is the floor, not a target.
+4. Optionally raise the function's duration cap — it _is_ the reconnect
+   interval, and the default is 5 minutes. Left out of the committed
+   `vercel.json` because a value above the plan limit fails the deploy (Hobby
+   caps at 300s, Pro at 800s). On Pro, add:
+
+   ```json
+   "functions": { "api/index.js": { "maxDuration": 800 } }
+   ```
+
 5. Rebuild the web app with `VITE_COLLAB_URL=wss://<project>.vercel.app`. It is
    baked in at build time — changing the variable without redeploying web does
    nothing.
@@ -238,8 +245,12 @@ Limits you own after this:
   reconnects on its own (`page-editor.tsx` passes `token` as an async function,
   so it re-mints a collab token each time) — expect a brief "connecting" blip.
 - Instances are frozen without `SIGTERM`. The serverless entry compensates with
-  a 400 ms / 2 s store debounce and an explicit flush on socket close instead of
-  the graceful shutdown the container path uses.
+  a 400 ms / 2 s store debounce and, on socket close, a flush whose `UPDATE`s
+  are handed to `waitUntil` — instead of the graceful shutdown the container
+  path uses.
+- If the WebSocket handshake fails at the root path, the rewrite is not being
+  applied to the `Upgrade` request: point `VITE_COLLAB_URL` at
+  `wss://<project>.vercel.app/api` and rebuild web.
 - Every cross-instance edit takes a Redis round trip.
 
 ## Health & monitoring
