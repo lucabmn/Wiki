@@ -4,6 +4,8 @@ import { env } from "@nilovon-wiki/env/server";
 import { log, parseError } from "evlog";
 import { Hono } from "hono";
 
+import { checkInternalToken } from "./internal-token";
+
 /**
  * Drives the bundled-notification (digest) runner.
  *
@@ -76,18 +78,10 @@ export const digestRoutes = new Hono();
 /**
  * Manual/external trigger. Guarded by a shared secret rather than a session:
  * the caller is a scheduler, not a person, and the work it starts is expensive.
- * Compared in full so a wrong token cannot be probed byte by byte.
  */
 digestRoutes.post("/digests/run", async (c) => {
-  const expected = env.DIGEST_RUN_TOKEN;
-  if (!expected) {
-    return c.json({ error: "DIGEST_RUN_TOKEN is not configured" }, 501);
-  }
-  const header = c.req.header("authorization") ?? "";
-  const presented = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
-  if (!timingSafeEqual(presented, expected)) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
+  const auth = checkInternalToken(c.req.header("authorization"));
+  if (!auth.ok) return c.json({ error: auth.error }, auth.status);
 
   try {
     const summary = await tick("http");
@@ -98,17 +92,3 @@ digestRoutes.post("/digests/run", async (c) => {
     return c.json({ error: "Digest run failed" }, 500);
   }
 });
-
-/**
- * Constant-time comparison for equal-length strings, so a wrong token cannot be
- * probed byte by byte. The length check short-circuits and therefore leaks the
- * token's length — which is not secret.
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < a.length; index++) {
-    mismatch |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return mismatch === 0;
-}

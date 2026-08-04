@@ -1,0 +1,157 @@
+---
+title: Webhooks
+description: Events leaving the wiki — signed, retried, and inspectable.
+icon: Webhook
+---
+
+A **webhook** posts an event to a URL you control whenever something happens in
+the wiki: a page is created, a comment is resolved, a file is uploaded. That is
+how Slack, Teams, Jira or your own automation learn about a change without
+polling.
+
+Organization admins manage them under **Einstellungen → Organisation →
+Webhooks**. Each subscription has a name, a target URL, an optional space it is
+limited to, and the list of events it wants.
+
+## What can be subscribed to
+
+The list below is **exhaustive** — a webhook can report these events and nothing
+else:
+
+| Category    | Events                                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------------------------- |
+| Spaces      | `space.created`, `space.updated`, `space.archived`, `space.deleted`                                              |
+| Pages       | `page.created`, `page.updated`, `page.published`, `page.moved`, `page.archived`, `page.restored`, `page.deleted` |
+| Comments    | `comment.created`, `comment.resolved`, `comment.deleted`                                                         |
+| Attachments | `attachment.uploaded`, `attachment.deleted`                                                                      |
+
+<Callout type="warn">
+  **Not every change produces an event.** Webhooks are built on the audit log, and the audit log
+  does not yet cover permission (ACL) changes, membership changes, or edits to an existing comment.
+  Those changes happen without any webhook firing. Managing webhooks themselves (`webhook.created`,
+  `webhook.updated`, `webhook.deleted`) is audited but deliberately **not** deliverable — a
+  subscription reporting its own edits would feed back into itself.
+</Callout>
+
+## The payload
+
+One JSON object per event, `POST`ed with `Content-Type: application/json`:
+
+```json
+{
+  "id": "kf3n8x2m9q1w7c4v",
+  "event": "page.updated",
+  "at": "2026-08-04T10:00:00.000Z",
+  "organization": { "id": "org_1", "name": "Acme" },
+  "actor": { "id": "usr_1", "name": "Ada Lovelace" },
+  "space": { "id": "spc_1", "slug": "handbuch", "name": "Handbuch" },
+  "page": {
+    "id": "pag_1",
+    "slug": "onboarding",
+    "title": "Onboarding",
+    "url": "https://wiki.example.com/pages/pag_1"
+  },
+  "metadata": { "title": "Onboarding" }
+}
+```
+
+- `id` is the delivery id. It is **stable across retries**, so use it to
+  deduplicate.
+- `actor`, `space` and `page` are `null` when the event has none — a deleted
+  page's row keeps its title in `metadata` rather than in `page`.
+- `metadata` carries event-specific context and its shape depends on the event.
+- **Page content is never included.** The receiver sits outside the permission
+  system; a webhook must not become a way to read a private space. Names,
+  titles and a link are what a notification needs.
+
+The transport details travel in headers, so the signed body stays exactly the
+event:
+
+| Header             | Meaning                                    |
+| ------------------ | ------------------------------------------ |
+| `X-Wiki-Event`     | The event name, for cheap routing          |
+| `X-Wiki-Delivery`  | The delivery id (same as `id` in the body) |
+| `X-Wiki-Attempt`   | 1 on the first try, higher on retries      |
+| `X-Wiki-Timestamp` | Unix seconds, signed along with the body   |
+| `X-Wiki-Signature` | `sha256=<hex HMAC>` — see below            |
+
+## Verifying the signature
+
+The secret is shown **once**, when the webhook is created — it is stored to sign
+with, not to be read back. If you lose it, create a new webhook.
+
+The signature is an HMAC-SHA256 over the timestamp, a literal dot, and the raw
+request body:
+
+```
+X-Wiki-Signature = "sha256=" + HMAC_SHA256(secret, timestamp + "." + body)
+```
+
+Signing the timestamp too is what makes a captured request unusable later: a
+body-only signature stays valid forever.
+
+```ts
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+function verify(secret: string, request: { body: string; headers: Headers }): boolean {
+  const timestamp = Number(request.headers.get("X-Wiki-Timestamp"));
+  const signature = request.headers.get("X-Wiki-Signature") ?? "";
+
+  // Reject anything older than five minutes, so a captured request cannot be
+  // replayed at leisure.
+  if (!Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) return false;
+
+  const expected = `sha256=${createHmac("sha256", secret)
+    .update(`${timestamp}.${request.body}`)
+    .digest("hex")}`;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+```
+
+Verify against the **raw body bytes**, before any JSON parsing — re-serialising
+changes whitespace and key order, and the signature will not match.
+
+## Delivery, retries, and the log
+
+Sending never happens inside the write that caused the event. The mutation only
+appends a row to an outbox — in the same transaction, so a rolled-back write
+leaves no event behind — and a background runner drains it right after the
+commit. A slow or dead receiver therefore cannot block anyone's page save.
+
+- **Answer `2xx`** to acknowledge. Any other status counts as a failure.
+- **Failures are retried** with exponential backoff, starting at a minute, until
+  the attempt ceiling (`WEBHOOK_MAX_ATTEMPTS`, default 6) is reached. After that
+  the delivery is marked `failed` and is not retried again.
+- **Redirects are not followed**, and each attempt has a timeout
+  (`WEBHOOK_TIMEOUT_SECONDS`, default 10 s).
+- **Receive fast, work later.** The timeout applies to your whole response, so
+  acknowledge first and do the work asynchronously.
+
+Every attempt — including failures, with the status code and the error text — is
+visible per webhook under **Zustellungen**. The **Test** button sends a one-off
+`ping` event so you can confirm the endpoint before waiting for real activity.
+
+## Where a webhook may point
+
+Targets must be publicly reachable `http(s)` URLs. Addresses inside the private
+network — `localhost`, `10.x`, `192.168.x`, link-local (including cloud metadata
+at `169.254.169.254`) — are refused, both when saving and again against the
+resolved address before each request. On a shared instance an admin who may not
+reach your database host must not be able to make the server reach it for them.
+
+Single-tenant installs whose receiver genuinely lives on the internal network
+(an n8n container next door) can allow it with
+`WEBHOOK_ALLOW_PRIVATE_HOSTS=true`.
+
+## Related
+
+<Cards>
+  <Card title="Activity log & audit" href="/docs/concepts/activity-log">
+    The events webhooks are built on.
+  </Card>
+  <Card title="Configuration" href="/docs/self-hosting/configuration">
+    Runner and delivery settings.
+  </Card>
+</Cards>

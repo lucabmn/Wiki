@@ -19,6 +19,7 @@ import { attachmentRoutes } from "./attachments";
 import { digestRoutes, startDigestScheduler, stopDigestScheduler } from "./digests";
 import { rateLimit } from "./rate-limit";
 import { spaceExportRoutes } from "./space-exports";
+import { startWebhookScheduler, stopWebhookScheduler, webhookRoutes } from "./webhooks";
 
 initLogger({
   env: { service: "nilovon-wiki-server" },
@@ -114,6 +115,7 @@ app.route("/exports", spaceExportRoutes);
 // be used to hammer the database.
 app.use("/internal/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "internal" }));
 app.route("/internal", digestRoutes);
+app.route("/internal", webhookRoutes);
 
 export const apiHandler = new OpenAPIHandler(appRouter, {
   plugins: [
@@ -189,6 +191,7 @@ async function shutdown(signal: string): Promise<void> {
   shuttingDown = true;
   log.info({ source: "server", msg: "shutting down", signal });
   stopDigestScheduler();
+  stopWebhookScheduler();
   try {
     await closeDb();
   } catch (error) {
@@ -202,5 +205,9 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 // Bundled notifications. A no-op where the ticker is disabled (serverless, or
 // an install that drives /internal/digests/run from an external scheduler).
 startDigestScheduler();
+
+// Outbound webhooks. Same deal: a no-op where the ticker is disabled and an
+// external scheduler drives /internal/webhooks/run instead.
+startWebhookScheduler();
 
 export default app;

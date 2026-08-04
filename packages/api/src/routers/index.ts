@@ -17,6 +17,7 @@ import { spaceMemberRouter } from "./space-member";
 import { tagRouter } from "./tag";
 import { userRouter } from "./user";
 import { userStateRouter } from "./user-state";
+import { webhookRouter } from "./webhook";
 
 /**
  * The application API. Each entity lives in its own router module and every
@@ -40,6 +41,7 @@ export const appRouter = {
   externalLinks: externalLinkRouter,
   activity: activityRouter,
   notifications: notificationRouter,
+  webhooks: webhookRouter,
   search: searchRouter,
   users: userRouter,
   me: userStateRouter,

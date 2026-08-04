@@ -45,6 +45,25 @@ For `pnpm dev`, each app reads its own file.
 | `APP_NAME`                               | no       | Display name used by auth flows (white-labeling)    |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_AUTH_MAX` | no       | Per-IP requests/minute for the API / auth routes    |
 | `RATE_LIMIT_SCIM_MAX`                    | no       | Per-IP requests/minute for SCIM (default `1200`)    |
+| `INTERNAL_RUN_TOKEN`                     | no       | Bearer token for the `/internal` runner endpoints   |
+
+<Callout type="info">
+  `INTERNAL_RUN_TOKEN` replaces the digest-specific `DIGEST_RUN_TOKEN`, which still works as an
+  alias — existing deployments need no change. One token opens every `POST /internal/…/run`
+  endpoint; unset leaves them all disabled.
+</Callout>
+
+### Outbound webhooks
+
+See [Webhooks](/docs/concepts/webhooks) for the payload and signature contract.
+
+| Variable                      | Required | Description                                                        |
+| ----------------------------- | -------- | ------------------------------------------------------------------ |
+| `WEBHOOK_SCHEDULER_ENABLED`   | no       | In-process runner (default `true`); off for serverless/cron setups |
+| `WEBHOOK_TICK_SECONDS`        | no       | How often the runner looks for queued deliveries (default `30`)    |
+| `WEBHOOK_TIMEOUT_SECONDS`     | no       | Per-request timeout (default `10`)                                 |
+| `WEBHOOK_MAX_ATTEMPTS`        | no       | Attempts before a delivery is marked failed (default `6`)          |
+| `WEBHOOK_ALLOW_PRIVATE_HOSTS` | no       | Allow endpoints on the internal network (default `false`)          |
 
 ### `apps/collab/.env`
 

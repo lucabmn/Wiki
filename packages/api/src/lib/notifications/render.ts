@@ -48,6 +48,11 @@ const ACTION_PHRASES: Record<ActivityAction, { verb: string; noun: string }> = {
   "comment.deleted": { verb: "hat einen Kommentar gelöscht:", noun: "Seite" },
   "attachment.uploaded": { verb: "hat einen Anhang hochgeladen:", noun: "Seite" },
   "attachment.deleted": { verb: "hat einen Anhang gelöscht:", noun: "Seite" },
+  // Webhook administration never reaches a digest — no category maps to it, so
+  // `collectDigest` drops those rows. Present only to keep the record total.
+  "webhook.created": { verb: "hat einen Webhook angelegt", noun: "Webhook" },
+  "webhook.updated": { verb: "hat einen Webhook geändert", noun: "Webhook" },
+  "webhook.deleted": { verb: "hat einen Webhook gelöscht", noun: "Webhook" },
 };
 
 const UNKNOWN_ACTOR = "Jemand";
