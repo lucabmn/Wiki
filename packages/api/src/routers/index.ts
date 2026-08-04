@@ -11,6 +11,7 @@ import { notificationRouter } from "./notification";
 import { onboardingRouter } from "./onboarding";
 import { pageRouter } from "./page";
 import { pageAccessRouter } from "./page-access";
+import { pageTemplateRouter } from "./page-template";
 import { searchRouter } from "./search";
 import { securityPolicyRouter } from "./security-policy";
 import { spaceRouter } from "./space";
@@ -32,7 +33,9 @@ export const appRouter = {
   },
   spaces: spaceRouter,
   spaceMembers: spaceMemberRouter,
-  pages: pageRouter,
+  // Template procedures live in their own module but share the `pages` surface
+  // — they operate on the same rows and read as `pages.listTemplates` clients.
+  pages: { ...pageRouter, ...pageTemplateRouter },
   pageAccess: pageAccessRouter,
   comments: commentRouter,
   tags: tagRouter,
