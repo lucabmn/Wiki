@@ -3,6 +3,12 @@ import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-or
 import { z } from "zod";
 
 import type { Database } from "@nilovon-wiki/db";
+import {
+  adoptMermaidCodeBlocks,
+  MERMAID_CAPTION_LIMIT,
+  MERMAID_NODE_NAME,
+  MERMAID_SOURCE_LIMIT,
+} from "@nilovon-wiki/editor/mermaid-document";
 import { attachment, page, pageRevision } from "@nilovon-wiki/db/schema/index";
 import { env } from "@nilovon-wiki/env/server";
 
@@ -153,6 +159,7 @@ const IMPORT_NODE_TYPES = new Set([
   "tableRow",
   "tableHeader",
   "tableCell",
+  MERMAID_NODE_NAME,
 ]);
 const IMPORT_MARK_TYPES = new Set([
   "bold",
@@ -211,6 +218,18 @@ function assertSafeImportNodeAttrs(node: Record<string, unknown>): void {
         throw new ORPCError("BAD_REQUEST", {
           message: "Imported ordered-list attributes are invalid",
         });
+      }
+      return;
+    case MERMAID_NODE_NAME:
+      assertImportKeys(attrs, ["source", "caption"], "Unsupported diagram attribute");
+      if (
+        typeof attrs.source !== "string" ||
+        attrs.source.length > MERMAID_SOURCE_LIMIT ||
+        (attrs.caption !== null &&
+          attrs.caption !== undefined &&
+          (typeof attrs.caption !== "string" || attrs.caption.length > MERMAID_CAPTION_LIMIT))
+      ) {
+        throw new ORPCError("BAD_REQUEST", { message: "Imported diagram attributes are invalid" });
       }
       return;
     case "codeBlock":
@@ -434,6 +453,10 @@ export const pageRouter = {
         throw new ORPCError("BAD_REQUEST", { message: "Import page keys must be unique" });
       }
       for (const item of input.pages) {
+        // ` ```mermaid ` fences arrive as code blocks from every Markdown-ish
+        // source; turning them into diagram nodes here closes the export/import
+        // round trip no matter which client did the conversion.
+        item.content = adoptMermaidCodeBlocks(item.content);
         assertSafeImportDocument(item.content);
         if (
           input.status === "published" &&

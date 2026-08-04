@@ -17,8 +17,11 @@ import {
   Quote,
   Table as TableIcon,
   Type,
+  Workflow,
 } from "lucide-react";
 import { type ComponentType, forwardRef, useEffect, useImperativeHandle, useState } from "react";
+
+import { MERMAID_TEMPLATE } from "./mermaid";
 
 /** A slash-menu entry: a labelled block transform run on the current selection. */
 type SlashCommand = {
@@ -111,6 +114,20 @@ const BLOCK_COMMANDS: SlashCommand[] = [
         .focus()
         .deleteRange(range)
         .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run(),
+  },
+  {
+    title: "Diagramm",
+    icon: Workflow,
+    keywords: ["diagramm", "mermaid", "graph", "flowchart", "sequenz", "uml", "chart"],
+    // Inserted with a small example so the block shows a diagram immediately;
+    // the node view opens on its source, which is what the author came for.
+    run: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertMermaidDiagram({ source: MERMAID_TEMPLATE })
         .run(),
   },
   {

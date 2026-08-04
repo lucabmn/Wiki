@@ -1,3 +1,9 @@
+import {
+  containsMermaidDiagram,
+  MERMAID_LANGUAGE,
+  MERMAID_NODE_NAME,
+} from "@nilovon-wiki/editor/mermaid-document";
+
 export type ExportFormat = "markdown" | "html" | "json";
 
 export type RichTextNode = {
@@ -162,6 +168,16 @@ function htmlNode(node: RichTextNode): string {
       return `<img src="${htmlEscape(safeHtmlUrl(node.attrs?.src, "image"))}" alt="${htmlEscape(node.attrs?.alt)}"${node.attrs?.title ? ` title="${htmlEscape(node.attrs.title)}"` : ""}>`;
     case "mention":
       return `<span class="mention">@${htmlEscape(node.attrs?.label ?? node.attrs?.id)}</span>`;
+    // Diagrams ship as source, not as an image: rendering Mermaid server-side
+    // needs a DOM (jsdom) or Chromium, and the export is not worth that
+    // dependency (see T08, "Offene Entscheidung"). `<pre class="mermaid">` is
+    // the shape Mermaid's own browser script picks up, so the block renders as
+    // soon as the export is viewed with Mermaid available — and stays readable
+    // text otherwise. The note in `documentToHtml` says so in the document.
+    case MERMAID_NODE_NAME:
+      return `<figure class="mermaid-diagram"><pre class="${MERMAID_LANGUAGE}">${htmlEscape(node.attrs?.source)}</pre>${
+        node.attrs?.caption ? `<figcaption>${htmlEscape(node.attrs.caption)}</figcaption>` : ""
+      }</figure>`;
     case "table":
       return `<table>${children}</table>`;
     case "tableRow":
@@ -199,9 +215,17 @@ function textAlignAttribute(node: RichTextNode): string {
     : "";
 }
 
+/** Told to the reader once per page, not per diagram. */
+const MERMAID_EXPORT_NOTE =
+  "Hinweis: Diagramme sind als Mermaid-Quelltext eingebettet und werden in diesem Export nicht gezeichnet.";
+
 export function documentToHtml(content: unknown, title: string): string {
-  const body = htmlNode((content ?? { type: "doc" }) as RichTextNode);
-  return `<!doctype html>\n<html lang="de">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">\n<title>${htmlEscape(title)}</title>\n<style>body{font:16px/1.6 system-ui,sans-serif;max-width:76ch;margin:3rem auto;padding:0 1rem}img{max-width:100%}table{border-collapse:collapse}th,td{border:1px solid #bbb;padding:.35rem .5rem}blockquote{border-left:3px solid #bbb;padding-left:1rem;color:#555}pre{overflow:auto;background:#f5f5f5;padding:1rem}</style>\n</head>\n<body>\n<h1>${htmlEscape(title)}</h1>\n${body}\n</body>\n</html>\n`;
+  const document = (content ?? { type: "doc" }) as RichTextNode;
+  const body = htmlNode(document);
+  const note = containsMermaidDiagram(document)
+    ? `<p class="export-note">${htmlEscape(MERMAID_EXPORT_NOTE)}</p>\n`
+    : "";
+  return `<!doctype html>\n<html lang="de">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">\n<title>${htmlEscape(title)}</title>\n<style>body{font:16px/1.6 system-ui,sans-serif;max-width:76ch;margin:3rem auto;padding:0 1rem}img{max-width:100%}table{border-collapse:collapse}th,td{border:1px solid #bbb;padding:.35rem .5rem}blockquote{border-left:3px solid #bbb;padding-left:1rem;color:#555}pre{overflow:auto;background:#f5f5f5;padding:1rem}figure{margin:1.5rem 0}figcaption{color:#555;font-size:.9em;text-align:center}.export-note{color:#555;font-size:.9em;border-left:3px solid #bbb;padding-left:1rem}</style>\n</head>\n<body>\n<h1>${htmlEscape(title)}</h1>\n${note}${body}\n</body>\n</html>\n`;
 }
 
 function markMarkdown(value: string, node: RichTextNode): string {
@@ -281,6 +305,19 @@ function markdownNode(node: RichTextNode, depth = 0): string {
       return `![${markdownEscape(String(node.attrs?.alt ?? ""))}](${String(node.attrs?.src ?? "")}${node.attrs?.title ? ` "${String(node.attrs.title).replace(/"/g, '\\"')}"` : ""})`;
     case "mention":
       return `@${markdownEscape(String(node.attrs?.label ?? node.attrs?.id ?? ""))}`;
+    // The de-facto standard: GitHub, GitLab and most Markdown viewers render a
+    // ```mermaid fence, and `adoptMermaidCodeBlocks` reads it back on import.
+    case MERMAID_NODE_NAME: {
+      const source = String(node.attrs?.source ?? "");
+      // A source containing backticks needs a longer fence than the run inside.
+      const fence = "`".repeat(
+        Math.max(3, ...(source.match(/`+/g) ?? []).map((run) => run.length + 1)),
+      );
+      const caption = node.attrs?.caption
+        ? `\n\n_${markdownEscape(String(node.attrs.caption))}_`
+        : "";
+      return `${fence}${MERMAID_LANGUAGE}\n${source}\n${fence}${caption}`;
+    }
     case "table": {
       const rows = (node.content ?? []).map((row) => markdownNode(row, depth));
       const columns = node.content?.[0]?.content?.length ?? 1;

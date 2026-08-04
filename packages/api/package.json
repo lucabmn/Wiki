@@ -21,6 +21,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1091.0",
     "@nilovon-wiki/auth": "workspace:*",
     "@nilovon-wiki/db": "workspace:*",
+    "@nilovon-wiki/editor": "workspace:*",
     "@nilovon-wiki/env": "workspace:*",
     "@orpc/client": "catalog:",
     "@orpc/openapi": "catalog:",

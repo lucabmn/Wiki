@@ -2,9 +2,10 @@ import { normalizeExternalUrl } from "@nilovon-wiki/api/lib/external-url";
 import { pageIdFromHref } from "@nilovon-wiki/api/lib/page-href";
 import { generateHTML } from "@tiptap/core";
 import { useNavigate } from "@tanstack/react-router";
-import { type MouseEvent, useMemo } from "react";
+import { type MouseEvent, useMemo, useRef } from "react";
 
 import { pageEditorExtensions } from "./extensions";
+import { useMermaidReadView } from "./mermaid";
 import "./editor.css";
 
 /**
@@ -102,6 +103,7 @@ export function PageContent({
   emptyLabel?: string;
 }) {
   const navigate = useNavigate();
+  const container = useRef<HTMLDivElement>(null);
 
   const html = useMemo(() => {
     if (!content || typeof content !== "object") return null;
@@ -122,6 +124,10 @@ export function PageContent({
       return null;
     }
   }, [content]);
+
+  // Diagram nodes serialize to `<pre class="mermaid">`; this renders them in
+  // place, lazy-loading Mermaid only for pages that actually contain one.
+  useMermaidReadView(container, html);
 
   if (html === null) {
     const text = fallbackText.trim();
@@ -145,8 +151,14 @@ export function PageContent({
   // Safe: the HTML is produced by TipTap's serializer from a fixed schema —
   // unknown nodes/marks are dropped, so no user-authored markup survives — and
   // `hardenLinks`, `hardenImages`, and `hardenStyles` validate the attributes
-  // the schema can carry into HTML.
+  // the schema can carry into HTML. Diagram sources arrive as escaped text
+  // inside `<pre>` and only become SVG after `mermaid/sanitize.ts`.
   return (
-    <div className="tiptap" onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />
+    <div
+      ref={container}
+      className="tiptap"
+      onClick={handleClick}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }

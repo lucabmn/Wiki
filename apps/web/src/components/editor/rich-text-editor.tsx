@@ -17,6 +17,7 @@ import { pageEditorExtensions } from "./extensions";
 import { applyLink } from "./link-commands";
 import { LinkPageDialog } from "./link-page-dialog";
 import { createMentionSuggestion } from "./mention";
+import { createMermaidNodeView } from "./mermaid";
 import { createSlashCommand } from "./slash-command";
 import "./editor.css";
 
@@ -76,6 +77,9 @@ export function RichTextEditor({
   }, []);
 
   const mention = useMemo(() => createMentionSuggestion(spaceId), [spaceId]);
+  // The diagram node lives in the shared schema; only its renderer is browser
+  // side, and rebuilding it would tear down every mounted diagram.
+  const mermaidNodeView = useMemo(() => createMermaidNodeView(), []);
   const slashCommand = useMemo(
     () =>
       createSlashCommand({
@@ -89,7 +93,7 @@ export function RichTextEditor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      ...pageEditorExtensions({ collaborative: true, mention }),
+      ...pageEditorExtensions({ collaborative: true, mention, mermaidNodeView }),
       ...cleverEditorExtensions(),
       CharacterCount,
       slashCommand,
