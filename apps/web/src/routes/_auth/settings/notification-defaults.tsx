@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { orpc } from "@/utils/orpc";
 import { toastError } from "@/lib/query";
 import { PermissionGate } from "@/components/settings/permission-gate";
+import { DirectNotificationDefaults } from "@/components/settings/direct-notification-defaults";
 import { SettingsCard, SettingsSection } from "@/components/settings/settings-section";
 import {
   DigestForm,
@@ -79,6 +80,8 @@ function NotificationDefaults() {
 
   return (
     <div className="space-y-8">
+      <DirectNotificationDefaults />
+
       <SettingsSection
         title="Gebündelte Benachrichtigungen"
         description="Diese Einstellungen gelten für alle Mitglieder, die nichts Eigenes festgelegt haben."

@@ -33,6 +33,7 @@ vi.mock("@/components/theme-provider", () => ({
 vi.mock("@/components/command-palette", () => ({ CommandPalette: () => null }));
 vi.mock("@/components/create-space-dialog", () => ({ CreateSpaceDialog: () => null }));
 vi.mock("@/components/create-page-dialog", () => ({ CreatePageDialog: () => null }));
+vi.mock("@/components/inbox/notification-bell", () => ({ NotificationBell: () => null }));
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigateSpy,

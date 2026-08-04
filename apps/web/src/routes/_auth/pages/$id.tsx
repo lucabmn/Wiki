@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, createFileRoute, useRouteContext } from "@tanstack/react-router";
+import { Link, createFileRoute, useLocation, useRouteContext } from "@tanstack/react-router";
 import { FileText, Lock, Pencil } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { extractHeadings } from "@/components/editor/headings";
@@ -71,6 +71,15 @@ function RouteComponent() {
   const { data: comments } = useQuery(
     orpc.comments.list.queryOptions({ input: { pageId: id }, enabled: Boolean(page) }),
   );
+  // A notification links straight at one comment. The anchor only exists once
+  // the list has rendered, so the jump waits for the query rather than the URL.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash.startsWith("comment-") || !comments) return;
+    const target = document.getElementById(hash);
+    if (target) scrollIntoPageView(target);
+  }, [hash, comments]);
+
   // Resolve the owning space for the back-link; cached from the sidebar.
   const { data: spaces } = useQuery(orpc.spaces.list.queryOptions({ input: {} }));
   const space = spaces?.find((s) => s.id === page?.spaceId);
@@ -232,7 +241,7 @@ function RouteComponent() {
                 ))}
               </div>
             )}
-            <CommentForm pageId={page.id} />
+            <CommentForm pageId={page.id} spaceId={page.spaceId} />
           </section>
         </div>
 

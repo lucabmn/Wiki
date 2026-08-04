@@ -1,6 +1,7 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
 import { getUser } from "@/functions/get-user";
+import { NotificationBell } from "@/components/inbox/notification-bell";
 import MainSidebar from "@/components/main-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@nilovon-wiki/ui/components/sidebar";
 
@@ -37,7 +38,10 @@ function AuthLayout() {
             bar is its only opener, so it must exist on every page. */}
         <div className="flex items-center gap-2 border-b border-border px-2 py-1.5 md:hidden">
           <SidebarTrigger />
-          <span className="text-sm font-semibold">Wiki</span>
+          <span className="flex-1 text-sm font-semibold">Wiki</span>
+          {/* The sidebar's bell is off-canvas here, and an unread badge nobody
+              can see is not a notification. */}
+          <NotificationBell />
         </div>
         <div data-page-scroll className="flex flex-1 flex-col overflow-y-auto">
           <Outlet />
