@@ -48,6 +48,11 @@ const ACTION_PHRASES: Record<ActivityAction, { verb: string; noun: string }> = {
   "comment.deleted": { verb: "hat einen Kommentar gelöscht:", noun: "Seite" },
   "attachment.uploaded": { verb: "hat einen Anhang hochgeladen:", noun: "Seite" },
   "attachment.deleted": { verb: "hat einen Anhang gelöscht:", noun: "Seite" },
+  // Never reach a digest — `categoryForAction` maps them to no category — but
+  // the map is exhaustive over the enum so a future reader finds real copy here
+  // instead of a crash.
+  "impersonation.started": { verb: "wurde von der Administration übernommen", noun: "Konto" },
+  "impersonation.ended": { verb: "ist nicht mehr übernommen", noun: "Konto" },
 };
 
 const UNKNOWN_ACTOR = "Jemand";

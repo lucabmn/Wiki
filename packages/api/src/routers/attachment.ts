@@ -8,7 +8,7 @@ import { env } from "@nilovon-wiki/env/server";
 import { protectedProcedure } from "../index";
 import { assertSpaceRead } from "../lib/access";
 import { requireOwnerOrSpaceCapability, requirePageCapability } from "../lib/authz";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { loadAttachment, loadPage, loadSpace } from "../lib/loaders";
 import { getStorage } from "../lib/storage";
 import { AttachmentSchema, ListAttachmentsInputSchema } from "../schemas/attachment";
@@ -136,7 +136,7 @@ export const attachmentRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "attachment.deleted",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: existing.spaceId,
           pageId: existing.pageId,
           metadata: { attachmentId: existing.id, fileName: existing.fileName },

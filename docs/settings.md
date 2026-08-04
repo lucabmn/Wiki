@@ -17,6 +17,8 @@ It is split in two: **Konto** (personal, open to every signed-in user) and **Org
 | `/settings/teams`        | Organisation | `team:["create"]`                                    | Teams and their membership                                      |
 | `/settings/sso`          | Organisation | static role `owner`/`admin` (see below)              | OIDC identity providers, SCIM directory-sync connections        |
 
+> **Not in this area:** `/admin` — the instance console (accounts, sessions, instance health, support impersonation). It is gated on `user.role`, not on any organization right, and gets its own sidebar entry. See [Permissions](./permissions.md#instance-admin-vs-org-admin).
+
 The sidebar entry points at `/settings/profile` and is visible to everyone; `/settings` redirects there. The nav only renders the **Organisation** group when [`useAnyPermission`](../apps/web/src/lib/permissions.ts) settles as allowed for any of `member:update` / `ac:create` / `organization:update`.
 
 > That OR is **not** the same thing as the backend's "org manager" (`isOrgManager`, which is `member:["update"]` only, and overrides _content_ access — see [Permissions](./permissions.md)). It is deliberately wider: it decides whether the nav group is worth showing at all, and each tab still re-checks its own right.

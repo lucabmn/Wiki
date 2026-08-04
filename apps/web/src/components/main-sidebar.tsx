@@ -1,5 +1,6 @@
 import { authClient } from "@/lib/auth-client";
 import { initials } from "@/lib/format";
+import { isInstanceAdminSession } from "@/lib/instance-admin";
 import { usePermission } from "@/lib/permissions";
 import { orpc } from "@/utils/orpc";
 import { PageTree } from "./page-tree/page-tree";
@@ -52,6 +53,7 @@ import {
   Plus,
   Search,
   Settings,
+  ShieldAlert,
   Sun,
   User,
   UsersRound,
@@ -71,6 +73,18 @@ const settingsNavItem = {
   to: "/settings/profile",
   label: "Einstellungen",
   icon: Settings,
+} as const;
+
+/**
+ * Instance administration — a different axis from the organization settings
+ * above, so it gets its own entry rather than a tab inside them. Hidden for
+ * everyone else, but that is cosmetic: the route and every procedure behind it
+ * re-check server-side.
+ */
+const adminNavItem = {
+  to: "/admin",
+  label: "Instanz-Verwaltung",
+  icon: ShieldAlert,
 } as const;
 
 const SPACE_OPEN_STATE_STORAGE_PREFIX = "nilovon-wiki:sidebar:space-open-state";
@@ -266,11 +280,14 @@ export default function MainSidebar() {
   // route id — importing the route module here would be a circular import, since
   // the layout route renders this sidebar.
   const { auth } = useRouteContext({ from: "/_auth" });
+  const { data: session } = authClient.useSession();
   const { theme, setTheme } = useTheme();
 
   // Settings is open to everyone: it starts on the personal tabs (profile,
   // security, appearance). The organization tabs inside it are gated separately.
-  const nav = [...baseNav, settingsNavItem];
+  const nav = isInstanceAdminSession(session)
+    ? [...baseNav, settingsNavItem, adminNavItem]
+    : [...baseNav, settingsNavItem];
 
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
