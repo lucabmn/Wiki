@@ -9,7 +9,7 @@ import { env } from "@nilovon-wiki/env/server";
 import { isOrgManager, protectedProcedure } from "../index";
 import { filterReadablePages, loadSpaceRole } from "../lib/access";
 import { requirePageCapability, requireSpaceCapabilityById } from "../lib/authz";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { COLLAB_TOKEN_TTL_SECONDS, collabDocName, signCollabToken } from "../lib/collab-token";
 import { generateKeyBetween } from "../lib/fractional";
 import { pageNotTrashed } from "../lib/lifecycle";
@@ -549,7 +549,7 @@ export const pageRouter = {
               await recordActivity(tx, {
                 organizationId,
                 action: "page.created",
-                actorId: userId,
+                ...activityActor(context),
                 spaceId: row.spaceId,
                 pageId: row.id,
                 metadata: { title: row.title, source: "html-import", sourcePath: item.sourcePath },
@@ -643,7 +643,7 @@ export const pageRouter = {
           await recordActivity(tx, {
             organizationId: item.organizationId,
             action: "page.updated",
-            actorId: context.session.user.id,
+            ...activityActor(context),
             spaceId: item.row.spaceId,
             pageId: item.row.id,
             metadata: { title: item.row.title, source: "html-import-assets" },
@@ -708,7 +708,7 @@ export const pageRouter = {
             await recordActivity(tx, {
               organizationId,
               action: "page.created",
-              actorId: userId,
+              ...activityActor(context),
               spaceId: row.spaceId,
               pageId: row.id,
               metadata: { title: row.title },
@@ -758,7 +758,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.updated",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -847,7 +847,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.published",
-          actorId: userId,
+          ...activityActor(context),
           spaceId: existing.spaceId,
           pageId: existing.id,
           metadata: { title: nextTitle },
@@ -895,7 +895,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.moved",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -936,7 +936,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.archived",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -989,7 +989,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.deleted",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: existing.spaceId,
           pageId: existing.id,
           // The page row survives a soft delete, but the title is denormalized
@@ -1028,7 +1028,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.restored",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -1105,7 +1105,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.updated",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title, restoredVersion: revision.version },

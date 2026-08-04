@@ -4,7 +4,7 @@ import { z } from "zod";
 import { organizationRetentionSetting } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg, requireOrgPermission } from "../index";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { previewRetentionImpact } from "../lib/retention/preview";
 import { loadRetentionPolicy, saveRetentionPolicy } from "../lib/retention/settings";
 import {
@@ -90,7 +90,7 @@ export const retentionRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "retention.updated",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           metadata: { from: previous, to: input },
         });
         return { ...input, lastPurgeAt: existing?.lastPurgeAt ?? null };

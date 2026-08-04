@@ -5,7 +5,7 @@ import { z } from "zod";
 import { page, space } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure } from "../index";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { requireSpaceCapability, requireSpaceManage } from "../lib/authz";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { assertPageDeletable, assertSpaceDeletable, pageSubtreeIds } from "../lib/retention/holds";
@@ -67,7 +67,7 @@ export const trashPurgeRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.purged",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: target.spaceId,
           metadata: { pageId: target.id, title: target.title, pages: subtree.length },
         });
@@ -113,7 +113,7 @@ export const trashPurgeRouter = {
         await recordActivity(tx, {
           organizationId: spaceRow.organizationId,
           action: "space.purged",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           metadata: { spaceId: spaceRow.id, name: spaceRow.name },
         });
       });

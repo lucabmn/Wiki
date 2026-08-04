@@ -6,7 +6,7 @@ import type { Database } from "@nilovon-wiki/db";
 import { legalHold, page, space } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg, requireOrgPermission } from "../index";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { assertSpaceRead } from "../lib/access";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { mapUniqueViolation } from "../lib/pg-errors";
@@ -27,13 +27,17 @@ const TAGS = ["Legal hold"];
  * Deletion blocks.
  *
  * Setting and releasing both require org-level `organization:["update"]` — the
- * same grant. That is a known limitation, not an oversight: a block is often
- * aimed at the very administrator who can lift it, so genuine four-eyes control
- * needs an authority above the organization (the instance-admin role tracked
- * separately). Until that exists, the guarantee this gives is *evidentiary*
- * rather than preventive: a release cannot happen quietly. It is a separate
- * event, it carries a mandatory reason, and neither the block nor its release can
- * be removed by any retention window.
+ * same grant. So the guarantee here is *evidentiary*, not preventive: a release
+ * cannot happen quietly. It is a separate event, it carries a mandatory reason,
+ * it names the instance admin when made under an impersonated session, and
+ * neither the block nor its release can be removed by any retention window.
+ *
+ * A genuinely preventive block needs an authority above the organization, and
+ * `instanceAdminProcedure` (`lib/instance-admin.ts`) now provides one. Gating the
+ * *release* on it is a deliberate follow-up rather than part of this change: on an
+ * install where nobody set `INITIAL_ADMIN_EMAIL` there is no instance admin, and
+ * a block nobody can lift is its own kind of broken. That trade-off deserves its
+ * own decision, not a side effect of adding the feature.
  */
 export const legalHoldRouter = {
   list: requireOrgPermission({ organization: ["update"] })
@@ -139,7 +143,10 @@ export const legalHoldRouter = {
             await recordActivity(tx, {
               organizationId,
               action: "hold.created",
-              actorId: userId,
+              // Attributed to the impersonating admin as well, when there is
+              // one: a block set under a borrowed identity must not read as the
+              // borrowed account's own decision.
+              ...activityActor(context),
               spaceId: input.subject === "space" ? subjectId : null,
               pageId: input.subject === "page" ? subjectId : null,
               metadata: { holdId: row.id, subject: row.subject, reason: row.reason },
@@ -184,7 +191,7 @@ export const legalHoldRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "hold.released",
-          actorId: userId,
+          ...activityActor(context),
           spaceId: row.subject === "space" ? row.subjectId : null,
           pageId: row.subject === "page" ? row.subjectId : null,
           metadata: { holdId: row.id, subject: row.subject, reason: input.reason },

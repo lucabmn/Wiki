@@ -20,6 +20,7 @@ const activityFeedColumns = {
   spaceId: activity.spaceId,
   pageId: activity.pageId,
   actorId: activity.actorId,
+  impersonatedBy: activity.impersonatedBy,
   action: activity.action,
   metadata: activity.metadata,
   createdAt: activity.createdAt,

@@ -4,7 +4,7 @@ import { env } from "@nilovon-wiki/env/server";
 import { log, parseError } from "evlog";
 import { Hono } from "hono";
 
-import { checkInternalAuth } from "./internal-auth";
+import { checkInternalToken } from "./internal-token";
 
 /**
  * Drives the data-retention runner: the audit window and the trash expiry.
@@ -22,6 +22,10 @@ import { checkInternalAuth } from "./internal-auth";
  * next to the deletion-block rules the request path has to reuse — two copies of
  * that decision is precisely how a purge job ends up removing something a user
  * was told was protected.
+ *
+ * The HTTP trigger shares `checkInternalToken` with the digest and webhook
+ * runners: they are one trust boundary, and a third secret would only be a third
+ * thing to rotate and forget.
  */
 
 let running = false;
@@ -86,8 +90,8 @@ export const retentionRoutes = new Hono();
  * session: the caller is a scheduler, and the work it starts deletes data.
  */
 retentionRoutes.post("/retention/run", async (c) => {
-  const failure = checkInternalAuth(c);
-  if (failure) return c.json(failure.body, failure.status);
+  const auth = checkInternalToken(c.req.header("authorization"));
+  if (!auth.ok) return c.json({ error: auth.error }, auth.status);
 
   try {
     const summary = await tick("http");

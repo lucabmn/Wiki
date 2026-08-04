@@ -1,5 +1,5 @@
 {
-  "id": "f47dba9d-25f4-4592-8570-4fe61f4963b9",
+  "id": "b41d341a-0027-4826-a4f9-0f0a6d8b998d",
   "prevId": "7bca977a-4651-4a1b-b2e5-c533175451b6",
   "version": "7",
   "dialect": "postgresql",
@@ -3175,18 +3175,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deleted_by": {
-          "name": "deleted_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3314,21 +3302,6 @@
           "concurrently": false,
           "method": "gin",
           "with": {}
-        },
-        "page_deleted_idx": {
-          "name": "page_deleted_idx",
-          "columns": [
-            {
-              "expression": "deleted_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -3368,16 +3341,6 @@
           "tableTo": "user",
           "schemaTo": "auth",
           "columnsFrom": ["last_edited_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "page_deleted_by_user_id_fk": {
-          "name": "page_deleted_by_user_id_fk",
-          "tableFrom": "page",
-          "tableTo": "user",
-          "schemaTo": "auth",
-          "columnsFrom": ["deleted_by"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
@@ -3698,263 +3661,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "wiki.legal_hold": {
-      "name": "legal_hold",
-      "schema": "wiki",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject": {
-          "name": "subject",
-          "type": "legal_hold_subject",
-          "typeSchema": "wiki",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject_id": {
-          "name": "subject_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reason": {
-          "name": "reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "released_at": {
-          "name": "released_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "released_by": {
-          "name": "released_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "release_reason": {
-          "name": "release_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "legal_hold_active_uq": {
-          "name": "legal_hold_active_uq",
-          "columns": [
-            {
-              "expression": "subject",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "subject_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "released_at IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "legal_hold_org_idx": {
-          "name": "legal_hold_org_idx",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "legal_hold_subject_idx": {
-          "name": "legal_hold_subject_idx",
-          "columns": [
-            {
-              "expression": "subject",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "subject_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "legal_hold_organization_id_organization_id_fk": {
-          "name": "legal_hold_organization_id_organization_id_fk",
-          "tableFrom": "legal_hold",
-          "tableTo": "organization",
-          "schemaTo": "auth",
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "legal_hold_created_by_user_id_fk": {
-          "name": "legal_hold_created_by_user_id_fk",
-          "tableFrom": "legal_hold",
-          "tableTo": "user",
-          "schemaTo": "auth",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "legal_hold_released_by_user_id_fk": {
-          "name": "legal_hold_released_by_user_id_fk",
-          "tableFrom": "legal_hold",
-          "tableTo": "user",
-          "schemaTo": "auth",
-          "columnsFrom": ["released_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "wiki.organization_retention_setting": {
-      "name": "organization_retention_setting",
-      "schema": "wiki",
-      "columns": {
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "audit_retention_days": {
-          "name": "audit_retention_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "trash_retention_days": {
-          "name": "trash_retention_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 30
-        },
-        "purge_claimed_at": {
-          "name": "purge_claimed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_purge_at": {
-          "name": "last_purge_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "org_retention_claim_idx": {
-          "name": "org_retention_claim_idx",
-          "columns": [
-            {
-              "expression": "purge_claimed_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "organization_retention_setting_organization_id_organization_id_fk": {
-          "name": "organization_retention_setting_organization_id_organization_id_fk",
-          "tableFrom": "organization_retention_setting",
-          "tableTo": "organization",
-          "schemaTo": "auth",
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "wiki.space": {
       "name": "space",
       "schema": "wiki",
@@ -4021,18 +3727,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deleted_by": {
-          "name": "deleted_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deletion_pending_at": {
           "name": "deletion_pending_at",
           "type": "timestamp with time zone",
@@ -4090,21 +3784,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "space_deleted_idx": {
-          "name": "space_deleted_idx",
-          "columns": [
-            {
-              "expression": "deleted_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -4124,16 +3803,6 @@
           "tableTo": "user",
           "schemaTo": "auth",
           "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "space_deleted_by_user_id_fk": {
-          "name": "space_deleted_by_user_id_fk",
-          "tableFrom": "space",
-          "tableTo": "user",
-          "schemaTo": "auth",
-          "columnsFrom": ["deleted_by"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
@@ -4609,6 +4278,296 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "wiki.webhook": {
+      "name": "webhook",
+      "schema": "wiki",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret": {
+          "name": "secret",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "events": {
+          "name": "events",
+          "type": "activity_action[]",
+          "typeSchema": "wiki",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "space_id": {
+          "name": "space_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "webhook_org_active_idx": {
+          "name": "webhook_org_active_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "webhook_organization_id_organization_id_fk": {
+          "name": "webhook_organization_id_organization_id_fk",
+          "tableFrom": "webhook",
+          "tableTo": "organization",
+          "schemaTo": "auth",
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "webhook_space_id_space_id_fk": {
+          "name": "webhook_space_id_space_id_fk",
+          "tableFrom": "webhook",
+          "tableTo": "space",
+          "schemaTo": "wiki",
+          "columnsFrom": ["space_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "webhook_created_by_user_id_fk": {
+          "name": "webhook_created_by_user_id_fk",
+          "tableFrom": "webhook",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "wiki.webhook_delivery": {
+      "name": "webhook_delivery",
+      "schema": "wiki",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "webhook_id": {
+          "name": "webhook_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "activity_id": {
+          "name": "activity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "webhook_delivery_status",
+          "typeSchema": "wiki",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response_status": {
+          "name": "response_status",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "webhook_delivery_due_idx": {
+          "name": "webhook_delivery_due_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "webhook_delivery_webhook_idx": {
+          "name": "webhook_delivery_webhook_idx",
+          "columns": [
+            {
+              "expression": "webhook_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "webhook_delivery_webhook_id_webhook_id_fk": {
+          "name": "webhook_delivery_webhook_id_webhook_id_fk",
+          "tableFrom": "webhook_delivery",
+          "tableTo": "webhook",
+          "schemaTo": "wiki",
+          "columnsFrom": ["webhook_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "webhook_delivery_activity_id_activity_id_fk": {
+          "name": "webhook_delivery_activity_id_activity_id_fk",
+          "tableFrom": "webhook_delivery",
+          "tableTo": "activity",
+          "schemaTo": "wiki",
+          "columnsFrom": ["activity_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -4619,10 +4578,7 @@
         "space.created",
         "space.updated",
         "space.archived",
-        "space.restored",
         "space.deleted",
-        "space.untrashed",
-        "space.purged",
         "page.created",
         "page.updated",
         "page.published",
@@ -4630,17 +4586,14 @@
         "page.archived",
         "page.restored",
         "page.deleted",
-        "page.untrashed",
-        "page.purged",
         "comment.created",
         "comment.resolved",
         "comment.deleted",
         "attachment.uploaded",
         "attachment.deleted",
-        "retention.updated",
-        "retention.purged",
-        "hold.created",
-        "hold.released"
+        "webhook.created",
+        "webhook.updated",
+        "webhook.deleted"
       ]
     },
     "wiki.digest_category": {
@@ -4670,11 +4623,6 @@
       "schema": "wiki",
       "values": ["organization", "my_spaces", "subscribed"]
     },
-    "wiki.legal_hold_subject": {
-      "name": "legal_hold_subject",
-      "schema": "wiki",
-      "values": ["organization", "space", "page"]
-    },
     "wiki.page_status": {
       "name": "page_status",
       "schema": "wiki",
@@ -4689,6 +4637,11 @@
       "name": "space_visibility",
       "schema": "wiki",
       "values": ["public", "private", "restricted"]
+    },
+    "wiki.webhook_delivery_status": {
+      "name": "webhook_delivery_status",
+      "schema": "wiki",
+      "values": ["pending", "delivered", "failed"]
     },
     "wiki.wiki_role": {
       "name": "wiki_role",

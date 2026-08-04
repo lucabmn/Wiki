@@ -12,3 +12,4 @@ export * from "./retention";
 export * from "./spaces";
 export * from "./tags";
 export * from "./user-state";
+export * from "./webhooks";

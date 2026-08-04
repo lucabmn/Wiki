@@ -2,6 +2,7 @@ import type { RouterClient } from "@orpc/server";
 
 import { publicProcedure } from "../index";
 import { activityRouter } from "./activity";
+import { adminRouter } from "./admin";
 import { attachmentRouter } from "./attachment";
 import { commentRouter } from "./comment";
 import { dashboardRouter } from "./dashboard";
@@ -20,6 +21,7 @@ import { tagRouter } from "./tag";
 import { trashRouter } from "./trash";
 import { userRouter } from "./user";
 import { userStateRouter } from "./user-state";
+import { webhookRouter } from "./webhook";
 
 /**
  * The application API. Each entity lives in its own router module and every
@@ -32,6 +34,7 @@ export const appRouter = {
       .route({ method: "GET", path: "/health", tags: ["Health"], summary: "Liveness probe" })
       .handler(() => "OK"),
   },
+  admin: adminRouter,
   spaces: spaceRouter,
   spaceMembers: spaceMemberRouter,
   pages: pageRouter,
@@ -43,6 +46,7 @@ export const appRouter = {
   externalLinks: externalLinkRouter,
   activity: activityRouter,
   notifications: notificationRouter,
+  webhooks: webhookRouter,
   // Data lifecycle: how long things live, what may not be removed, and what is
   // on its way out but still recoverable.
   retention: retentionRouter,

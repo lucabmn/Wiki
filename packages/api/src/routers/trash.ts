@@ -7,7 +7,7 @@ import { page, space } from "@nilovon-wiki/db/schema/index";
 import type { AuthedContext } from "../context";
 import { protectedProcedure, requireActiveOrg } from "../index";
 import type { SpaceAccessInput } from "../lib/access";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { requireSpaceCapability, requireSpaceManage } from "../lib/authz";
 import { loadPage, loadSpace } from "../lib/loaders";
 import {
@@ -171,7 +171,7 @@ const trashViewRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.untrashed",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: target.spaceId,
           pageId: target.id,
           metadata: { title: target.title, restored: restored.length },
@@ -205,7 +205,7 @@ const trashViewRouter = {
         await recordActivity(tx, {
           organizationId: spaceRow.organizationId,
           action: "space.untrashed",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: spaceRow.id,
           metadata: { name: spaceRow.name },
         });

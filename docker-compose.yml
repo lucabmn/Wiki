@@ -87,6 +87,17 @@ services:
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env (see .env.example, or use the installer)}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example, or use the installer)}@postgres:5432/nilovon-wiki
+      # Reported in the admin console's instance overview — the first thing a
+      # support case asks for. Mirrors the image tag.
+      APP_VERSION: ${WIKI_VERSION:-dev}
+      # Instance administration. Without INITIAL_ADMIN_EMAIL nobody can open
+      # /admin on a fresh install; see DEPLOY.md.
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
+      IMPERSONATION_ENABLED: ${IMPERSONATION_ENABLED:-true}
+      IMPERSONATION_MAX_MINUTES: ${IMPERSONATION_MAX_MINUTES:-30}
+      # The collab service runs in its own container, so the reachability probe
+      # on the instance overview needs its address rather than loopback.
+      COLLAB_INTERNAL_URL: http://collab:1234
       # Mail. Unset SMTP_HOST disables delivery, so a single-user install boots
       # without a mail server. Mail bodies are never logged; invitations and
       # password resets only reach their recipient once this points somewhere.
@@ -101,11 +112,18 @@ services:
       # later loses no events.
       DIGEST_SCHEDULER_ENABLED: ${DIGEST_SCHEDULER_ENABLED:-true}
       DIGEST_TICK_SECONDS: ${DIGEST_TICK_SECONDS:-300}
-      # One token for every /internal runner (digest run, retention run). Unset
-      # leaves those endpoints disabled. DIGEST_RUN_TOKEN is the old name and is
-      # still accepted, so existing deployments keep working.
+      # Shared bearer token for the POST /internal/…/run endpoints (digests,
+      # webhooks, retention), for deployments driven by an external scheduler.
+      # The digest-specific DIGEST_RUN_TOKEN is still honoured as an alias.
       INTERNAL_RUN_TOKEN: ${INTERNAL_RUN_TOKEN:-}
       DIGEST_RUN_TOKEN: ${DIGEST_RUN_TOKEN:-}
+      # Outbound webhooks. Endpoints are configured per organization in the UI;
+      # these only tune the runner that drains the delivery queue.
+      WEBHOOK_SCHEDULER_ENABLED: ${WEBHOOK_SCHEDULER_ENABLED:-true}
+      WEBHOOK_TICK_SECONDS: ${WEBHOOK_TICK_SECONDS:-30}
+      WEBHOOK_TIMEOUT_SECONDS: ${WEBHOOK_TIMEOUT_SECONDS:-10}
+      WEBHOOK_MAX_ATTEMPTS: ${WEBHOOK_MAX_ATTEMPTS:-6}
+      WEBHOOK_ALLOW_PRIVATE_HOSTS: ${WEBHOOK_ALLOW_PRIVATE_HOSTS:-false}
       # Data retention. The windows themselves are per-organization settings in
       # the app; this only drives the runner that enforces them. Defaults: the
       # activity log is kept forever, the trash for 30 days.

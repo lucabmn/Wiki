@@ -6,7 +6,7 @@ import { comment } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure } from "../index";
 import { requireOwnerOrPageCapability, requirePageCapability } from "../lib/authz";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { loadComment, loadPage } from "../lib/loaders";
 import { assertPageContentDeletable } from "../lib/retention/holds";
 import { firstRow } from "../lib/rows";
@@ -77,7 +77,7 @@ export const commentRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "comment.created",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: target.spaceId,
           pageId: target.id,
           metadata: { commentId: row.id },
@@ -142,7 +142,7 @@ export const commentRouter = {
           await recordActivity(tx, {
             organizationId,
             action: "comment.resolved",
-            actorId: context.session.user.id,
+            ...activityActor(context),
             spaceId: target.spaceId,
             pageId: target.id,
             metadata: { commentId: row.id },
@@ -184,7 +184,7 @@ export const commentRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "comment.deleted",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: target.spaceId,
           pageId: target.id,
           metadata: { commentId: existing.id },

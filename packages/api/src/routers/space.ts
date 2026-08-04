@@ -7,7 +7,7 @@ import { space, spaceMember } from "@nilovon-wiki/db/schema/index";
 import { protectedProcedure, requireActiveOrg, requireOrgPermission } from "../index";
 import { assertSpaceRead, buildSpaceReadFilter } from "../lib/access";
 import { requireSpaceManage } from "../lib/authz";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { spaceNotTrashed } from "../lib/lifecycle";
 import { loadSpace } from "../lib/loaders";
 import { mapUniqueViolation } from "../lib/pg-errors";
@@ -122,7 +122,7 @@ export const spaceRouter = {
             await recordActivity(tx, {
               organizationId,
               action: "space.created",
-              actorId: userId,
+              ...activityActor(context),
               spaceId: row.id,
               metadata: { name: row.name },
             });
@@ -155,7 +155,7 @@ export const spaceRouter = {
         await recordActivity(tx, {
           organizationId: existing.organizationId,
           action: "space.updated",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.id,
         });
         return row;
@@ -186,7 +186,7 @@ export const spaceRouter = {
         await recordActivity(tx, {
           organizationId: existing.organizationId,
           action: "space.archived",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.id,
         });
         return row;
@@ -217,7 +217,7 @@ export const spaceRouter = {
         await recordActivity(tx, {
           organizationId: existing.organizationId,
           action: "space.restored",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.id,
         });
         return row;
@@ -261,7 +261,9 @@ export const spaceRouter = {
         await recordActivity(tx, {
           organizationId: existing.organizationId,
           action: "space.deleted",
-          actorId: context.session.user.id,
+          ...activityActor(context),
+          // The row survives a soft delete, so unlike the old hard delete this
+          // *can* carry the FK — the feed scopes it to the space it happened in.
           spaceId: existing.id,
           metadata: { spaceId: existing.id, name: existing.name },
         });

@@ -12,12 +12,24 @@ record.
 
 ## What is captured
 
-- The actor (who).
+- The actor (who) — and, when the write was made during an impersonated support
+  session, the instance admin behind them as well. Both identities, never one.
 - The action and the affected resource (what).
 - Enough context to reconstruct the change.
 
 Destructive actions — including deletes — are captured too, so a removal is never
 silent.
+
+## Two logs, two audiences
+
+The activity log above is **per organization**, and its members may read it.
+
+Instance-wide administration — banning an account, changing an instance role,
+starting an impersonation — belongs to no organization and is written to a
+separate log that only instance admins can open. Organization owners must not
+see who was banned or impersonated elsewhere on the installation. The one
+crossover is deliberate: an impersonation is mirrored into the affected person's
+own activity feed, so being signed in as does not stay invisible to them.
 
 ## Activity feed
 

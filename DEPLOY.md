@@ -106,6 +106,61 @@ reachable from the network.
 
 Open `https://wiki.example.com` and register.
 
+## The first instance admin
+
+The admin console at `/admin` (accounts, sessions, instance health, support
+impersonation) is gated on an **instance role**, stored in `user.role`. Nothing
+sets that role at registration, so on a fresh install nobody can open it — the
+first admin has to be named from outside the app.
+
+Set `INITIAL_ADMIN_EMAIL` in `.env`:
+
+```sh
+INITIAL_ADMIN_EMAIL=admin@example.com
+```
+
+The server promotes that address on every start, and stamps the role at
+registration if the account does not exist yet — so it works whether you set it
+before or after signing up. Both paths are idempotent, and an account that is
+already an admin is never touched.
+
+Further admins are appointed inside the console (**Instanz-Verwaltung →
+Benutzer → Zum Admin machen**). Pointing `INITIAL_ADMIN_EMAIL` at someone else
+later promotes them; it never demotes anyone. The last remaining instance admin
+cannot be demoted, banned or deleted.
+
+> The chosen approach is deliberate: the alternative — "the first account to
+> register becomes admin" — is a race on any instance that is reachable before
+> the operator gets around to registering.
+
+**Instance admin is not org admin.** An instance admin operates the deployment
+and is not a member of any organization; an org owner has no rights here at
+all. The console shows metadata only — never page content. See
+[docs/permissions.md](docs/permissions.md#instance-admin-vs-org-admin).
+
+### Impersonation
+
+For support cases an instance admin can work as another user. It is bounded and
+audited:
+
+- A banner is visible across the whole app for as long as it lasts, with a
+  one-click exit.
+- The session expires on its own after `IMPERSONATION_MAX_MINUTES` (default 30).
+- Start and end are written to the instance audit log with both identities, and
+  mirrored into the impersonated person's own activity feed.
+- Writes made during the session carry both the impersonated user and the real
+  admin.
+- Other instance admins cannot be impersonated.
+
+Operators who must be able to rule the capability out entirely:
+
+```sh
+IMPERSONATION_ENABLED=false
+```
+
+This is enforced in the auth layer — a request straight to the auth endpoint is
+refused, not just hidden in the UI.
+
 ## Updates
 
 Easiest: run the installer again → **"Updaten"** (`git pull --ff-only`, rebuild,
@@ -170,15 +225,44 @@ curl -X POST https://api.example.com/internal/digests/run \
   -H "Authorization: Bearer $INTERNAL_RUN_TOKEN"
 ```
 
+> `INTERNAL_RUN_TOKEN` guards every `/internal/…/run` endpoint, not just this
+> one. The older `DIGEST_RUN_TOKEN` is still accepted as an alias, so existing
+> deployments keep working — set the new name for anything added from here on.
+
 The runner claims its work in the database, so calling it from several places —
 or leaving the ticker on as well — cannot send anything twice. A call that
 arrives while a run is in progress returns `202` and does nothing.
 
-`INTERNAL_RUN_TOKEN` guards every `/internal` runner, retention included: they
-are the same trust boundary — a scheduler, not a person — and a second secret
-would only be a second thing to rotate and forget. The older, digest-only name
-`DIGEST_RUN_TOKEN` is still accepted, so an existing deployment keeps working
-without an edit; new installs should set `INTERNAL_RUN_TOKEN`.
+## Outbound webhooks
+
+Organization admins wire events to Slack, Teams, Jira or their own automation
+under **Einstellungen → Organisation → Webhooks**. Nothing needs installing: the
+`server` container drains the delivery queue in-process. The payload, headers and
+signature contract are documented under **Concepts → Webhooks**; operationally:
+
+| Variable                      | Default | Purpose                                                          |
+| ----------------------------- | ------- | ---------------------------------------------------------------- |
+| `WEBHOOK_SCHEDULER_ENABLED`   | `true`  | In-process runner. Turn off for serverless or external cron      |
+| `WEBHOOK_TICK_SECONDS`        | `30`    | How often to look for queued deliveries (minimum 5)              |
+| `WEBHOOK_TIMEOUT_SECONDS`     | `10`    | Per-request timeout — a stalled receiver must not hold the batch |
+| `WEBHOOK_MAX_ATTEMPTS`        | `6`     | Attempts (backoff from 1 min) before a delivery is `failed`      |
+| `WEBHOOK_ALLOW_PRIVATE_HOSTS` | `false` | Allow endpoints inside the private network                       |
+
+External scheduler, same shape as the digests:
+
+```sh
+curl -X POST https://api.example.com/internal/webhooks/run \
+  -H "Authorization: Bearer $INTERNAL_RUN_TOKEN"
+```
+
+Deliveries are **claimed in the database**, so the ticker and an external cron
+may both be active without anything being sent twice.
+
+Endpoints pointing into the private network (`localhost`, `10.x`, `192.168.x`,
+the cloud metadata address) are refused — on a shared instance that would let an
+org admin reach hosts they otherwise cannot. Set
+`WEBHOOK_ALLOW_PRIVATE_HOSTS=true` only where the receiver genuinely lives on the
+internal network and every org admin is trusted with it.
 
 ## Which data lives how long
 

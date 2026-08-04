@@ -56,6 +56,15 @@ const ACTION_PHRASES: Record<ActivityAction, { verb: string; noun: string }> = {
   "comment.deleted": { verb: "hat einen Kommentar gelöscht:", noun: "Seite" },
   "attachment.uploaded": { verb: "hat einen Anhang hochgeladen:", noun: "Seite" },
   "attachment.deleted": { verb: "hat einen Anhang gelöscht:", noun: "Seite" },
+  // Webhook administration never reaches a digest — no category maps to it, so
+  // `collectDigest` drops those rows. Present only to keep the record total.
+  "webhook.created": { verb: "hat einen Webhook angelegt", noun: "Webhook" },
+  "webhook.updated": { verb: "hat einen Webhook geändert", noun: "Webhook" },
+  "webhook.deleted": { verb: "hat einen Webhook gelöscht", noun: "Webhook" },
+  // Same for the impersonation events, which are mirrored into the target's
+  // feed rather than mailed out.
+  "impersonation.started": { verb: "wurde von der Administration übernommen", noun: "Konto" },
+  "impersonation.ended": { verb: "ist nicht mehr übernommen", noun: "Konto" },
   // Governance events. Unmapped to a digest category (see
   // `DIGEST_CATEGORY_ACTIONS`), so these never actually reach a mail — the
   // record has to be exhaustive over the enum, not over what gets sent.

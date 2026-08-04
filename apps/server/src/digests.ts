@@ -4,7 +4,7 @@ import { env } from "@nilovon-wiki/env/server";
 import { log, parseError } from "evlog";
 import { Hono } from "hono";
 
-import { checkInternalAuth } from "./internal-auth";
+import { checkInternalToken } from "./internal-token";
 
 /**
  * Drives the bundled-notification (digest) runner.
@@ -15,9 +15,6 @@ import { checkInternalAuth } from "./internal-auth";
  *   - an in-process ticker, for the long-lived container this normally ships as;
  *   - `POST /internal/digests/run`, for deployments where the process is not
  *     long-lived (serverless) or where an external scheduler owns the cadence.
- *
- * The HTTP trigger is guarded by the shared `/internal` token (see
- * `internal-auth.ts`), which every runner behind that prefix uses.
  *
  * Nothing here decides *who* gets what — that lives in the API package next to
  * the access-control helpers it has to reuse.
@@ -83,8 +80,8 @@ export const digestRoutes = new Hono();
  * the caller is a scheduler, not a person, and the work it starts is expensive.
  */
 digestRoutes.post("/digests/run", async (c) => {
-  const failure = checkInternalAuth(c);
-  if (failure) return c.json(failure.body, failure.status);
+  const auth = checkInternalToken(c.req.header("authorization"));
+  if (!auth.ok) return c.json({ error: auth.error }, auth.status);
 
   try {
     const summary = await tick("http");
