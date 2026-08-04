@@ -157,7 +157,7 @@ schedule itself. Two things matter:
 | -------------------------- | ------- | ----------------------------------------------------------- |
 | `DIGEST_SCHEDULER_ENABLED` | `true`  | In-process ticker. Turn off for serverless or external cron |
 | `DIGEST_TICK_SECONDS`      | `300`   | How often to look for due digests (minimum 30)              |
-| `DIGEST_RUN_TOKEN`         | unset   | Enables `POST /internal/digests/run`; unset = disabled      |
+| `INTERNAL_RUN_TOKEN`       | unset   | Enables `POST /internal/digests/run`; unset = disabled      |
 
 ### Driving it from an external scheduler
 
@@ -167,12 +167,47 @@ a token (`openssl rand -base64 32`) and call the endpoint on your own schedule:
 
 ```sh
 curl -X POST https://api.example.com/internal/digests/run \
-  -H "Authorization: Bearer $DIGEST_RUN_TOKEN"
+  -H "Authorization: Bearer $INTERNAL_RUN_TOKEN"
 ```
+
+> `INTERNAL_RUN_TOKEN` guards every `/internal/…/run` endpoint, not just this
+> one. The older `DIGEST_RUN_TOKEN` is still accepted as an alias, so existing
+> deployments keep working — set the new name for anything added from here on.
 
 The runner claims its work in the database, so calling it from several places —
 or leaving the ticker on as well — cannot send anything twice. A call that
 arrives while a run is in progress returns `202` and does nothing.
+
+## Outbound webhooks
+
+Organization admins wire events to Slack, Teams, Jira or their own automation
+under **Einstellungen → Organisation → Webhooks**. Nothing needs installing: the
+`server` container drains the delivery queue in-process. The payload, headers and
+signature contract are documented under **Concepts → Webhooks**; operationally:
+
+| Variable                      | Default | Purpose                                                          |
+| ----------------------------- | ------- | ---------------------------------------------------------------- |
+| `WEBHOOK_SCHEDULER_ENABLED`   | `true`  | In-process runner. Turn off for serverless or external cron      |
+| `WEBHOOK_TICK_SECONDS`        | `30`    | How often to look for queued deliveries (minimum 5)              |
+| `WEBHOOK_TIMEOUT_SECONDS`     | `10`    | Per-request timeout — a stalled receiver must not hold the batch |
+| `WEBHOOK_MAX_ATTEMPTS`        | `6`     | Attempts (backoff from 1 min) before a delivery is `failed`      |
+| `WEBHOOK_ALLOW_PRIVATE_HOSTS` | `false` | Allow endpoints inside the private network                       |
+
+External scheduler, same shape as the digests:
+
+```sh
+curl -X POST https://api.example.com/internal/webhooks/run \
+  -H "Authorization: Bearer $INTERNAL_RUN_TOKEN"
+```
+
+Deliveries are **claimed in the database**, so the ticker and an external cron
+may both be active without anything being sent twice.
+
+Endpoints pointing into the private network (`localhost`, `10.x`, `192.168.x`,
+the cloud metadata address) are refused — on a shared instance that would let an
+org admin reach hosts they otherwise cannot. Set
+`WEBHOOK_ALLOW_PRIVATE_HOSTS=true` only where the receiver genuinely lives on the
+internal network and every org admin is trusted with it.
 
 ## Backups
 

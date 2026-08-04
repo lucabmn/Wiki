@@ -10,6 +10,7 @@ import {
   User,
   Users,
   UsersRound,
+  Webhook,
 } from "lucide-react";
 
 import DashboardLayout from "@/components/layouts/dashboard-layout";
@@ -35,6 +36,7 @@ const ORGANIZATION_TABS = [
   { to: "/settings/groups", label: "Gruppen", icon: KeyRound },
   { to: "/settings/teams", label: "Teams", icon: UsersRound },
   { to: "/settings/notification-defaults", label: "Benachrichtigungen", icon: BellRing },
+  { to: "/settings/webhooks", label: "Webhooks", icon: Webhook },
 ] as const;
 
 /**
