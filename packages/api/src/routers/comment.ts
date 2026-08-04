@@ -8,6 +8,7 @@ import { protectedProcedure } from "../index";
 import { requireOwnerOrPageCapability, requirePageCapability } from "../lib/authz";
 import { activityActor, recordActivity } from "../lib/activity";
 import { loadComment, loadPage } from "../lib/loaders";
+import { assertPageContentDeletable } from "../lib/retention/holds";
 import { firstRow } from "../lib/rows";
 import {
   CommentSchema,
@@ -171,6 +172,13 @@ export const commentRouter = {
         target,
         { isOwner: existing.authorId === context.session.user.id, capability: "write" },
       );
+      // A hold on the page (or its space, or the org) covers its comments too:
+      // "this must not disappear" is worthless if the discussion around it can.
+      await assertPageContentDeletable(context.db, {
+        id: target.id,
+        spaceId: target.spaceId,
+        organizationId,
+      });
       return context.db.transaction(async (tx) => {
         await tx.update(comment).set({ deletedAt: new Date() }).where(eq(comment.id, existing.id));
         await recordActivity(tx, {

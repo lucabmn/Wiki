@@ -130,6 +130,23 @@ export const env = createEnv({
       .default("false")
       .transform((value) => value === "true"),
 
+    // ── Data retention (audit window, trash expiry) ──────────────────────────
+    // Same shape again: a ticker for the long-lived container, plus
+    // POST /internal/retention/run where an external scheduler owns the cadence.
+    // The runner claims work per organization, so both may be active without
+    // deleting anything twice.
+    RETENTION_SCHEDULER_ENABLED: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
+    // Hourly by default. Retention windows are measured in days, so a tighter
+    // cadence buys nothing and only costs database round-trips.
+    RETENTION_TICK_SECONDS: z.coerce.number().int().min(60).default(3600),
+    // Rows removed per category per run. The ceiling is the difference between
+    // a first run that trims a year-old audit log in the background and one
+    // that issues a single DELETE over millions of rows and stalls the app.
+    RETENTION_BATCH_LIMIT: z.coerce.number().int().min(1).max(100_000).default(1000),
+
     // ── Object storage (S3-compatible: RustFS, MinIO, AWS S3, …) ────────────
     // Optional for the same reason: attachments stay disabled until configured.
     S3_ENDPOINT: z.url().optional(),

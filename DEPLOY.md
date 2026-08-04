@@ -212,7 +212,7 @@ schedule itself. Two things matter:
 | -------------------------- | ------- | ----------------------------------------------------------- |
 | `DIGEST_SCHEDULER_ENABLED` | `true`  | In-process ticker. Turn off for serverless or external cron |
 | `DIGEST_TICK_SECONDS`      | `300`   | How often to look for due digests (minimum 30)              |
-| `INTERNAL_RUN_TOKEN`       | unset   | Enables `POST /internal/digests/run`; unset = disabled      |
+| `INTERNAL_RUN_TOKEN`       | unset   | Enables the `/internal/**` runner endpoints; unset = off    |
 
 ### Driving it from an external scheduler
 
@@ -263,6 +263,67 @@ the cloud metadata address) are refused — on a shared instance that would let 
 org admin reach hosts they otherwise cannot. Set
 `WEBHOOK_ALLOW_PRIVATE_HOSTS=true` only where the receiver genuinely lives on the
 internal network and every org admin is trusted with it.
+
+## Which data lives how long
+
+Three windows govern how long anything survives in this install. Two are per
+organization and set in the app under **Einstellungen → Daten & Fristen**; the
+third is deletion blocks, which override both.
+
+| Data                                | Default retention | Where it is configured                      |
+| ----------------------------------- | ----------------- | ------------------------------------------- |
+| Pages, revisions, comments, uploads | forever           | not time-limited; deleting is a user action |
+| Activity log / audit rows           | **unbegrenzt**    | Einstellungen → Daten & Fristen             |
+| Deleted pages and spaces (trash)    | **30 Tage**       | Einstellungen → Daten & Fristen             |
+| Attachments of a purged page        | removed with it   | follows the trash window                    |
+
+The defaults keep everything. Nothing in an upgrade shortens them, and no
+environment variable can: the windows are organization settings, so a deletion
+policy is always an act by a named administrator, recorded in the audit log.
+
+Four audit actions are exempt from the audit window whatever it is set to —
+`retention.updated`, `retention.purged`, `hold.created`, `hold.released`. Without
+that, shortening the window to a week would erase, a week later, the only record
+of who shortened it.
+
+**Deletion blocks (Löschsperren)** outrank every window. A block on a page, a
+space or the whole organization prevents deletion by the runner _and_ by a user,
+and covers everything beneath it — pages, comments, attachments and the audit
+rows pointing at them. Setting and lifting are separate audited events, each with
+a mandatory reason, and neither can be removed by a retention window.
+
+### Operating the retention runner
+
+Nothing to install — the `server` container runs it. It sweeps expired audit rows
+and expired trash in one job, in batches with a ceiling per run, so a first run
+against a log that has grown unbounded for a year does not lock the database.
+Whatever is left over is picked up by the next tick.
+
+| Variable                      | Default | Purpose                                                     |
+| ----------------------------- | ------- | ----------------------------------------------------------- |
+| `RETENTION_SCHEDULER_ENABLED` | `true`  | In-process ticker. Turn off for serverless or external cron |
+| `RETENTION_TICK_SECONDS`      | `3600`  | How often to sweep (minimum 60)                             |
+| `RETENTION_BATCH_LIMIT`       | `1000`  | Rows removed per category per run                           |
+
+```sh
+curl -X POST https://api.example.com/internal/retention/run \
+  -H "Authorization: Bearer $INTERNAL_RUN_TOKEN"
+```
+
+Each organization is claimed in the database for the duration of a run, so
+overlapping ticks and multiple replicas cannot delete the same rows twice; the
+loser skips the organization rather than waiting. A crashed run's claim expires
+after 15 minutes so it cannot freeze a tenant.
+
+Every run that removed something logs a count per category
+(`source: "retention"`), and writes one audit row per affected organization —
+so "what did the job remove last night?" is answerable from the logs and from
+inside the app.
+
+Retention deliberately does not reach into **backups**. A dump taken before a
+purge still contains the purged rows, and a deletion block does not protect
+anything inside an archive either. Aligning backup rotation with these windows is
+a separate decision — see [Backups](#backups).
 
 ## Backups
 

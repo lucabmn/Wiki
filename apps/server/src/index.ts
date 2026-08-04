@@ -19,6 +19,7 @@ import { cors } from "hono/cors";
 import { attachmentRoutes } from "./attachments";
 import { digestRoutes, startDigestScheduler, stopDigestScheduler } from "./digests";
 import { rateLimit } from "./rate-limit";
+import { retentionRoutes, startRetentionScheduler, stopRetentionScheduler } from "./retention";
 import { spaceExportRoutes } from "./space-exports";
 import { startWebhookScheduler, stopWebhookScheduler, webhookRoutes } from "./webhooks";
 
@@ -117,6 +118,7 @@ app.route("/exports", spaceExportRoutes);
 app.use("/internal/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "internal" }));
 app.route("/internal", digestRoutes);
 app.route("/internal", webhookRoutes);
+app.route("/internal", retentionRoutes);
 
 export const apiHandler = new OpenAPIHandler(appRouter, {
   plugins: [
@@ -193,6 +195,7 @@ async function shutdown(signal: string): Promise<void> {
   log.info({ source: "server", msg: "shutting down", signal });
   stopDigestScheduler();
   stopWebhookScheduler();
+  stopRetentionScheduler();
   try {
     await closeDb();
   } catch (error) {
@@ -210,6 +213,10 @@ startDigestScheduler();
 // Outbound webhooks. Same deal: a no-op where the ticker is disabled and an
 // external scheduler drives /internal/webhooks/run instead.
 startWebhookScheduler();
+
+// Data retention: the audit window and the trash expiry. Same arrangement, and
+// a no-op under the same conditions.
+startRetentionScheduler();
 
 // Bootstraps the first instance admin from INITIAL_ADMIN_EMAIL. Deliberately
 // not awaited: an unreachable database at boot must not stop the process from

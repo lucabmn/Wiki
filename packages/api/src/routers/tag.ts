@@ -12,6 +12,7 @@ import {
   requirePageCapability,
   requireSpaceCapabilityById,
 } from "../lib/authz";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { loadPage, loadSpace, loadTag } from "../lib/loaders";
 import { firstRow } from "../lib/rows";
 import { IdSchema } from "../schemas/shared";
@@ -72,6 +73,7 @@ export const tagRouter = {
             eq(page.spaceId, input.spaceId),
             isNull(page.archivedAt),
             eq(page.status, "published"),
+            pageNotTrashed(),
           ),
         );
       const readablePages = await filterReadablePagesAcrossSpaces(
@@ -126,6 +128,7 @@ export const tagRouter = {
             eq(pageTag.tagId, input.tagId),
             isNull(page.archivedAt),
             eq(page.status, "published"),
+            pageNotTrashed(),
           ),
         )
         .orderBy(desc(page.updatedAt))

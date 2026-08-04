@@ -41,6 +41,21 @@ docker compose up -d
 For an external S3 service, use that provider's versioned backup or object-copy tooling instead.
 Copy the backup set off the wiki host; a backup on the same machine is not disaster recovery.
 
+## Backups and retention are separate
+
+Retention windows and deletion blocks govern the **live** database, not your
+archives. A dump taken before a purge still contains the purged rows, and a
+deletion block does not reach into a tarball. Two consequences worth deciding
+about deliberately:
+
+- A restore from an old backup **brings deleted data back**. Where a deletion was
+  a data-protection obligation, restoring is not the end of the task.
+- Keeping backups longer than your audit window means the audit history you
+  configured to expire still exists offline.
+
+Align your backup rotation with those windows on purpose rather than by accident.
+See [Retention, trash & deletion blocks](/docs/concepts/data-lifecycle).
+
 ## Restore
 
 Restore into a fresh stack. Never extract an archive over a running or non-empty RustFS volume.

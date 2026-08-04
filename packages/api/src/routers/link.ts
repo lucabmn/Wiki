@@ -6,6 +6,7 @@ import { page, pageLink } from "@nilovon-wiki/db/schema/index";
 import { isOrgManager, protectedProcedure } from "../index";
 import { filterReadablePages, loadSpaceRole } from "../lib/access";
 import { requirePageCapability } from "../lib/authz";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { PageSchema } from "../schemas/page";
 import { IdSchema } from "../schemas/shared";
@@ -34,7 +35,14 @@ export const linkRouter = {
         .innerJoin(page, eq(pageLink.sourcePageId, page.id))
         // A backlink is only real once the linking page is published — an
         // unpublished draft's links must not surface as incoming references.
-        .where(and(eq(pageLink.targetPageId, input.id), eq(page.status, "published")))
+        .where(
+          and(
+            eq(pageLink.targetPageId, input.id),
+            eq(page.status, "published"),
+            // A trashed page is not a real backlink any more.
+            pageNotTrashed(),
+          ),
+        )
         .orderBy(asc(page.title));
       // Linked pages live in the same space; hide any the caller can't read.
       return filterReadablePages(
@@ -64,7 +72,7 @@ export const linkRouter = {
         .select({ page })
         .from(pageLink)
         .innerJoin(page, eq(pageLink.targetPageId, page.id))
-        .where(eq(pageLink.sourcePageId, input.id))
+        .where(and(eq(pageLink.sourcePageId, input.id), pageNotTrashed()))
         .orderBy(asc(page.title));
       return filterReadablePages(
         context.db,

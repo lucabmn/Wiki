@@ -10,6 +10,7 @@ import { assertSpaceRead } from "../lib/access";
 import { requireOwnerOrSpaceCapability, requirePageCapability } from "../lib/authz";
 import { activityActor, recordActivity } from "../lib/activity";
 import { loadAttachment, loadPage, loadSpace } from "../lib/loaders";
+import { assertPageContentDeletable } from "../lib/retention/holds";
 import { getStorage } from "../lib/storage";
 import { AttachmentSchema, ListAttachmentsInputSchema } from "../schemas/attachment";
 import { IdSchema } from "../schemas/shared";
@@ -114,6 +115,14 @@ export const attachmentRouter = {
         capability: "write",
       });
       const organizationId = space.organizationId;
+      // Attachments are evidence as much as the page text is, so they inherit
+      // the same deletion block — via the page when there is one, otherwise via
+      // the space the bare upload lives in.
+      await assertPageContentDeletable(context.db, {
+        id: existing.pageId ?? "",
+        spaceId: existing.spaceId,
+        organizationId,
+      });
       // Persist intent before touching object storage. If storage or the final
       // DB transaction fails, repeating this request safely resumes deletion.
       await context.db

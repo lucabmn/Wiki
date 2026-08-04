@@ -22,6 +22,7 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useRouteContext } from "@tanstack/react-router";
 import {
+  Archive,
   ChevronRight,
   FilePlus,
   FileText,
@@ -68,8 +69,10 @@ function RouteComponent() {
 
   // The space list is org-scoped and already cached from the sidebar, so
   // resolving the slug here is a lookup, not an extra round-trip in practice.
+  // Archived spaces are included so this route can still open one: its settings
+  // sheet holds the only "restore" affordance there is.
   const { data: spaces, isPending: spacesPending } = useQuery(
-    orpc.spaces.list.queryOptions({ input: {} }),
+    orpc.spaces.list.queryOptions({ input: { includeArchived: true } }),
   );
   const space = spaces?.find((s) => s.slug === slug);
 
@@ -171,6 +174,12 @@ function RouteComponent() {
                 <Badge variant="outline" className="shrink-0 bg-background/60">
                   {VISIBILITY_LABEL[space.visibility] ?? space.visibility}
                 </Badge>
+                {space.archivedAt ? (
+                  <Badge variant="secondary" className="shrink-0 gap-1">
+                    <Archive className="size-3" />
+                    Archiviert
+                  </Badge>
+                ) : null}
               </div>
               {space.description ? (
                 <p className="mt-1 line-clamp-2 max-w-prose text-sm text-muted-foreground">
@@ -331,8 +340,10 @@ function RouteComponent() {
             visibility: space.visibility,
             color: space.color,
             icon: space.icon,
+            archivedAt: space.archivedAt,
           }}
           organizationId={auth.organization.id}
+          nameOf={nameOf}
         />
       ) : null}
     </DashboardLayout>

@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import type { Database } from "@nilovon-wiki/db";
 import { page, pageLink } from "@nilovon-wiki/db/schema/index";
@@ -76,7 +76,7 @@ export async function syncPageLinks(
         await db
           .select({ id: page.id })
           .from(page)
-          .where(and(inArray(page.id, wanted), eq(page.spaceId, spaceId)))
+          .where(and(inArray(page.id, wanted), eq(page.spaceId, spaceId), isNull(page.deletedAt)))
       ).map((r) => r.id)
     : [];
 

@@ -16,14 +16,19 @@ export const activityAction = wikiSchema.enum("activity_action", [
   "space.created",
   "space.updated",
   "space.archived",
-  "space.deleted",
+  "space.restored",
+  "space.deleted", // moved to the trash — recoverable until it expires
+  "space.untrashed",
+  "space.purged", // gone for good, from the trash or by an admin
   "page.created",
   "page.updated",
   "page.published",
   "page.moved",
   "page.archived",
   "page.restored",
-  "page.deleted",
+  "page.deleted", // moved to the trash — recoverable until it expires
+  "page.untrashed",
+  "page.purged",
   "comment.created",
   "comment.resolved",
   "comment.deleted",
@@ -40,6 +45,25 @@ export const activityAction = wikiSchema.enum("activity_action", [
   // in their own feed, not only in a log they cannot open.
   "impersonation.started",
   "impersonation.ended",
+  // ── Data lifecycle ────────────────────────────────────────────────────────
+  // These four are never removed by the audit-retention purge itself: a
+  // shortened window that erased the record of who shortened it, or of a
+  // deletion block, would defeat the purpose of keeping an audit log at all.
+  "retention.updated",
+  "retention.purged",
+  "hold.created",
+  "hold.released",
+]);
+
+/**
+ * What a deletion block ("legal hold") is attached to. A hold on a space covers
+ * everything inside it; a hold on the organization covers everything, which is
+ * the blunt instrument for "freeze this tenant, we are in litigation".
+ */
+export const legalHoldSubject = wikiSchema.enum("legal_hold_subject", [
+  "organization",
+  "space",
+  "page",
 ]);
 
 export const wikiRole = wikiSchema.enum("wiki_role", ["viewer", "commenter", "editor", "admin"]);

@@ -7,6 +7,7 @@ import {
   KeyRound,
   Palette,
   ShieldCheck,
+  Timer,
   User,
   Users,
   UsersRound,
@@ -37,6 +38,7 @@ const ORGANIZATION_TABS = [
   { to: "/settings/teams", label: "Teams", icon: UsersRound },
   { to: "/settings/notification-defaults", label: "Benachrichtigungen", icon: BellRing },
   { to: "/settings/webhooks", label: "Webhooks", icon: Webhook },
+  { to: "/settings/data-lifecycle", label: "Daten & Fristen", icon: Timer },
 ] as const;
 
 /**

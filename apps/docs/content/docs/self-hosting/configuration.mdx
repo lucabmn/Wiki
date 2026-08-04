@@ -91,6 +91,20 @@ See [Webhooks](/docs/concepts/webhooks) for the payload and signature contract.
 | `WEBHOOK_MAX_ATTEMPTS`        | no       | Attempts before a delivery is marked failed (default `6`)          |
 | `WEBHOOK_ALLOW_PRIVATE_HOSTS` | no       | Allow endpoints on the internal network (default `false`)          |
 
+### Data retention
+
+The **windows** are not environment variables. They are per-organization settings
+under Einstellungen → Daten & Fristen, so a deletion policy is always a recorded
+decision by a named administrator — see
+[Retention, trash & deletion blocks](/docs/concepts/data-lifecycle). These only
+tune the runner that enforces them.
+
+| Variable                      | Required | Description                                           |
+| ----------------------------- | -------- | ----------------------------------------------------- |
+| `RETENTION_SCHEDULER_ENABLED` | no       | In-process retention ticker (default `true`)          |
+| `RETENTION_TICK_SECONDS`      | no       | Retention sweep interval (default `3600`, minimum 60) |
+| `RETENTION_BATCH_LIMIT`       | no       | Rows removed per category per run (default `1000`)    |
+
 ### `apps/collab/.env`
 
 | Variable             | Required | Description                                            |

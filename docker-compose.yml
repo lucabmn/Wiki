@@ -112,9 +112,9 @@ services:
       # later loses no events.
       DIGEST_SCHEDULER_ENABLED: ${DIGEST_SCHEDULER_ENABLED:-true}
       DIGEST_TICK_SECONDS: ${DIGEST_TICK_SECONDS:-300}
-      # Shared bearer token for the POST /internal/…/run endpoints (digests and
-      # webhooks), for deployments driven by an external scheduler. The
-      # digest-specific DIGEST_RUN_TOKEN is still honoured as an alias.
+      # Shared bearer token for the POST /internal/…/run endpoints (digests,
+      # webhooks, retention), for deployments driven by an external scheduler.
+      # The digest-specific DIGEST_RUN_TOKEN is still honoured as an alias.
       INTERNAL_RUN_TOKEN: ${INTERNAL_RUN_TOKEN:-}
       DIGEST_RUN_TOKEN: ${DIGEST_RUN_TOKEN:-}
       # Outbound webhooks. Endpoints are configured per organization in the UI;
@@ -124,6 +124,12 @@ services:
       WEBHOOK_TIMEOUT_SECONDS: ${WEBHOOK_TIMEOUT_SECONDS:-10}
       WEBHOOK_MAX_ATTEMPTS: ${WEBHOOK_MAX_ATTEMPTS:-6}
       WEBHOOK_ALLOW_PRIVATE_HOSTS: ${WEBHOOK_ALLOW_PRIVATE_HOSTS:-false}
+      # Data retention. The windows themselves are per-organization settings in
+      # the app; this only drives the runner that enforces them. Defaults: the
+      # activity log is kept forever, the trash for 30 days.
+      RETENTION_SCHEDULER_ENABLED: ${RETENTION_SCHEDULER_ENABLED:-true}
+      RETENTION_TICK_SECONDS: ${RETENTION_TICK_SECONDS:-3600}
+      RETENTION_BATCH_LIMIT: ${RETENTION_BATCH_LIMIT:-1000}
       # Object storage for attachments — defaults to the bundled RustFS.
       S3_ENDPOINT: ${S3_ENDPOINT:-http://rustfs:9000}
       S3_REGION: ${S3_REGION:-us-east-1}

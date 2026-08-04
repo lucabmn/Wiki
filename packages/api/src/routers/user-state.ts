@@ -5,6 +5,7 @@ import { favorite, page, pageSubscription, space } from "@nilovon-wiki/db/schema
 
 import { protectedProcedure } from "../index";
 import { buildSpaceReadFilter } from "../lib/access";
+import { pageLive } from "../lib/lifecycle";
 import { filterReadablePagesAcrossSpaces, requirePageCapability } from "../lib/authz";
 import { loadPage } from "../lib/loaders";
 import { PageSchema } from "../schemas/page";
@@ -41,7 +42,9 @@ export const userStateRouter = {
           .from(favorite)
           .innerJoin(page, eq(favorite.pageId, page.id))
           .innerJoin(space, eq(page.spaceId, space.id))
-          .where(eq(favorite.userId, context.session.user.id))
+          // A favorite pointing into the trash is not shown — restoring the
+          // page brings it back, because the favorite row itself is untouched.
+          .where(and(eq(favorite.userId, context.session.user.id), pageLive()))
           .orderBy(desc(favorite.createdAt)),
         buildSpaceReadFilter(context.db, context),
       ]);
@@ -112,7 +115,7 @@ export const userStateRouter = {
           .from(pageSubscription)
           .innerJoin(page, eq(pageSubscription.pageId, page.id))
           .innerJoin(space, eq(page.spaceId, space.id))
-          .where(eq(pageSubscription.userId, context.session.user.id))
+          .where(and(eq(pageSubscription.userId, context.session.user.id), pageLive()))
           .orderBy(desc(pageSubscription.createdAt)),
         buildSpaceReadFilter(context.db, context),
       ]);

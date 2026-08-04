@@ -8,7 +8,10 @@ export const ActivityActionSchema = z.enum([
   "space.created",
   "space.updated",
   "space.archived",
+  "space.restored",
   "space.deleted",
+  "space.untrashed",
+  "space.purged",
   "page.created",
   "page.updated",
   "page.published",
@@ -16,6 +19,8 @@ export const ActivityActionSchema = z.enum([
   "page.archived",
   "page.restored",
   "page.deleted",
+  "page.untrashed",
+  "page.purged",
   "comment.created",
   "comment.resolved",
   "comment.deleted",
@@ -30,6 +35,10 @@ export const ActivityActionSchema = z.enum([
   // `categoryForAction` drops it, which keeps it out of summary mails.
   "impersonation.started",
   "impersonation.ended",
+  "retention.updated",
+  "retention.purged",
+  "hold.created",
+  "hold.released",
 ]);
 
 export const ActivitySchema = z.object({
