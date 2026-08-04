@@ -4,19 +4,30 @@ export const ACTION_LABEL: Record<string, string> = {
   "space.created": "Space erstellt",
   "space.updated": "Space aktualisiert",
   "space.archived": "Space archiviert",
-  "space.deleted": "Space gelöscht",
+  "space.restored": "Space wiederhergestellt",
+  // "gelöscht" is the trash, "endgültig gelöscht" is the purge. The feed has to
+  // keep the two apart, because only one of them is reversible.
+  "space.deleted": "Space in den Papierkorb",
+  "space.untrashed": "Space aus dem Papierkorb geholt",
+  "space.purged": "Space endgültig gelöscht",
   "page.created": "Seite erstellt",
   "page.updated": "Seite bearbeitet",
   "page.published": "Seite veröffentlicht",
   "page.moved": "Seite verschoben",
   "page.archived": "Seite archiviert",
   "page.restored": "Seite wiederhergestellt",
-  "page.deleted": "Seite gelöscht",
+  "page.deleted": "Seite in den Papierkorb",
+  "page.untrashed": "Seite aus dem Papierkorb geholt",
+  "page.purged": "Seite endgültig gelöscht",
   "comment.created": "Kommentar hinzugefügt",
   "comment.resolved": "Kommentar gelöst",
   "comment.deleted": "Kommentar gelöscht",
   "attachment.uploaded": "Datei hochgeladen",
   "attachment.deleted": "Datei gelöscht",
+  "retention.updated": "Aufbewahrungsfristen geändert",
+  "retention.purged": "Abgelaufene Daten gelöscht",
+  "hold.created": "Löschsperre gesetzt",
+  "hold.released": "Löschsperre aufgehoben",
 };
 
 export const STATUS_LABEL: Record<string, string> = {

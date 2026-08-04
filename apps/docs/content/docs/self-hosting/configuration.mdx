@@ -35,16 +35,32 @@ For `pnpm dev`, each app reads its own file.
 
 ### `apps/server/.env`
 
-| Variable                                 | Required | Description                                         |
-| ---------------------------------------- | -------- | --------------------------------------------------- |
-| `DATABASE_URL`                           | yes      | PostgreSQL connection string                        |
-| `BETTER_AUTH_SECRET`                     | yes      | Auth signing secret (min 32 chars, no placeholders) |
-| `BETTER_AUTH_URL`                        | yes      | Public URL of the server                            |
-| `CORS_ORIGIN`                            | yes      | Allowed origin of the web app                       |
-| `NODE_ENV`                               | no       | `development` (default) / `production` / `test`     |
-| `APP_NAME`                               | no       | Display name used by auth flows (white-labeling)    |
-| `RATE_LIMIT_MAX` / `RATE_LIMIT_AUTH_MAX` | no       | Per-IP requests/minute for the API / auth routes    |
-| `RATE_LIMIT_SCIM_MAX`                    | no       | Per-IP requests/minute for SCIM (default `1200`)    |
+| Variable                                 | Required | Description                                                   |
+| ---------------------------------------- | -------- | ------------------------------------------------------------- |
+| `DATABASE_URL`                           | yes      | PostgreSQL connection string                                  |
+| `BETTER_AUTH_SECRET`                     | yes      | Auth signing secret (min 32 chars, no placeholders)           |
+| `BETTER_AUTH_URL`                        | yes      | Public URL of the server                                      |
+| `CORS_ORIGIN`                            | yes      | Allowed origin of the web app                                 |
+| `NODE_ENV`                               | no       | `development` (default) / `production` / `test`               |
+| `APP_NAME`                               | no       | Display name used by auth flows (white-labeling)              |
+| `RATE_LIMIT_MAX` / `RATE_LIMIT_AUTH_MAX` | no       | Per-IP requests/minute for the API / auth routes              |
+| `RATE_LIMIT_SCIM_MAX`                    | no       | Per-IP requests/minute for SCIM (default `1200`)              |
+| `INTERNAL_RUN_TOKEN`                     | no       | Bearer token for the `/internal/**` runners; unset = disabled |
+| `RETENTION_SCHEDULER_ENABLED`            | no       | In-process retention ticker (default `true`)                  |
+| `RETENTION_TICK_SECONDS`                 | no       | Retention sweep interval (default `3600`, min 60)             |
+| `RETENTION_BATCH_LIMIT`                  | no       | Rows removed per category per run (default `1000`)            |
+
+<Callout type="info">
+  `INTERNAL_RUN_TOKEN` guards every `/internal` runner — the digest run and the
+  retention run alike. The older `DIGEST_RUN_TOKEN` is still accepted as an alias
+  so existing deployments keep working; prefer the new name for new installs.
+
+The retention **windows** are not environment variables. They are per-organization
+settings under Einstellungen → Daten & Fristen, so a deletion policy is always a
+recorded decision by a named administrator — see
+[Retention, trash & deletion blocks](/docs/concepts/data-lifecycle).
+
+</Callout>
 
 ### `apps/collab/.env`
 

@@ -98,11 +98,20 @@ services:
       SMTP_FROM: ${SMTP_FROM:-Wiki <no-reply@localhost>}
       # Bundled notifications. The server runs the schedule in-process; without
       # SMTP above nothing is delivered and no cursor moves, so enabling mail
-      # later loses no events. DIGEST_RUN_TOKEN additionally exposes
-      # POST /internal/digests/run for an external scheduler.
+      # later loses no events.
       DIGEST_SCHEDULER_ENABLED: ${DIGEST_SCHEDULER_ENABLED:-true}
       DIGEST_TICK_SECONDS: ${DIGEST_TICK_SECONDS:-300}
+      # One token for every /internal runner (digest run, retention run). Unset
+      # leaves those endpoints disabled. DIGEST_RUN_TOKEN is the old name and is
+      # still accepted, so existing deployments keep working.
+      INTERNAL_RUN_TOKEN: ${INTERNAL_RUN_TOKEN:-}
       DIGEST_RUN_TOKEN: ${DIGEST_RUN_TOKEN:-}
+      # Data retention. The windows themselves are per-organization settings in
+      # the app; this only drives the runner that enforces them. Defaults: the
+      # activity log is kept forever, the trash for 30 days.
+      RETENTION_SCHEDULER_ENABLED: ${RETENTION_SCHEDULER_ENABLED:-true}
+      RETENTION_TICK_SECONDS: ${RETENTION_TICK_SECONDS:-3600}
+      RETENTION_BATCH_LIMIT: ${RETENTION_BATCH_LIMIT:-1000}
       # Object storage for attachments — defaults to the bundled RustFS.
       S3_ENDPOINT: ${S3_ENDPOINT:-http://rustfs:9000}
       S3_REGION: ${S3_REGION:-us-east-1}
