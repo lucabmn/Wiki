@@ -6,7 +6,7 @@ import type { Database } from "@nilovon-wiki/db";
 import { organization, webhook, webhookDelivery } from "@nilovon-wiki/db/schema/index";
 
 import { requireActiveOrg, requireOrgPermission } from "../index";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { DELIVERABLE_ACTIONS } from "../lib/webhooks/events";
 import { sendTestDelivery } from "../lib/webhooks/run";
 import { generateWebhookSecret, webhookSecretPreview } from "../lib/webhooks/signature";
@@ -81,7 +81,7 @@ export const webhookRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "webhook.created",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           metadata: { webhookId: row.id, name: row.name, url: row.url, spaceId: row.spaceId },
         });
         return row;
@@ -117,7 +117,7 @@ export const webhookRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "webhook.updated",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           metadata: {
             webhookId: id,
             name: values.name ?? existing.name,
@@ -142,7 +142,7 @@ export const webhookRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "webhook.deleted",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           // The endpoint is gone from the table after this, so the audit row is
           // the only remaining record of where events used to be sent.
           metadata: { webhookId: existing.id, name: existing.name, url: existing.url },

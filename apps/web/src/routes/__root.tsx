@@ -18,6 +18,7 @@ import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 
 import appCss from "../index.css?url";
+import { ImpersonationBanner } from "@/components/admin/impersonation-banner";
 import { ThemeProvider } from "@/components/theme-provider";
 export interface RouterAppContext {
   orpc: typeof orpc;
@@ -61,6 +62,10 @@ function RootDocument() {
       <body>
         <div className="grid h-svh grid-rows-[auto_1fr]">
           <ThemeProvider defaultTheme="system" storageKey="theme">
+            {/* Above every route on purpose: an admin must never lose track of
+                whose account they are writing in, on any screen. Renders
+                nothing unless the session is actually impersonated. */}
+            <ImpersonationBanner />
             <Outlet />
           </ThemeProvider>
         </div>

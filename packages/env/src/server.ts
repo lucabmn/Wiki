@@ -26,6 +26,14 @@ export const env = createEnv({
     APP_NAME: z.string().min(1).default("Wiki"),
     // Port the real-time collaboration service (`apps/collab`) listens on.
     COLLAB_PORT: z.coerce.number().int().positive().default(1234),
+    // Where this process reaches the collab service, for the admin console's
+    // "collab reachable" probe. Defaults to loopback (the dev layout, where all
+    // three apps share a host); under docker-compose the service lives on its
+    // own container and this must point at it.
+    COLLAB_INTERNAL_URL: z.url().optional(),
+    // Reported verbatim in the admin console's instance overview — the first
+    // thing anyone asks for in a support case. Set from the image tag.
+    APP_VERSION: z.string().min(1).default("dev"),
     // Per-IP request ceilings (requests per minute). The general limit covers
     // /rpc and the REST surface; the auth limit protects /api/auth/* against
     // credential stuffing. Set high enough that normal usage never hits them.
@@ -35,6 +43,26 @@ export const env = createEnv({
     // not a person signing in: one request per user, all from one IP. It needs
     // a ceiling sized for a full directory push, not for credential stuffing.
     RATE_LIMIT_SCIM_MAX: z.coerce.number().int().positive().default(1200),
+
+    // ── Instance administration ─────────────────────────────────────────────
+    // Bootstraps the first instance admin. `user.role` is nullable and nothing
+    // sets it at registration, so on a fresh instance nobody can open the admin
+    // console — a chicken-and-egg the operator has to break from outside the
+    // app. The address is matched case-insensitively and promoted at startup as
+    // well as at registration, so it works whether the account already exists
+    // or is created later. Existing admins are never demoted by changing it.
+    INITIAL_ADMIN_EMAIL: z.email().optional(),
+    // Hard kill-switch for impersonation. Some operators (works councils,
+    // regulated industries) must be able to prove the capability is absent
+    // rather than merely audited, so this is enforced server-side — the UI only
+    // mirrors it.
+    IMPERSONATION_ENABLED: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
+    // How long an impersonated session survives on its own. Short by design: a
+    // forgotten tab must not stay signed in as someone else for a working day.
+    IMPERSONATION_MAX_MINUTES: z.coerce.number().int().min(1).max(480).default(30),
 
     // ── SMTP ────────────────────────────────────────────────────────────────
     // Optional as a whole: with SMTP_HOST unset the app still boots but mail is

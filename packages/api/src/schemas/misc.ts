@@ -25,6 +25,11 @@ export const ActivityActionSchema = z.enum([
   "webhook.created",
   "webhook.updated",
   "webhook.deleted",
+  // Mirrored from the instance audit log so the impersonated account sees, in
+  // its own feed, that somebody signed in as them. Carries no digest category —
+  // `categoryForAction` drops it, which keeps it out of summary mails.
+  "impersonation.started",
+  "impersonation.ended",
 ]);
 
 export const ActivitySchema = z.object({
@@ -33,6 +38,8 @@ export const ActivitySchema = z.object({
   spaceId: IdSchema.nullable(),
   pageId: IdSchema.nullable(),
   actorId: IdSchema.nullable(),
+  /** The instance admin behind `actorId` when the row was written while impersonating. */
+  impersonatedBy: IdSchema.nullable(),
   action: ActivityActionSchema,
   metadata: z.unknown().nullable(),
   createdAt: z.date(),

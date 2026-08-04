@@ -4,7 +4,7 @@ import { z } from "zod";
 import { page, space, spaceMember } from "@nilovon-wiki/db/schema/index";
 
 import { requireActiveOrg, requireOrgPermission } from "../index";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { generateKeyBetween } from "../lib/fractional";
 import { firstRow } from "../lib/rows";
 
@@ -144,7 +144,7 @@ export const onboardingRouter = {
           await recordActivity(tx, {
             organizationId,
             action: "space.created",
-            actorId: userId,
+            ...activityActor(context),
             spaceId: spaceRow.id,
             metadata: { name: spaceRow.name },
           });
@@ -172,7 +172,7 @@ export const onboardingRouter = {
             await recordActivity(tx, {
               organizationId,
               action: "page.created",
-              actorId: userId,
+              ...activityActor(context),
               spaceId: spaceRow.id,
               pageId: pageRow.id,
               metadata: { title: pageRow.title },

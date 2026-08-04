@@ -9,7 +9,39 @@ Authorization has **two layers**:
 
 Both are enforced **server-side**; the frontend only mirrors them for UI gating.
 
+Sitting beside them, on a different axis entirely, is the **instance role** — see [Instance admin vs. org admin](#instance-admin-vs-org-admin).
+
 For which right unlocks which settings tab, see [Settings](./settings.md).
+
+---
+
+## Instance admin vs. org admin
+
+These are two unrelated things that both get called "admin", and confusing them is the fastest way to grant somebody far more than intended.
+
+|               | **Instance admin**                                                  | **Org owner / admin**                                          |
+| ------------- | ------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Stored in     | `auth.user.role` (comma-separated, e.g. `admin`)                    | `auth.member.role`, per organization                           |
+| Scope         | The whole deployment — every organization, every account            | One organization                                               |
+| Granted by    | `INITIAL_ADMIN_EMAIL`, then other instance admins                   | The organization's owner, or an SSO/SCIM provisioning rule     |
+| Can do        | List/create/ban/delete accounts, revoke sessions, impersonate       | Manage members, groups, teams, spaces and content of _its_ org |
+| **Cannot** do | Read wiki content, act as an org member, appear in a member list    | Anything outside its own organization                          |
+| Enforced by   | `instanceAdminProcedure` (`packages/api/src/lib/instance-admin.ts`) | `assertOrgPermission` / `requireOrgPermission`                 |
+| Audited in    | `admin.admin_audit` (instance-wide, admins only)                    | `wiki.activity` (org-scoped, visible to the org)               |
+
+Neither implies the other. An org owner calling any `admin.*` procedure gets `FORBIDDEN`, and an instance admin is not a member of any organization by virtue of the role — they have no active org, see no spaces, and appear in nobody's member list.
+
+### Why an instance admin cannot read content
+
+The console shows metadata only: counts, storage, space names, ban state, sessions. It never renders page content or comments.
+
+That is a deliberate line, not an oversight. An instance admin _can_ always get at content — by impersonating a member. The point is that this path leaves two audit entries naming both identities, and the wiki's own activity feed tells the impersonated person it happened. Letting the console display content directly would make the same access invisible. The difference is between "an admin can read along" and "an admin read along, and it is provable".
+
+Operators who want the capability gone entirely set `IMPERSONATION_ENABLED=false`; the auth layer then rejects impersonation server-side rather than merely hiding the button.
+
+### Bootstrapping and revoking
+
+The first instance admin comes from `INITIAL_ADMIN_EMAIL` — see [DEPLOY.md](../DEPLOY.md#the-first-instance-admin). Further admins are appointed in the console. The last remaining instance admin cannot be demoted, banned or deleted: that would lock everyone out of a surface only recoverable by editing the database by hand.
 
 ---
 

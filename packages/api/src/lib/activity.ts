@@ -3,10 +3,30 @@ import type { z } from "zod";
 import type { Database } from "@nilovon-wiki/db";
 import { activity } from "@nilovon-wiki/db/schema/index";
 
+import type { AuthedContext } from "../context";
 import type { ActivityActionSchema } from "../schemas/misc";
 import { enqueueWebhookDeliveries } from "./webhooks/enqueue";
 
 export type ActivityAction = z.infer<typeof ActivityActionSchema>;
+
+/**
+ * Who to credit an audit row to. During an impersonated session the write is
+ * attributed to the account it was made in *and* to the instance admin driving
+ * it — an edit that reads as the user's own would hide exactly the thing
+ * impersonation has to stay accountable for.
+ *
+ * Spread into every `recordActivity` call instead of passing `actorId` by hand,
+ * so a new mutation cannot forget the second identity.
+ */
+export function activityActor(context: AuthedContext): {
+  actorId: string;
+  impersonatedBy: string | null;
+} {
+  return {
+    actorId: context.session.user.id,
+    impersonatedBy: context.session.session.impersonatedBy ?? null,
+  };
+}
 
 // Accepts either the db handle or a transaction — both expose `insert`/`select`
 // with the same signature, so the audit row *and* the webhook outbox rows it
@@ -17,6 +37,8 @@ type RecordActivityInput = {
   organizationId: string;
   action: ActivityAction;
   actorId?: string | null;
+  /** The instance admin behind `actorId` — see `activityActor`. */
+  impersonatedBy?: string | null;
   spaceId?: string | null;
   pageId?: string | null;
   // Denormalized context that must survive the referenced row being deleted
@@ -44,6 +66,7 @@ export async function recordActivity(
       organizationId: input.organizationId,
       action: input.action,
       actorId: input.actorId ?? null,
+      impersonatedBy: input.impersonatedBy ?? null,
       spaceId,
       pageId: input.pageId ?? null,
       metadata: input.metadata ?? null,

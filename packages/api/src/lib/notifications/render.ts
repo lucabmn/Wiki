@@ -53,6 +53,10 @@ const ACTION_PHRASES: Record<ActivityAction, { verb: string; noun: string }> = {
   "webhook.created": { verb: "hat einen Webhook angelegt", noun: "Webhook" },
   "webhook.updated": { verb: "hat einen Webhook geändert", noun: "Webhook" },
   "webhook.deleted": { verb: "hat einen Webhook gelöscht", noun: "Webhook" },
+  // Same for the impersonation events, which are mirrored into the target's
+  // feed rather than mailed out.
+  "impersonation.started": { verb: "wurde von der Administration übernommen", noun: "Konto" },
+  "impersonation.ended": { verb: "ist nicht mehr übernommen", noun: "Konto" },
 };
 
 const UNKNOWN_ACTOR = "Jemand";

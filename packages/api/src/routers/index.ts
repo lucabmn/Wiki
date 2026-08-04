@@ -2,6 +2,7 @@ import type { RouterClient } from "@orpc/server";
 
 import { publicProcedure } from "../index";
 import { activityRouter } from "./activity";
+import { adminRouter } from "./admin";
 import { attachmentRouter } from "./attachment";
 import { commentRouter } from "./comment";
 import { dashboardRouter } from "./dashboard";
@@ -30,6 +31,7 @@ export const appRouter = {
       .route({ method: "GET", path: "/health", tags: ["Health"], summary: "Liveness probe" })
       .handler(() => "OK"),
   },
+  admin: adminRouter,
   spaces: spaceRouter,
   spaceMembers: spaceMemberRouter,
   pages: pageRouter,

@@ -1,7 +1,8 @@
 import { createContext } from "@nilovon-wiki/api/context";
 import { appRouter } from "@nilovon-wiki/api/routers/index";
 import { auth } from "@nilovon-wiki/auth";
-import { closeDb, pingDb } from "@nilovon-wiki/db";
+import { ensureInitialAdmin } from "@nilovon-wiki/auth/instance-admin";
+import { closeDb, db, pingDb } from "@nilovon-wiki/db";
 import { env } from "@nilovon-wiki/env/server";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -209,5 +210,16 @@ startDigestScheduler();
 // Outbound webhooks. Same deal: a no-op where the ticker is disabled and an
 // external scheduler drives /internal/webhooks/run instead.
 startWebhookScheduler();
+
+// Bootstraps the first instance admin from INITIAL_ADMIN_EMAIL. Deliberately
+// not awaited: an unreachable database at boot must not stop the process from
+// serving its health endpoint, and the promotion is idempotent on every start.
+void ensureInitialAdmin(db)
+  .then((promoted) => {
+    if (promoted) log.info({ source: "server", msg: "initial admin promoted" });
+  })
+  .catch((error) => {
+    log.error({ source: "server", msg: "initial admin bootstrap failed", ...parseError(error) });
+  });
 
 export default app;

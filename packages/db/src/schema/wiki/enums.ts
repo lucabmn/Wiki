@@ -35,6 +35,11 @@ export const activityAction = wikiSchema.enum("activity_action", [
   "webhook.created",
   "webhook.updated",
   "webhook.deleted",
+  // Instance-admin events are logged in `admin.admin_audit`, but these two are
+  // mirrored here as well: someone whose account was used has a right to see it
+  // in their own feed, not only in a log they cannot open.
+  "impersonation.started",
+  "impersonation.ended",
 ]);
 
 export const wikiRole = wikiSchema.enum("wiki_role", ["viewer", "commenter", "editor", "admin"]);

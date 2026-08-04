@@ -26,11 +26,13 @@ export const Route = createFileRoute("/_auth")({
 
 function AuthLayout() {
   return (
-    // Pin the shell to the viewport so the sidebar stays fixed and only the
-    // content column scrolls — on every _auth page.
-    <SidebarProvider className="h-svh overflow-hidden">
+    // Pin the shell to its grid row (see __root.tsx) so the sidebar stays fixed
+    // and only the content column scrolls — on every _auth page. `h-full`
+    // rather than `h-svh`: the impersonation banner sits in the row above and
+    // would otherwise push the whole shell a banner-height off-screen.
+    <SidebarProvider className="h-full overflow-hidden">
       <MainSidebar />
-      <SidebarInset className="h-svh overflow-hidden">
+      <SidebarInset className="h-full overflow-hidden">
         {/* On narrow viewports the sidebar is an off-canvas sheet; this slim
             bar is its only opener, so it must exist on every page. */}
         <div className="flex items-center gap-2 border-b border-border px-2 py-1.5 md:hidden">
