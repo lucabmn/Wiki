@@ -29,6 +29,12 @@ export const activityAction = wikiSchema.enum("activity_action", [
   "comment.deleted",
   "attachment.uploaded",
   "attachment.deleted",
+  // Org-wide security policy. Auditable because turning the requirement off is
+  // the interesting event: it silently restores access for every member who
+  // never set up a second factor.
+  "organization.two_factor_enabled",
+  "organization.two_factor_disabled",
+  "organization.two_factor_grace_updated",
 ]);
 
 export const wikiRole = wikiSchema.enum("wiki_role", ["viewer", "commenter", "editor", "admin"]);
