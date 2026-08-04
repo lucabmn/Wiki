@@ -12,6 +12,7 @@ import { onboardingRouter } from "./onboarding";
 import { pageRouter } from "./page";
 import { pageAccessRouter } from "./page-access";
 import { searchRouter } from "./search";
+import { securityPolicyRouter } from "./security-policy";
 import { spaceRouter } from "./space";
 import { spaceMemberRouter } from "./space-member";
 import { tagRouter } from "./tag";
@@ -41,6 +42,7 @@ export const appRouter = {
   activity: activityRouter,
   notifications: notificationRouter,
   search: searchRouter,
+  securityPolicy: securityPolicyRouter,
   users: userRouter,
   me: userStateRouter,
   onboarding: onboardingRouter,

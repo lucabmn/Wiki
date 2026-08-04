@@ -3,6 +3,9 @@ import { auth } from "@nilovon-wiki/auth";
 import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 
 import type { AuthedContext, Context } from "./context";
+import { assertTwoFactorCompliance } from "./lib/two-factor-policy";
+
+export { TWO_FACTOR_REQUIRED } from "./lib/two-factor-policy";
 
 export const o = os.$context<Context>();
 
@@ -24,7 +27,28 @@ const requireAuth = o.middleware(async ({ context, next }) => {
   });
 });
 
-export const protectedProcedure = publicProcedure.use(requireAuth);
+/**
+ * Refuses callers who owe their organization a second factor.
+ *
+ * The three exemptions the policy needs are structural rather than listed here:
+ * enrolling a second factor, signing out and the rest of `/api/auth/*` are
+ * served by Better Auth and never reach oRPC, and `/health` is a
+ * `publicProcedure`. What still has to be reachable *inside* oRPC — the status
+ * the blocking screen renders — is built on `sessionProcedure` below.
+ */
+const requireTwoFactorCompliance = o.middleware(async ({ context, next }) => {
+  await assertTwoFactorCompliance(context.db, context.session);
+  return next();
+});
+
+/**
+ * Signed in, but *not* subject to the two-factor policy. Reserved for the
+ * handful of procedures a blocked user must still reach; everything else wants
+ * `protectedProcedure`.
+ */
+export const sessionProcedure = publicProcedure.use(requireAuth);
+
+export const protectedProcedure = sessionProcedure.use(requireTwoFactorCompliance);
 
 // Resolves the caller's active organization, throwing when none is set. Most
 // create/list flows are scoped to it. Cross-org mutations should instead gate
