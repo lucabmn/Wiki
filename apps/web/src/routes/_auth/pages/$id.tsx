@@ -6,6 +6,7 @@ import { PageAccessSheet } from "@/components/pages/page-access-sheet";
 import { PageAttachments } from "@/components/pages/page-attachments";
 import { PageExternalLinks } from "@/components/pages/page-external-links";
 import { PageTags } from "@/components/pages/page-tags";
+import { PageTemplateBanner, TemplateToggleButton } from "@/components/pages/page-template-banner";
 import { RevisionHistory } from "@/components/editor/revision-history";
 import { extractHeadings } from "@/components/editor/headings";
 import { STATUS_LABEL } from "@/lib/labels";
@@ -452,6 +453,8 @@ function RouteComponent() {
         <div className="min-w-0 flex-1">
           {breadcrumb}
 
+          {page.isTemplate ? <PageTemplateBanner page={page} /> : null}
+
           {editing ? (
             <PageEditor
               page={page}
@@ -488,6 +491,7 @@ function RouteComponent() {
                       <Lock className="size-4" />
                     </Button>
                   ) : null}
+                  {canEdit ? <TemplateToggleButton page={page} /> : null}
                   {canEdit ? (
                     <Button
                       variant="outline"

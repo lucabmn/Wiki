@@ -83,6 +83,19 @@ vi.mock("@/utils/orpc", () => ({
           ...opts,
         }),
       },
+      createFromTemplate: {
+        mutationOptions: (opts: Record<string, unknown>) => ({
+          mutationFn: async () => ({}),
+          ...opts,
+        }),
+      },
+      listTemplates: {
+        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
+          queryKey: ["templates"],
+          queryFn: async () => [],
+          enabled,
+        }),
+      },
       list: { key: () => ["pages"] },
     },
   },

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { MemberAccessManager } from "@/components/access/member-access-manager";
 import { SpaceIconPicker } from "@/components/spaces/space-icon-picker";
+import { SpaceTemplates } from "@/components/spaces/space-templates";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { VISIBILITY_LABEL } from "@/lib/labels";
 import { spaceExportUrl } from "@/lib/space-export";
@@ -346,6 +347,12 @@ export function SpaceSettingsSheet({
               removeDescription={(label) => `„${label}" verliert den Zugriff auf diesen Space.`}
             />
           </section>
+
+          <SpaceTemplates
+            spaceId={space.id}
+            enabled={open}
+            onNavigate={() => onOpenChange(false)}
+          />
 
           <section className="space-y-3">
             <div className="space-y-0.5">
