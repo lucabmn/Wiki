@@ -66,9 +66,33 @@ export const env = createEnv({
     // How often the ticker looks for due digests. Sub-minute granularity buys
     // nothing for a daily mail, and every tick is a database round-trip.
     DIGEST_TICK_SECONDS: z.coerce.number().int().min(30).default(300),
-    // Bearer token for POST /internal/digests/run. Unset leaves the endpoint
-    // disabled — an unauthenticated trigger would let anyone drain the queue.
+
+    // ── Machine-triggered maintenance (/internal/**) ─────────────────────────
+    // One bearer token for every `/internal` runner, because they are the same
+    // trust boundary: a scheduler, not a person. Unset leaves those endpoints
+    // disabled — an unauthenticated trigger would let anyone drain the queues.
+    INTERNAL_RUN_TOKEN: z.string().min(16).optional(),
+    // The original, digest-only name. Kept as an accepted alias so existing
+    // deployments keep working after the rename; `internalRunToken()` prefers
+    // INTERNAL_RUN_TOKEN and falls back to this.
     DIGEST_RUN_TOKEN: z.string().min(16).optional(),
+
+    // ── Data retention (audit window, trash expiry) ──────────────────────────
+    // Same shape as the digest runner: an in-process ticker for the long-lived
+    // container this ships as, plus POST /internal/retention/run for installs
+    // where an external scheduler owns the cadence. The runner claims work in
+    // the database, so both may be active without deleting anything twice.
+    RETENTION_SCHEDULER_ENABLED: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
+    // Hourly by default. Retention windows are measured in days, so a tighter
+    // cadence buys nothing and only costs database round-trips.
+    RETENTION_TICK_SECONDS: z.coerce.number().int().min(60).default(3600),
+    // Rows removed per category per run. The ceiling is the difference between
+    // a first run that trims a year-old audit log in the background and one
+    // that issues a single DELETE over millions of rows and stalls the app.
+    RETENTION_BATCH_LIMIT: z.coerce.number().int().min(1).max(100_000).default(1000),
 
     // ── Object storage (S3-compatible: RustFS, MinIO, AWS S3, …) ────────────
     // Optional for the same reason: attachments stay disabled until configured.

@@ -2,16 +2,17 @@ import { ORPCError } from "@orpc/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { attachment, space, spaceMember } from "@nilovon-wiki/db/schema/index";
+import { space, spaceMember } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg, requireOrgPermission } from "../index";
 import { assertSpaceRead, buildSpaceReadFilter } from "../lib/access";
 import { requireSpaceManage } from "../lib/authz";
 import { recordActivity } from "../lib/activity";
+import { spaceNotTrashed } from "../lib/lifecycle";
 import { loadSpace } from "../lib/loaders";
 import { mapUniqueViolation } from "../lib/pg-errors";
+import { assertSpaceDeletable } from "../lib/retention/holds";
 import { firstRow } from "../lib/rows";
-import { getStorage } from "../lib/storage";
 import { slugify, uniqueSlug } from "../lib/slug";
 import {
   CreateSpaceInputSchema,
@@ -45,6 +46,9 @@ export const spaceRouter = {
           where: and(
             eq(space.organizationId, organizationId),
             input.includeArchived ? undefined : isNull(space.archivedAt),
+            // Trashed spaces are only reachable through the trash view, even
+            // when archived rows are requested — the two states are unrelated.
+            spaceNotTrashed(),
           ),
           orderBy: [desc(space.createdAt)],
         }),
@@ -189,59 +193,79 @@ export const spaceRouter = {
       });
     }),
 
+  restore: protectedProcedure
+    .route({
+      method: "POST",
+      path: "/spaces/{id}/restore",
+      tags: TAGS,
+      summary: "Un-archive a space",
+    })
+    .input(z.object({ id: IdSchema }))
+    .output(SpaceSchema)
+    .handler(async ({ input, context }) => {
+      const existing = await loadSpace(context.db, input.id);
+      await requireSpaceManage(context.db, context, context.headers, existing, {
+        space: ["update"],
+      });
+      return context.db.transaction(async (tx) => {
+        const rows = await tx
+          .update(space)
+          .set({ archivedAt: null })
+          .where(eq(space.id, input.id))
+          .returning();
+        const row = firstRow(rows);
+        await recordActivity(tx, {
+          organizationId: existing.organizationId,
+          action: "space.restored",
+          actorId: context.session.user.id,
+          spaceId: row.id,
+        });
+        return row;
+      });
+    }),
+
+  /**
+   * Soft delete: the space moves to the trash and vanishes from every view, but
+   * survives — with its pages, comments and attachments — until the org's trash
+   * window expires or someone purges it explicitly (`trash.purgeSpace`).
+   *
+   * This used to cascade immediately. It no longer does, and that is the point:
+   * "Delete space" was the one button in the product that could destroy a year
+   * of writing with no way back.
+   */
   delete: protectedProcedure
     .route({
       method: "DELETE",
       path: "/spaces/{id}",
       tags: TAGS,
-      summary: "Permanently delete a space and its contents",
+      summary: "Move a space to the trash",
     })
     .input(z.object({ id: IdSchema }))
     .output(z.object({ id: IdSchema }))
     .handler(async ({ input, context }) => {
       const existing = await loadSpace(context.db, input.id);
-      // Hard delete: space admin, or the org-wide `space:["delete"]` grant.
-      // Cascades remove pages, comments, attachments, etc.
+      // Space admin, or the org-wide `space:["delete"]` grant.
       await requireSpaceManage(context.db, context, context.headers, existing, {
         space: ["delete"],
       });
-      // Mark the whole operation before touching storage. The marker and all
-      // attachment markers commit together, making a partial cleanup retryable.
-      const pendingAttachments = await context.db.transaction(async (tx) => {
+      // Blocked when the space — or any page inside it — is under a deletion
+      // block: trashing the space would put a held page beyond reach.
+      await assertSpaceDeletable(context.db, existing);
+      return context.db.transaction(async (tx) => {
         await tx
           .update(space)
-          .set({ deletionPendingAt: existing.deletionPendingAt ?? new Date() })
+          .set({ deletedAt: new Date(), deletedBy: context.session.user.id })
           .where(eq(space.id, input.id));
-        return tx
-          .update(attachment)
-          .set({ deletionPendingAt: new Date() })
-          .where(eq(attachment.spaceId, input.id))
-          .returning({ storageKey: attachment.storageKey });
-      });
-
-      if (pendingAttachments.length > 0) {
-        const storage = getStorage();
-        if (!storage) {
-          throw new ORPCError("NOT_IMPLEMENTED", {
-            message: "Cannot delete space attachments: no object storage is configured.",
-          });
-        }
-        // DeleteObject is idempotent. On failure the space and attachment rows
-        // remain pending, and repeating this request resumes the cleanup.
-        for (const item of pendingAttachments) await storage.delete(item.storageKey);
-      }
-
-      await context.db.transaction(async (tx) => {
-        await tx.delete(space).where(eq(space.id, input.id));
-        // `activity.spaceId` is set-null on delete, so keep the id/name in
-        // metadata — the audit row must survive the space it describes.
+        // The row survives, but the name stays denormalized here so the feed
+        // still reads correctly once the purge removes it for good.
         await recordActivity(tx, {
           organizationId: existing.organizationId,
           action: "space.deleted",
           actorId: context.session.user.id,
+          spaceId: existing.id,
           metadata: { spaceId: existing.id, name: existing.name },
         });
+        return { id: input.id };
       });
-      return { id: input.id };
     }),
 };

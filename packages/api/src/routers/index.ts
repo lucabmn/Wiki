@@ -6,15 +6,18 @@ import { attachmentRouter } from "./attachment";
 import { commentRouter } from "./comment";
 import { dashboardRouter } from "./dashboard";
 import { externalLinkRouter } from "./external-link";
+import { legalHoldRouter } from "./legal-hold";
 import { linkRouter } from "./link";
 import { notificationRouter } from "./notification";
 import { onboardingRouter } from "./onboarding";
 import { pageRouter } from "./page";
 import { pageAccessRouter } from "./page-access";
+import { retentionRouter } from "./retention";
 import { searchRouter } from "./search";
 import { spaceRouter } from "./space";
 import { spaceMemberRouter } from "./space-member";
 import { tagRouter } from "./tag";
+import { trashRouter } from "./trash";
 import { userRouter } from "./user";
 import { userStateRouter } from "./user-state";
 
@@ -40,6 +43,11 @@ export const appRouter = {
   externalLinks: externalLinkRouter,
   activity: activityRouter,
   notifications: notificationRouter,
+  // Data lifecycle: how long things live, what may not be removed, and what is
+  // on its way out but still recoverable.
+  retention: retentionRouter,
+  legalHolds: legalHoldRouter,
+  trash: trashRouter,
   search: searchRouter,
   users: userRouter,
   me: userStateRouter,

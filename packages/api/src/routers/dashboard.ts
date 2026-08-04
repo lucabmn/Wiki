@@ -5,6 +5,7 @@ import { activity, comment, page } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg } from "../index";
 import { readableSpaceIds } from "../lib/access";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { firstRow } from "../lib/rows";
 import { DashboardOverviewSchema } from "../schemas/misc";
 
@@ -40,7 +41,9 @@ export const dashboardRouter = {
       }
 
       const weekAgo = new Date(Date.now() - WEEK_MS);
-      const inReadableSpace = inArray(page.spaceId, spaceIds);
+      // `spaceIds` already excludes trashed spaces; this drops individually
+      // trashed pages, which would otherwise still be counted.
+      const inReadableSpace = and(inArray(page.spaceId, spaceIds), pageNotTrashed());
       // Comment counts join through page so they inherit the same space scope.
       const commentInReadableSpace = () =>
         context.db

@@ -5,6 +5,7 @@ import { page } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg } from "../index";
 import { assertSpaceRead, readableSpaceIds } from "../lib/access";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { filterReadablePagesAcrossSpaces } from "../lib/authz";
 import { loadSpace } from "../lib/loaders";
 import { SearchHitSchema, SearchInputSchema } from "../schemas/misc";
@@ -57,6 +58,9 @@ export const searchRouter = {
           and(
             inArray(page.spaceId, spaceIds),
             isNull(page.archivedAt),
+            // A page in the trash must not surface in search: it is gone as far
+            // as its readers are concerned, even though the row still exists.
+            pageNotTrashed(),
             // Only published pages are indexed for readers: an unpublished draft
             // must not surface via full-text search (its body isn't visible).
             eq(page.status, "published"),

@@ -523,7 +523,16 @@ export async function loadReadableSpacesAs(
         createdBy: space.createdBy,
       })
       .from(space)
-      .where(and(eq(space.organizationId, organizationId), isNull(space.archivedAt))),
+      // Trashed spaces are excluded here rather than at each call site, so every
+      // cross-space reader built on this helper — search, the activity feed, the
+      // dashboard counters, the digest collector — inherits the rule for free.
+      .where(
+        and(
+          eq(space.organizationId, organizationId),
+          isNull(space.archivedAt),
+          isNull(space.deletedAt),
+        ),
+      ),
     buildSpaceReadFilterAs(db, principal),
   ]);
   return spaces.filter(canRead);

@@ -140,6 +140,13 @@ export async function collectDigest(
         // signal — archiving changes `status` but not this. Authors still hear
         // about their own drafts, so nothing they can act on goes missing.
         or(isNull(activity.pageId), isNotNull(page.publishedAt), eq(page.createdBy, userId)),
+        // Nothing about a page in the trash, not even the deletion itself. The
+        // trash is a staging area: while a page sits in it the deletion is still
+        // reversible, and mailing "Ada deleted X" for something that may be back
+        // tomorrow trains people to ignore the digest. The final removal is
+        // announced as `page.purged`, which carries no page id and so survives
+        // this filter.
+        or(isNull(activity.pageId), isNull(page.deletedAt)),
       ),
     )
     .orderBy(desc(activity.createdAt))
