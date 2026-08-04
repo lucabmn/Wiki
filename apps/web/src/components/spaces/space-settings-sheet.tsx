@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, Download, Globe, Lock, Users } from "lucide-react";
+import { Archive, Check, Download, Globe, Lock, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { MemberAccessManager } from "@/components/access/member-access-manager";
+import {
+  LegalHoldBadge,
+  LegalHoldControl,
+  useHoldStatus,
+} from "@/components/lifecycle/legal-hold-control";
 import { SpaceIconPicker } from "@/components/spaces/space-icon-picker";
+import { SpaceTrashSheet } from "@/components/spaces/space-trash-sheet";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { VISIBILITY_LABEL } from "@/lib/labels";
 import { spaceExportUrl } from "@/lib/space-export";
@@ -62,6 +68,7 @@ export function SpaceSettingsSheet({
   onOpenChange,
   space,
   organizationId,
+  nameOf,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -71,8 +78,11 @@ export function SpaceSettingsSheet({
     visibility: string;
     color: string | null;
     icon: string | null;
+    archivedAt: Date | null;
   };
   organizationId: string;
+  /** Resolves a user id to a display name, for the trash listing. */
+  nameOf: (userId: string | null) => string;
 }) {
   const navigate = useNavigate();
   const invalidateMembers = useInvalidate(orpc.spaceMembers.list.key());
@@ -95,6 +105,10 @@ export function SpaceSettingsSheet({
 
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
+  // Loaded here so the danger zone can explain a refused delete *before* the
+  // click, rather than surfacing a server error afterwards.
+  const holdStatus = useHoldStatus({ spaceId: space.id });
 
   // Draft for the "Allgemein" section; re-seeded from the space each time the
   // sheet opens (and after a save, when the fresh space props arrive).
@@ -157,13 +171,23 @@ export function SpaceSettingsSheet({
     }),
   );
 
+  const restoreSpace = useMutation(
+    orpc.spaces.restore.mutationOptions({
+      onSuccess: () => {
+        invalidateSpaces();
+        toast.success("Space wiederhergestellt");
+      },
+      onError: toastError,
+    }),
+  );
+
   const deleteSpace = useMutation(
     orpc.spaces.delete.mutationOptions({
       onSuccess: () => {
         invalidateSpaces();
         setConfirmDelete(false);
         onOpenChange(false);
-        toast.success("Space gelöscht");
+        toast.success("Space in den Papierkorb verschoben");
         navigate({ to: "/spaces" });
       },
       onError: toastError,
@@ -372,6 +396,40 @@ export function SpaceSettingsSheet({
             </div>
           </section>
 
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <h3 className="text-sm font-semibold">Papierkorb</h3>
+              <p className="text-xs text-muted-foreground">
+                Gelöschte Seiten dieses Spaces, mit Ablaufdatum und Wiederherstellung.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setTrashOpen(true)}>
+              <Trash2 className="size-3.5" />
+              Papierkorb öffnen
+            </Button>
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold">Löschsperre</h3>
+                  <LegalHoldBadge status={holdStatus.data} />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Verhindert jedes Löschen — dieses Space, seiner Seiten, Kommentare, Anhänge und
+                  Protokolleinträge. Auch der Fristablauf greift dann nicht.
+                </p>
+              </div>
+              <LegalHoldControl
+                subject="space"
+                subjectId={space.id}
+                subjectLabel={space.name}
+                status={holdStatus.data}
+              />
+            </div>
+          </section>
+
           {/* Gefahrenzone: der Sheet wird vom Aufrufer nur für Space-Admins
               gerendert (myRole === "admin"), dieselbe Schranke gilt hier. */}
           <section className="space-y-2">
@@ -379,31 +437,51 @@ export function SpaceSettingsSheet({
             <div className="divide-y divide-border rounded-lg border border-destructive/30">
               <div className="flex items-center justify-between gap-3 p-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium">Space archivieren</div>
+                  <div className="text-sm font-medium">
+                    {space.archivedAt ? "Space ist archiviert" : "Space archivieren"}
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Der Space wird ausgeblendet, Seiten bleiben erhalten.
+                    {space.archivedAt
+                      ? "Ausgeblendet, aber vollständig erhalten. Jederzeit wieder aktivierbar."
+                      : "Der Space wird ausgeblendet, Seiten bleiben erhalten."}
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={archiveSpace.isPending}
-                  onClick={() => setConfirmArchive(true)}
-                >
-                  Archivieren
-                </Button>
+                {space.archivedAt ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={restoreSpace.isPending}
+                    onClick={() => restoreSpace.mutate({ id: space.id })}
+                  >
+                    <Archive className="size-3.5" />
+                    {restoreSpace.isPending ? "Aktivieren …" : "Wiederherstellen"}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={archiveSpace.isPending}
+                    onClick={() => setConfirmArchive(true)}
+                  >
+                    Archivieren
+                  </Button>
+                )}
               </div>
               <div className="flex items-center justify-between gap-3 p-3">
                 <div className="min-w-0">
                   <div className="text-sm font-medium">Space löschen</div>
                   <p className="text-xs text-muted-foreground">
-                    Löscht den Space und alle Inhalte dauerhaft.
+                    {holdStatus.data?.held
+                      ? "Nicht möglich: für diesen Space besteht eine Löschsperre."
+                      : "Verschiebt den Space in den Papierkorb. Er bleibt bis zum Ablauf der Frist wiederherstellbar."}
                   </p>
                 </div>
                 <Button
                   variant="destructive"
                   size="sm"
-                  disabled={deleteSpace.isPending}
+                  // Refused server-side anyway; disabling here means the user
+                  // learns why from the line above instead of from an error toast.
+                  disabled={deleteSpace.isPending || holdStatus.data?.held === true}
                   onClick={() => setConfirmDelete(true)}
                 >
                   Löschen
@@ -440,10 +518,11 @@ export function SpaceSettingsSheet({
         <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Space löschen?</AlertDialogTitle>
+              <AlertDialogTitle>Space in den Papierkorb?</AlertDialogTitle>
               <AlertDialogDescription>
-                „{space.name}" wird dauerhaft gelöscht. Alle Seiten in diesem Space werden
-                unwiderruflich gelöscht.
+                „{space.name}" verschwindet mit allen Seiten aus allen Ansichten, bleibt aber bis
+                zum Ablauf der Aufbewahrungsfrist wiederherstellbar. Danach wird er samt Anhängen
+                endgültig gelöscht.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -455,12 +534,20 @@ export function SpaceSettingsSheet({
                   deleteSpace.mutate({ id: space.id });
                 }}
               >
-                {deleteSpace.isPending ? "Löschen …" : "Löschen"}
+                {deleteSpace.isPending ? "Verschieben …" : "In den Papierkorb"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       </SheetContent>
+
+      <SpaceTrashSheet
+        open={trashOpen}
+        onOpenChange={setTrashOpen}
+        spaceId={space.id}
+        spaceName={space.name}
+        nameOf={nameOf}
+      />
     </Sheet>
   );
 }

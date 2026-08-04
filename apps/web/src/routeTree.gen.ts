@@ -35,6 +35,7 @@ import { Route as AuthSettingsNotificationsRouteImport } from './routes/_auth/se
 import { Route as AuthSettingsNotificationDefaultsRouteImport } from './routes/_auth/settings/notification-defaults'
 import { Route as AuthSettingsMembersRouteImport } from './routes/_auth/settings/members'
 import { Route as AuthSettingsGroupsRouteImport } from './routes/_auth/settings/groups'
+import { Route as AuthSettingsDataLifecycleRouteImport } from './routes/_auth/settings/data-lifecycle'
 import { Route as AuthSettingsAppearanceRouteImport } from './routes/_auth/settings/appearance'
 import { Route as AuthPagesIdRouteImport } from './routes/_auth/pages/$id'
 
@@ -170,6 +171,12 @@ const AuthSettingsGroupsRoute = AuthSettingsGroupsRouteImport.update({
   path: '/groups',
   getParentRoute: () => AuthSettingsRouteRoute,
 } as any)
+const AuthSettingsDataLifecycleRoute =
+  AuthSettingsDataLifecycleRouteImport.update({
+    id: '/data-lifecycle',
+    path: '/data-lifecycle',
+    getParentRoute: () => AuthSettingsRouteRoute,
+  } as any)
 const AuthSettingsAppearanceRoute = AuthSettingsAppearanceRouteImport.update({
   id: '/appearance',
   path: '/appearance',
@@ -195,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/auth/two-factor': typeof AuthTwoFactorRoute
   '/pages/$id': typeof AuthPagesIdRoute
   '/settings/appearance': typeof AuthSettingsAppearanceRoute
+  '/settings/data-lifecycle': typeof AuthSettingsDataLifecycleRoute
   '/settings/groups': typeof AuthSettingsGroupsRoute
   '/settings/members': typeof AuthSettingsMembersRoute
   '/settings/notification-defaults': typeof AuthSettingsNotificationDefaultsRoute
@@ -223,6 +231,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthIndexRoute
   '/pages/$id': typeof AuthPagesIdRoute
   '/settings/appearance': typeof AuthSettingsAppearanceRoute
+  '/settings/data-lifecycle': typeof AuthSettingsDataLifecycleRoute
   '/settings/groups': typeof AuthSettingsGroupsRoute
   '/settings/members': typeof AuthSettingsMembersRoute
   '/settings/notification-defaults': typeof AuthSettingsNotificationDefaultsRoute
@@ -254,6 +263,7 @@ export interface FileRoutesById {
   '/_auth/': typeof AuthIndexRoute
   '/_auth/pages/$id': typeof AuthPagesIdRoute
   '/_auth/settings/appearance': typeof AuthSettingsAppearanceRoute
+  '/_auth/settings/data-lifecycle': typeof AuthSettingsDataLifecycleRoute
   '/_auth/settings/groups': typeof AuthSettingsGroupsRoute
   '/_auth/settings/members': typeof AuthSettingsMembersRoute
   '/_auth/settings/notification-defaults': typeof AuthSettingsNotificationDefaultsRoute
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/auth/two-factor'
     | '/pages/$id'
     | '/settings/appearance'
+    | '/settings/data-lifecycle'
     | '/settings/groups'
     | '/settings/members'
     | '/settings/notification-defaults'
@@ -313,6 +324,7 @@ export interface FileRouteTypes {
     | '/'
     | '/pages/$id'
     | '/settings/appearance'
+    | '/settings/data-lifecycle'
     | '/settings/groups'
     | '/settings/members'
     | '/settings/notification-defaults'
@@ -343,6 +355,7 @@ export interface FileRouteTypes {
     | '/_auth/'
     | '/_auth/pages/$id'
     | '/_auth/settings/appearance'
+    | '/_auth/settings/data-lifecycle'
     | '/_auth/settings/groups'
     | '/_auth/settings/members'
     | '/_auth/settings/notification-defaults'
@@ -554,6 +567,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSettingsGroupsRouteImport
       parentRoute: typeof AuthSettingsRouteRoute
     }
+    '/_auth/settings/data-lifecycle': {
+      id: '/_auth/settings/data-lifecycle'
+      path: '/data-lifecycle'
+      fullPath: '/settings/data-lifecycle'
+      preLoaderRoute: typeof AuthSettingsDataLifecycleRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
     '/_auth/settings/appearance': {
       id: '/_auth/settings/appearance'
       path: '/appearance'
@@ -573,6 +593,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthSettingsRouteRouteChildren {
   AuthSettingsAppearanceRoute: typeof AuthSettingsAppearanceRoute
+  AuthSettingsDataLifecycleRoute: typeof AuthSettingsDataLifecycleRoute
   AuthSettingsGroupsRoute: typeof AuthSettingsGroupsRoute
   AuthSettingsMembersRoute: typeof AuthSettingsMembersRoute
   AuthSettingsNotificationDefaultsRoute: typeof AuthSettingsNotificationDefaultsRoute
@@ -587,6 +608,7 @@ interface AuthSettingsRouteRouteChildren {
 
 const AuthSettingsRouteRouteChildren: AuthSettingsRouteRouteChildren = {
   AuthSettingsAppearanceRoute: AuthSettingsAppearanceRoute,
+  AuthSettingsDataLifecycleRoute: AuthSettingsDataLifecycleRoute,
   AuthSettingsGroupsRoute: AuthSettingsGroupsRoute,
   AuthSettingsMembersRoute: AuthSettingsMembersRoute,
   AuthSettingsNotificationDefaultsRoute: AuthSettingsNotificationDefaultsRoute,
