@@ -17,6 +17,9 @@ export const ACTION_LABEL: Record<string, string> = {
   "comment.deleted": "Kommentar gelöscht",
   "attachment.uploaded": "Datei hochgeladen",
   "attachment.deleted": "Datei gelöscht",
+  "organization.two_factor_enabled": "Zwei-Faktor-Pflicht aktiviert",
+  "organization.two_factor_disabled": "Zwei-Faktor-Pflicht deaktiviert",
+  "organization.two_factor_grace_updated": "Zwei-Faktor-Pflicht geändert",
 };
 
 export const STATUS_LABEL: Record<string, string> = {

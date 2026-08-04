@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { createContext, type AuthedContext } from "@nilovon-wiki/api/context";
 import { requireSpaceCapability } from "@nilovon-wiki/api/lib/authz";
 import { getStorage } from "@nilovon-wiki/api/lib/storage";
+import { assertTwoFactorCompliance } from "@nilovon-wiki/api/lib/two-factor-policy";
 import {
   attachment,
   page,
@@ -45,6 +46,10 @@ spaceExportRoutes.get("/spaces/:id", async (c) => {
   if (!authorizationSpace) return c.json({ message: "Space not found" }, 404);
 
   try {
+    // A Space export is the single largest read in the product, and it never
+    // passes through oRPC — so the two-factor policy has to be asked here
+    // explicitly or it would be trivially sidestepped.
+    await assertTwoFactorCompliance(context.db, context.session);
     await requireSpaceCapability(
       context.db,
       authedContext,

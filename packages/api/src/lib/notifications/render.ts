@@ -48,6 +48,22 @@ const ACTION_PHRASES: Record<ActivityAction, { verb: string; noun: string }> = {
   "comment.deleted": { verb: "hat einen Kommentar gelöscht:", noun: "Seite" },
   "attachment.uploaded": { verb: "hat einen Anhang hochgeladen:", noun: "Seite" },
   "attachment.deleted": { verb: "hat einen Anhang gelöscht:", noun: "Seite" },
+  // Security-policy events are audit rows, not content: no digest category maps
+  // to them, so `collectDigest` never selects one. They are spelled out anyway
+  // to keep this map exhaustive — that is what catches the next *content*
+  // action somebody adds to the enum without a phrase for it.
+  "organization.two_factor_enabled": {
+    verb: "hat die Zwei-Faktor-Pflicht aktiviert",
+    noun: "Organisation",
+  },
+  "organization.two_factor_disabled": {
+    verb: "hat die Zwei-Faktor-Pflicht deaktiviert",
+    noun: "Organisation",
+  },
+  "organization.two_factor_grace_updated": {
+    verb: "hat die Zwei-Faktor-Pflicht geändert",
+    noun: "Organisation",
+  },
 };
 
 const UNKNOWN_ACTOR = "Jemand";

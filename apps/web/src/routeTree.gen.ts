@@ -28,6 +28,7 @@ import { Route as AuthUsersIdRouteImport } from './routes/_auth/users/$id'
 import { Route as AuthSpacesSlugRouteImport } from './routes/_auth/spaces/$slug'
 import { Route as AuthSettingsTeamsRouteImport } from './routes/_auth/settings/teams'
 import { Route as AuthSettingsSsoRouteImport } from './routes/_auth/settings/sso'
+import { Route as AuthSettingsSecurityPolicyRouteImport } from './routes/_auth/settings/security-policy'
 import { Route as AuthSettingsSecurityRouteImport } from './routes/_auth/settings/security'
 import { Route as AuthSettingsProfileRouteImport } from './routes/_auth/settings/profile'
 import { Route as AuthSettingsOrganizationRouteImport } from './routes/_auth/settings/organization'
@@ -132,6 +133,12 @@ const AuthSettingsSsoRoute = AuthSettingsSsoRouteImport.update({
   path: '/sso',
   getParentRoute: () => AuthSettingsRouteRoute,
 } as any)
+const AuthSettingsSecurityPolicyRoute =
+  AuthSettingsSecurityPolicyRouteImport.update({
+    id: '/security-policy',
+    path: '/security-policy',
+    getParentRoute: () => AuthSettingsRouteRoute,
+  } as any)
 const AuthSettingsSecurityRoute = AuthSettingsSecurityRouteImport.update({
   id: '/security',
   path: '/security',
@@ -202,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/settings/organization': typeof AuthSettingsOrganizationRoute
   '/settings/profile': typeof AuthSettingsProfileRoute
   '/settings/security': typeof AuthSettingsSecurityRoute
+  '/settings/security-policy': typeof AuthSettingsSecurityPolicyRoute
   '/settings/sso': typeof AuthSettingsSsoRoute
   '/settings/teams': typeof AuthSettingsTeamsRoute
   '/spaces/$slug': typeof AuthSpacesSlugRoute
@@ -230,6 +238,7 @@ export interface FileRoutesByTo {
   '/settings/organization': typeof AuthSettingsOrganizationRoute
   '/settings/profile': typeof AuthSettingsProfileRoute
   '/settings/security': typeof AuthSettingsSecurityRoute
+  '/settings/security-policy': typeof AuthSettingsSecurityPolicyRoute
   '/settings/sso': typeof AuthSettingsSsoRoute
   '/settings/teams': typeof AuthSettingsTeamsRoute
   '/spaces/$slug': typeof AuthSpacesSlugRoute
@@ -261,6 +270,7 @@ export interface FileRoutesById {
   '/_auth/settings/organization': typeof AuthSettingsOrganizationRoute
   '/_auth/settings/profile': typeof AuthSettingsProfileRoute
   '/_auth/settings/security': typeof AuthSettingsSecurityRoute
+  '/_auth/settings/security-policy': typeof AuthSettingsSecurityPolicyRoute
   '/_auth/settings/sso': typeof AuthSettingsSsoRoute
   '/_auth/settings/teams': typeof AuthSettingsTeamsRoute
   '/_auth/spaces/$slug': typeof AuthSpacesSlugRoute
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/settings/profile'
     | '/settings/security'
+    | '/settings/security-policy'
     | '/settings/sso'
     | '/settings/teams'
     | '/spaces/$slug'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/settings/profile'
     | '/settings/security'
+    | '/settings/security-policy'
     | '/settings/sso'
     | '/settings/teams'
     | '/spaces/$slug'
@@ -350,6 +362,7 @@ export interface FileRouteTypes {
     | '/_auth/settings/organization'
     | '/_auth/settings/profile'
     | '/_auth/settings/security'
+    | '/_auth/settings/security-policy'
     | '/_auth/settings/sso'
     | '/_auth/settings/teams'
     | '/_auth/spaces/$slug'
@@ -505,6 +518,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSettingsSsoRouteImport
       parentRoute: typeof AuthSettingsRouteRoute
     }
+    '/_auth/settings/security-policy': {
+      id: '/_auth/settings/security-policy'
+      path: '/security-policy'
+      fullPath: '/settings/security-policy'
+      preLoaderRoute: typeof AuthSettingsSecurityPolicyRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
     '/_auth/settings/security': {
       id: '/_auth/settings/security'
       path: '/security'
@@ -580,6 +600,7 @@ interface AuthSettingsRouteRouteChildren {
   AuthSettingsOrganizationRoute: typeof AuthSettingsOrganizationRoute
   AuthSettingsProfileRoute: typeof AuthSettingsProfileRoute
   AuthSettingsSecurityRoute: typeof AuthSettingsSecurityRoute
+  AuthSettingsSecurityPolicyRoute: typeof AuthSettingsSecurityPolicyRoute
   AuthSettingsSsoRoute: typeof AuthSettingsSsoRoute
   AuthSettingsTeamsRoute: typeof AuthSettingsTeamsRoute
   AuthSettingsIndexRoute: typeof AuthSettingsIndexRoute
@@ -594,6 +615,7 @@ const AuthSettingsRouteRouteChildren: AuthSettingsRouteRouteChildren = {
   AuthSettingsOrganizationRoute: AuthSettingsOrganizationRoute,
   AuthSettingsProfileRoute: AuthSettingsProfileRoute,
   AuthSettingsSecurityRoute: AuthSettingsSecurityRoute,
+  AuthSettingsSecurityPolicyRoute: AuthSettingsSecurityPolicyRoute,
   AuthSettingsSsoRoute: AuthSettingsSsoRoute,
   AuthSettingsTeamsRoute: AuthSettingsTeamsRoute,
   AuthSettingsIndexRoute: AuthSettingsIndexRoute,

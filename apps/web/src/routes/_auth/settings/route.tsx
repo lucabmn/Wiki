@@ -6,6 +6,7 @@ import {
   Fingerprint,
   KeyRound,
   Palette,
+  ShieldAlert,
   ShieldCheck,
   User,
   Users,
@@ -35,6 +36,7 @@ const ORGANIZATION_TABS = [
   { to: "/settings/groups", label: "Gruppen", icon: KeyRound },
   { to: "/settings/teams", label: "Teams", icon: UsersRound },
   { to: "/settings/notification-defaults", label: "Benachrichtigungen", icon: BellRing },
+  { to: "/settings/security-policy", label: "Sicherheit", icon: ShieldAlert },
 ] as const;
 
 /**
