@@ -29,6 +29,12 @@ export const activityAction = wikiSchema.enum("activity_action", [
   "comment.deleted",
   "attachment.uploaded",
   "attachment.deleted",
+  // Webhook configuration is itself auditable. These three are deliberately
+  // *not* deliverable over webhooks (see `enqueueWebhookDeliveries`): a webhook
+  // reporting its own creation would loop, and the row carries the endpoint.
+  "webhook.created",
+  "webhook.updated",
+  "webhook.deleted",
   // Instance-admin events are logged in `admin.admin_audit`, but these two are
   // mirrored here as well: someone whose account was used has a right to see it
   // in their own feed, not only in a log they cannot open.
@@ -37,6 +43,17 @@ export const activityAction = wikiSchema.enum("activity_action", [
 ]);
 
 export const wikiRole = wikiSchema.enum("wiki_role", ["viewer", "commenter", "editor", "admin"]);
+
+/**
+ * Lifecycle of one queued webhook POST. `failed` is terminal — it means the
+ * attempt ceiling ran out, not that a single attempt errored; a retryable
+ * failure stays `pending` with a later `next_attempt_at`.
+ */
+export const webhookDeliveryStatus = wikiSchema.enum("webhook_delivery_status", [
+  "pending",
+  "delivered",
+  "failed",
+]);
 
 // ── Bundled ("digest") notifications ────────────────────────────────────────
 

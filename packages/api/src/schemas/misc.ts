@@ -21,6 +21,10 @@ export const ActivityActionSchema = z.enum([
   "comment.deleted",
   "attachment.uploaded",
   "attachment.deleted",
+  // Auditable, but never delivered to a webhook — see `lib/webhooks/events.ts`.
+  "webhook.created",
+  "webhook.updated",
+  "webhook.deleted",
   // Mirrored from the instance audit log so the impersonated account sees, in
   // its own feed, that somebody signed in as them. Carries no digest category —
   // `categoryForAction` drops it, which keeps it out of summary mails.

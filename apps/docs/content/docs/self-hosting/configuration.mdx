@@ -45,6 +45,51 @@ For `pnpm dev`, each app reads its own file.
 | `APP_NAME`                               | no       | Display name used by auth flows (white-labeling)    |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_AUTH_MAX` | no       | Per-IP requests/minute for the API / auth routes    |
 | `RATE_LIMIT_SCIM_MAX`                    | no       | Per-IP requests/minute for SCIM (default `1200`)    |
+| `INTERNAL_RUN_TOKEN`                     | no       | Bearer token for the `/internal` runner endpoints   |
+
+<Callout type="info">
+  `INTERNAL_RUN_TOKEN` replaces the digest-specific `DIGEST_RUN_TOKEN`, which still works as an
+  alias — existing deployments need no change. One token opens every `POST /internal/…/run`
+  endpoint; unset leaves them all disabled.
+</Callout>
+
+### Instance administration
+
+The admin console at `/admin` is gated on an **instance role** stored in
+`user.role`. Nothing sets that role at registration, so on a fresh install
+nobody can open it — `INITIAL_ADMIN_EMAIL` is what breaks the chicken-and-egg.
+
+| Variable                    | Required | Description                                                         |
+| --------------------------- | -------- | ------------------------------------------------------------------- |
+| `INITIAL_ADMIN_EMAIL`       | no\*     | Promoted to instance admin at start **and** at registration         |
+| `IMPERSONATION_ENABLED`     | no       | Support impersonation (default `true`); `false` refuses it entirely |
+| `IMPERSONATION_MAX_MINUTES` | no       | How long an impersonated session survives on its own (default `30`) |
+| `APP_VERSION`               | no       | Reported in the instance overview (default `dev`; compose sets it)  |
+| `COLLAB_INTERNAL_URL`       | no       | Where the server reaches collab for its reachability probe          |
+
+\* Not required by the schema, but without it the console is unreachable on a
+fresh install. Further admins are appointed inside it; the last remaining one
+cannot be demoted, banned or deleted.
+
+<Callout type="info">
+  Instance admin is **not** org admin. It operates the deployment and is not a member of any
+  organization; an org owner has no rights in the console. The console shows metadata only — reading
+  wiki content requires impersonation, which is audited on both ends and mirrored into the affected
+  person's own activity feed. Set `IMPERSONATION_ENABLED=false` where that capability has to be
+  provably absent rather than merely logged.
+</Callout>
+
+### Outbound webhooks
+
+See [Webhooks](/docs/concepts/webhooks) for the payload and signature contract.
+
+| Variable                      | Required | Description                                                        |
+| ----------------------------- | -------- | ------------------------------------------------------------------ |
+| `WEBHOOK_SCHEDULER_ENABLED`   | no       | In-process runner (default `true`); off for serverless/cron setups |
+| `WEBHOOK_TICK_SECONDS`        | no       | How often the runner looks for queued deliveries (default `30`)    |
+| `WEBHOOK_TIMEOUT_SECONDS`     | no       | Per-request timeout (default `10`)                                 |
+| `WEBHOOK_MAX_ATTEMPTS`        | no       | Attempts before a delivery is marked failed (default `6`)          |
+| `WEBHOOK_ALLOW_PRIVATE_HOSTS` | no       | Allow endpoints on the internal network (default `false`)          |
 
 ### `apps/collab/.env`
 

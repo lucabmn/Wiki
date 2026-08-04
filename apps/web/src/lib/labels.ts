@@ -17,6 +17,9 @@ export const ACTION_LABEL: Record<string, string> = {
   "comment.deleted": "Kommentar gelöscht",
   "attachment.uploaded": "Datei hochgeladen",
   "attachment.deleted": "Datei gelöscht",
+  "webhook.created": "Webhook angelegt",
+  "webhook.updated": "Webhook geändert",
+  "webhook.deleted": "Webhook entfernt",
 };
 
 export const STATUS_LABEL: Record<string, string> = {

@@ -94,9 +94,41 @@ export const env = createEnv({
     // How often the ticker looks for due digests. Sub-minute granularity buys
     // nothing for a daily mail, and every tick is a database round-trip.
     DIGEST_TICK_SECONDS: z.coerce.number().int().min(30).default(300),
-    // Bearer token for POST /internal/digests/run. Unset leaves the endpoint
-    // disabled — an unauthenticated trigger would let anyone drain the queue.
+    // Legacy alias of INTERNAL_RUN_TOKEN below, kept working so existing
+    // deployments keep triggering digests after an update. Prefer the new name.
     DIGEST_RUN_TOKEN: z.string().min(16).optional(),
+
+    // ── Machine-triggered runners (/internal/**) ────────────────────────────
+    // Bearer token for every POST /internal/*/run endpoint. Unset leaves them
+    // disabled — an unauthenticated trigger would let anyone drain a queue.
+    INTERNAL_RUN_TOKEN: z.string().min(16).optional(),
+
+    // ── Outbound webhooks ───────────────────────────────────────────────────
+    // Same trade-off as the digest ticker: on for the long-lived container,
+    // off where an external scheduler owns the cadence. The runner claims its
+    // work in the database, so both triggers may be active at once.
+    WEBHOOK_SCHEDULER_ENABLED: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
+    // Webhooks are near-real-time by expectation, so this ticks far more often
+    // than the digest runner. Each tick is one indexed query when idle.
+    WEBHOOK_TICK_SECONDS: z.coerce.number().int().min(5).default(30),
+    // Per-request ceiling. A receiver that accepts the connection and then
+    // stalls must not hold the batch — this is what bounds a run's worst case.
+    WEBHOOK_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(60).default(10),
+    // Attempts before a delivery is given up on as `failed`. The backoff starts
+    // at a minute and doubles, so the default spans a good half hour.
+    WEBHOOK_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(6),
+    // On a multi-tenant instance an org admin pointing a webhook at
+    // `http://localhost:5432` or a cloud metadata IP is a privilege escalation,
+    // so private, loopback and link-local targets are refused by default. Turn
+    // this on for a single-tenant install whose receiver (n8n, a compose
+    // sidecar) genuinely lives on the internal network.
+    WEBHOOK_ALLOW_PRIVATE_HOSTS: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
 
     // ── Object storage (S3-compatible: RustFS, MinIO, AWS S3, …) ────────────
     // Optional for the same reason: attachments stay disabled until configured.
@@ -119,3 +151,13 @@ export const env = createEnv({
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: true,
 });
+
+/**
+ * The shared secret guarding the `/internal` runner endpoints.
+ *
+ * The token was originally digest-specific (`DIGEST_RUN_TOKEN`), which stopped
+ * fitting once a second runner needed the same door. The new name wins where
+ * both are set; the old one keeps working so an existing deployment's scheduler
+ * does not start getting 401s after an update.
+ */
+export const internalRunToken: string | undefined = env.INTERNAL_RUN_TOKEN ?? env.DIGEST_RUN_TOKEN;

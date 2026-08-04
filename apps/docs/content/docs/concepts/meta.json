@@ -9,6 +9,7 @@
     "comments",
     "search",
     "activity-log",
+    "webhooks",
     "collaboration"
   ]
 }

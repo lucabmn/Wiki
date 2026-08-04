@@ -28,6 +28,7 @@ import { Route as AuthSettingsIndexRouteImport } from './routes/_auth/settings/i
 import { Route as AuthAdminIndexRouteImport } from './routes/_auth/admin/index'
 import { Route as AuthUsersIdRouteImport } from './routes/_auth/users/$id'
 import { Route as AuthSpacesSlugRouteImport } from './routes/_auth/spaces/$slug'
+import { Route as AuthSettingsWebhooksRouteImport } from './routes/_auth/settings/webhooks'
 import { Route as AuthSettingsTeamsRouteImport } from './routes/_auth/settings/teams'
 import { Route as AuthSettingsSsoRouteImport } from './routes/_auth/settings/sso'
 import { Route as AuthSettingsSecurityRouteImport } from './routes/_auth/settings/security'
@@ -138,6 +139,11 @@ const AuthSpacesSlugRoute = AuthSpacesSlugRouteImport.update({
   id: '/spaces/$slug',
   path: '/spaces/$slug',
   getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthSettingsWebhooksRoute = AuthSettingsWebhooksRouteImport.update({
+  id: '/webhooks',
+  path: '/webhooks',
+  getParentRoute: () => AuthSettingsRouteRoute,
 } as any)
 const AuthSettingsTeamsRoute = AuthSettingsTeamsRouteImport.update({
   id: '/teams',
@@ -250,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/settings/security': typeof AuthSettingsSecurityRoute
   '/settings/sso': typeof AuthSettingsSsoRoute
   '/settings/teams': typeof AuthSettingsTeamsRoute
+  '/settings/webhooks': typeof AuthSettingsWebhooksRoute
   '/spaces/$slug': typeof AuthSpacesSlugRoute
   '/users/$id': typeof AuthUsersIdRoute
   '/admin/': typeof AuthAdminIndexRoute
@@ -284,6 +291,7 @@ export interface FileRoutesByTo {
   '/settings/security': typeof AuthSettingsSecurityRoute
   '/settings/sso': typeof AuthSettingsSsoRoute
   '/settings/teams': typeof AuthSettingsTeamsRoute
+  '/settings/webhooks': typeof AuthSettingsWebhooksRoute
   '/spaces/$slug': typeof AuthSpacesSlugRoute
   '/users/$id': typeof AuthUsersIdRoute
   '/admin': typeof AuthAdminIndexRoute
@@ -322,6 +330,7 @@ export interface FileRoutesById {
   '/_auth/settings/security': typeof AuthSettingsSecurityRoute
   '/_auth/settings/sso': typeof AuthSettingsSsoRoute
   '/_auth/settings/teams': typeof AuthSettingsTeamsRoute
+  '/_auth/settings/webhooks': typeof AuthSettingsWebhooksRoute
   '/_auth/spaces/$slug': typeof AuthSpacesSlugRoute
   '/_auth/users/$id': typeof AuthUsersIdRoute
   '/_auth/admin/': typeof AuthAdminIndexRoute
@@ -360,6 +369,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/settings/sso'
     | '/settings/teams'
+    | '/settings/webhooks'
     | '/spaces/$slug'
     | '/users/$id'
     | '/admin/'
@@ -394,6 +404,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/settings/sso'
     | '/settings/teams'
+    | '/settings/webhooks'
     | '/spaces/$slug'
     | '/users/$id'
     | '/admin'
@@ -431,6 +442,7 @@ export interface FileRouteTypes {
     | '/_auth/settings/security'
     | '/_auth/settings/sso'
     | '/_auth/settings/teams'
+    | '/_auth/settings/webhooks'
     | '/_auth/spaces/$slug'
     | '/_auth/users/$id'
     | '/_auth/admin/'
@@ -589,6 +601,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSpacesSlugRouteImport
       parentRoute: typeof AuthRouteRoute
     }
+    '/_auth/settings/webhooks': {
+      id: '/_auth/settings/webhooks'
+      path: '/webhooks'
+      fullPath: '/settings/webhooks'
+      preLoaderRoute: typeof AuthSettingsWebhooksRouteImport
+      parentRoute: typeof AuthSettingsRouteRoute
+    }
     '/_auth/settings/teams': {
       id: '/_auth/settings/teams'
       path: '/teams'
@@ -738,6 +757,7 @@ interface AuthSettingsRouteRouteChildren {
   AuthSettingsSecurityRoute: typeof AuthSettingsSecurityRoute
   AuthSettingsSsoRoute: typeof AuthSettingsSsoRoute
   AuthSettingsTeamsRoute: typeof AuthSettingsTeamsRoute
+  AuthSettingsWebhooksRoute: typeof AuthSettingsWebhooksRoute
   AuthSettingsIndexRoute: typeof AuthSettingsIndexRoute
 }
 
@@ -752,6 +772,7 @@ const AuthSettingsRouteRouteChildren: AuthSettingsRouteRouteChildren = {
   AuthSettingsSecurityRoute: AuthSettingsSecurityRoute,
   AuthSettingsSsoRoute: AuthSettingsSsoRoute,
   AuthSettingsTeamsRoute: AuthSettingsTeamsRoute,
+  AuthSettingsWebhooksRoute: AuthSettingsWebhooksRoute,
   AuthSettingsIndexRoute: AuthSettingsIndexRoute,
 }
 
