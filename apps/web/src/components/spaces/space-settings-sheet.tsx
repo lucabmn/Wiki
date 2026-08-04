@@ -8,7 +8,13 @@ import { MemberAccessManager } from "@/components/access/member-access-manager";
 import { SpaceIconPicker } from "@/components/spaces/space-icon-picker";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { VISIBILITY_LABEL } from "@/lib/labels";
-import { spaceExportUrl } from "@/lib/space-export";
+import {
+  EXPORT_FORMAT_HINT,
+  EXPORT_FORMAT_LABEL,
+  EXPORT_FORMATS,
+  spaceExportUrl,
+  startExportDownload,
+} from "@/lib/space-export";
 import { env } from "@nilovon-wiki/env/web";
 import { membersQueryOptions, rolesQueryOptions } from "@/lib/org-queries";
 import { toastError, useInvalidate } from "@/lib/query";
@@ -352,21 +358,30 @@ export function SpaceSettingsSheet({
               <h3 className="text-sm font-semibold">Datenexport</h3>
               <p className="text-xs text-muted-foreground">
                 Lädt Seiten, Hierarchie, Tags, Metadaten und Attachments als portables ZIP-Archiv.
+                PDFs enthalten ihre Bilder und sind sofort lesbar.
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {(["markdown", "html", "json"] as const).map((format) => (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {EXPORT_FORMATS.map((format) => (
                 <Button
                   key={format}
                   type="button"
                   variant="outline"
-                  size="sm"
+                  className="h-auto justify-start gap-2.5 px-3 py-2 text-left"
                   onClick={() => {
-                    window.location.assign(spaceExportUrl(env.VITE_SERVER_URL, space.id, format));
+                    startExportDownload(spaceExportUrl(env.VITE_SERVER_URL, space.id, format));
+                    toast.success(`${EXPORT_FORMAT_LABEL[format]}-Export wird erstellt …`);
                   }}
                 >
-                  <Download className="size-3.5" />
-                  {format === "markdown" ? "Markdown" : format.toUpperCase()}
+                  <Download className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0">
+                    <span className="block text-sm leading-tight font-medium">
+                      {EXPORT_FORMAT_LABEL[format]}
+                    </span>
+                    <span className="block truncate text-xs font-normal text-muted-foreground">
+                      {EXPORT_FORMAT_HINT[format]}
+                    </span>
+                  </span>
                 </Button>
               ))}
             </div>
