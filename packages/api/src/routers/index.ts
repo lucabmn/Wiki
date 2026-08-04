@@ -7,6 +7,7 @@ import { attachmentRouter } from "./attachment";
 import { commentRouter } from "./comment";
 import { dashboardRouter } from "./dashboard";
 import { externalLinkRouter } from "./external-link";
+import { inboxRouter } from "./inbox";
 import { legalHoldRouter } from "./legal-hold";
 import { linkRouter } from "./link";
 import { notificationRouter } from "./notification";
@@ -46,6 +47,7 @@ export const appRouter = {
   externalLinks: externalLinkRouter,
   activity: activityRouter,
   notifications: notificationRouter,
+  inbox: inboxRouter,
   webhooks: webhookRouter,
   // Data lifecycle: how long things live, what may not be removed, and what is
   // on its way out but still recoverable.

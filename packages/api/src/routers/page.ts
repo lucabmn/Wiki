@@ -14,6 +14,7 @@ import { COLLAB_TOKEN_TTL_SECONDS, collabDocName, signCollabToken } from "../lib
 import { generateKeyBetween } from "../lib/fractional";
 import { pageNotTrashed } from "../lib/lifecycle";
 import { loadPage, loadSpace } from "../lib/loaders";
+import { announcePageMentions } from "../lib/notifications/sources";
 import { extractPageLinks, syncPageLinks } from "../lib/page-links";
 import { assertPageDeletable, pageSubtreeIds } from "../lib/retention/holds";
 import { mapUniqueViolation } from "../lib/pg-errors";
@@ -681,7 +682,7 @@ export const pageRouter = {
 
       // uniqueSlug pre-checks, but two concurrent creates can both pass it and
       // then collide on `page_space_slug_uq`; map that race to a 409, not a 500.
-      return mapUniqueViolation(
+      const created = await mapUniqueViolation(
         () =>
           context.db.transaction(async (tx) => {
             const rows = await tx
@@ -717,6 +718,13 @@ export const pageRouter = {
           }),
         "A page with this slug already exists in the space",
       );
+      await announcePageMentions(context.db, {
+        organizationId,
+        page: created,
+        content: input.content ?? null,
+        actorId: userId,
+      });
+      return created;
     }),
 
   update: protectedProcedure
@@ -794,7 +802,7 @@ export const pageRouter = {
       const nextTitle = input.title?.trim() || existing.title;
       const nextContent = input.content !== undefined ? input.content : existing.content;
       const nextText = input.textContent !== undefined ? input.textContent : existing.textContent;
-      return context.db.transaction(async (tx) => {
+      const published = await context.db.transaction(async (tx) => {
         const latest = await tx.query.pageRevision.findFirst({
           where: eq(pageRevision.pageId, existing.id),
           orderBy: [desc(pageRevision.version)],
@@ -854,6 +862,16 @@ export const pageRouter = {
         });
         return row;
       });
+      // Publish is where a page body becomes readable content — the collab
+      // server only ever persists the Yjs snapshot — so it is also the point
+      // where a mention written in the editor takes effect.
+      await announcePageMentions(context.db, {
+        organizationId,
+        page: published,
+        content: nextContent,
+        actorId: userId,
+      });
+      return published;
     }),
 
   move: protectedProcedure
@@ -1081,7 +1099,7 @@ export const pageRouter = {
       if (!revision) {
         throw new ORPCError("NOT_FOUND", { message: "Revision not found" });
       }
-      return context.db.transaction(async (tx) => {
+      const restored = await context.db.transaction(async (tx) => {
         const rows = await tx
           .update(page)
           .set({
@@ -1112,6 +1130,15 @@ export const pageRouter = {
         });
         return row;
       });
+      // A restore can bring a removed mention back. That is a new mention of
+      // that person as far as they are concerned, and the diff treats it as one.
+      await announcePageMentions(context.db, {
+        organizationId,
+        page: restored,
+        content: revision.content,
+        actorId: context.session.user.id,
+      });
+      return restored;
     }),
 
   collabToken: protectedProcedure
