@@ -40,7 +40,10 @@ export const dashboardRouter = {
       }
 
       const weekAgo = new Date(Date.now() - WEEK_MS);
-      const inReadableSpace = inArray(page.spaceId, spaceIds);
+      // Templates never count: "142 Seiten" should be the wiki's size, not the
+      // size of the wiki plus its stationery drawer. The comment counts join
+      // through page, so the same predicate keeps template comments out too.
+      const inReadableSpace = and(inArray(page.spaceId, spaceIds), eq(page.isTemplate, false));
       // Comment counts join through page so they inherit the same space scope.
       const commentInReadableSpace = () =>
         context.db

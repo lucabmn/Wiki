@@ -34,7 +34,15 @@ export const linkRouter = {
         .innerJoin(page, eq(pageLink.sourcePageId, page.id))
         // A backlink is only real once the linking page is published — an
         // unpublished draft's links must not surface as incoming references.
-        .where(and(eq(pageLink.targetPageId, input.id), eq(page.status, "published")))
+        // Templates are excluded for the same reason they are hidden elsewhere:
+        // "3 Seiten verlinken hierher" must not count a blank form.
+        .where(
+          and(
+            eq(pageLink.targetPageId, input.id),
+            eq(page.status, "published"),
+            eq(page.isTemplate, false),
+          ),
+        )
         .orderBy(asc(page.title));
       // Linked pages live in the same space; hide any the caller can't read.
       return filterReadablePages(
@@ -64,7 +72,7 @@ export const linkRouter = {
         .select({ page })
         .from(pageLink)
         .innerJoin(page, eq(pageLink.targetPageId, page.id))
-        .where(eq(pageLink.sourcePageId, input.id))
+        .where(and(eq(pageLink.sourcePageId, input.id), eq(page.isTemplate, false)))
         .orderBy(asc(page.title));
       return filterReadablePages(
         context.db,
