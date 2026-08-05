@@ -18,6 +18,7 @@ import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { attachmentRoutes } from "./attachments";
 import { digestRoutes, startDigestScheduler, stopDigestScheduler } from "./digests";
+import { pageExportRoutes } from "./page-exports";
 import { rateLimit } from "./rate-limit";
 import { retentionRoutes, startRetentionScheduler, stopRetentionScheduler } from "./retention";
 import { spaceExportRoutes } from "./space-exports";
@@ -111,6 +112,7 @@ app.on(["POST", "GET", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.han
 // outside oRPC because their response bodies are files rather than JSON.
 app.route("/attachments", attachmentRoutes);
 app.route("/exports", spaceExportRoutes);
+app.route("/exports", pageExportRoutes);
 
 // Machine-triggered maintenance work. Guarded by a shared secret rather than a
 // session, and rate-limited like the rest of the API so a leaked token cannot

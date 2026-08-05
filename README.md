@@ -216,19 +216,20 @@ For local development (`pnpm dev`), each app reads its own `.env` file instead:
 
 **`apps/server/.env`**
 
-| Variable                                 | Required | Description                                         |
-| ---------------------------------------- | -------- | --------------------------------------------------- |
-| `DATABASE_URL`                           | yes      | PostgreSQL connection string                        |
-| `BETTER_AUTH_SECRET`                     | yes      | Auth signing secret (min 32 chars, no placeholders) |
-| `BETTER_AUTH_URL`                        | yes      | Public URL of the server                            |
-| `CORS_ORIGIN`                            | yes      | Allowed origin of the web app                       |
-| `NODE_ENV`                               | no       | `development` (default) / `production` / `test`     |
-| `APP_NAME`                               | no       | Display name used by auth flows (white-labeling)    |
-| `RATE_LIMIT_MAX` / `RATE_LIMIT_AUTH_MAX` | no       | Per-IP requests/minute for the API / auth routes    |
-| `RATE_LIMIT_SCIM_MAX`                    | no       | Per-IP requests/minute for SCIM (default `1200`)    |
-| `SMTP_*`                                 | no       | SMTP delivery; unset `SMTP_HOST` disables delivery  |
-| `S3_*`                                   | no       | S3-compatible attachment storage                    |
-| `ATTACHMENT_MAX_MB`                      | no       | Per-file upload ceiling (default 25)                |
+| Variable                                 | Required | Description                                            |
+| ---------------------------------------- | -------- | ------------------------------------------------------ |
+| `DATABASE_URL`                           | yes      | PostgreSQL connection string                           |
+| `BETTER_AUTH_SECRET`                     | yes      | Auth signing secret (min 32 chars, no placeholders)    |
+| `BETTER_AUTH_URL`                        | yes      | Public URL of the server                               |
+| `CORS_ORIGIN`                            | yes      | Allowed origin of the web app                          |
+| `NODE_ENV`                               | no       | `development` (default) / `production` / `test`        |
+| `APP_NAME`                               | no       | Display name used by auth flows (white-labeling)       |
+| `RATE_LIMIT_MAX` / `RATE_LIMIT_AUTH_MAX` | no       | Per-IP requests/minute for the API / auth routes       |
+| `RATE_LIMIT_SCIM_MAX`                    | no       | Per-IP requests/minute for SCIM (default `1200`)       |
+| `SMTP_*`                                 | no       | SMTP delivery; unset `SMTP_HOST` disables delivery     |
+| `S3_*`                                   | no       | S3-compatible attachment storage                       |
+| `ATTACHMENT_MAX_MB`                      | no       | Per-file upload ceiling (default 25)                   |
+| `PDF_EXPORT_*`                           | no       | Ceilings for PDF exports (see `docs/export-format.md`) |
 
 **`apps/collab/.env`**
 

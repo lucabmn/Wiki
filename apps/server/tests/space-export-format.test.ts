@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   documentToHtml,
-  documentToMarkdown,
   normalizeDocument,
   rewriteDocumentUrls,
   safeArchiveName,
 } from "../src/space-export-format";
+import { documentToMarkdown } from "../src/space-export-markdown";
 
 const document = {
   type: "doc",

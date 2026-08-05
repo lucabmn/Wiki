@@ -1,6 +1,12 @@
 import { UserLink } from "@/components/user-link";
 import { STATUS_LABEL } from "@/lib/labels";
 import { scrollIntoPageView } from "@/lib/scroll";
+import {
+  EXPORT_FORMAT_LABEL,
+  EXPORT_FORMATS,
+  pageExportUrl,
+  startExportDownload,
+} from "@/lib/space-export";
 import { orpc } from "@/utils/orpc";
 import type { Page } from "@nilovon-wiki/api/schemas/page";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
@@ -8,13 +14,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@nilovon-wiki/ui/components/dropdown-menu";
 import { Separator } from "@nilovon-wiki/ui/components/separator";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
+import { env } from "@nilovon-wiki/env/web";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { FileText, History, Link2, MessageSquare, Printer, Share2 } from "lucide-react";
+import { Download, FileText, History, Link2, MessageSquare, Printer, Share2 } from "lucide-react";
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -92,7 +103,7 @@ export function PageAside({
           label={`${commentCount} ${commentCount === 1 ? "Kommentar" : "Kommentare"}`}
           onClick={onJumpToComments}
         />
-        <ShareMenu />
+        <ShareMenu pageId={page.id} />
       </div>
 
       <Separator />
@@ -190,7 +201,7 @@ function ActionRow({
   );
 }
 
-function ShareMenu() {
+function ShareMenu({ pageId }: { pageId: string }) {
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -236,8 +247,35 @@ function ShareMenu() {
         <DropdownMenuItem onClick={copyLink}>
           <Link2 className="size-4" /> {copied ? "Link kopiert" : "Link kopieren"}
         </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            startExportDownload(pageExportUrl(env.VITE_SERVER_URL, pageId, "pdf"));
+            toast.success("PDF wird erstellt …");
+          }}
+        >
+          <Download className="size-4" /> Als PDF herunterladen
+        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <FileText className="size-4" /> Weitere Formate
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {EXPORT_FORMATS.filter((format) => format !== "pdf").map((format) => (
+              <DropdownMenuItem
+                key={format}
+                onClick={() => {
+                  startExportDownload(pageExportUrl(env.VITE_SERVER_URL, pageId, format));
+                  toast.success(`${EXPORT_FORMAT_LABEL[format]}-Export wird erstellt …`);
+                }}
+              >
+                <Download className="size-4" /> {EXPORT_FORMAT_LABEL[format]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => window.print()}>
-          <Printer className="size-4" /> Drucken / PDF
+          <Printer className="size-4" /> Drucken
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

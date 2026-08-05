@@ -446,6 +446,24 @@ Limits you own after this:
   `wss://<project>.vercel.app/api` and rebuild web.
 - Every cross-instance edit takes a Redis round trip.
 
+## PDF export
+
+PDF exports need no extra service: they are rendered inside the API process, so
+there is no headless browser, no additional container and no change to the
+Compose file or the installer. The cost lands on the API's CPU instead, bounded
+by three optional variables:
+
+```env
+PDF_EXPORT_MAX_PAGES=500         # pages rendered per Space export
+PDF_EXPORT_PAGE_TIMEOUT_MS=15000 # wall-clock budget per page
+PDF_EXPORT_IMAGE_CACHE_MB=64     # per-export image cache ceiling
+```
+
+Pages render one at a time, so peak memory stays at roughly one page regardless
+of Space size. Raise `PDF_EXPORT_MAX_PAGES` if your largest Space exceeds it —
+pages past the ceiling are not dropped, but they do come out as placeholders.
+See `docs/export-format.md`.
+
 ## Health & monitoring
 
 - `GET http://<api>/health` — deep health check (verifies database

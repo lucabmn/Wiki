@@ -163,6 +163,19 @@ export const env = createEnv({
     // Per-file upload ceiling. Uploads proxy through this process, so the limit
     // also bounds how much one request can make the server buffer.
     ATTACHMENT_MAX_MB: z.coerce.number().int().positive().default(25),
+
+    // ── PDF export ──────────────────────────────────────────────────────────
+    // PDFs are rendered in-process (no headless browser, see
+    // `docs/export-format.md`), which keeps the image small but puts the work
+    // on the API's CPU. These ceilings bound what one export request can cost.
+    // Nothing is dropped silently: pages beyond the ceiling and pages that time
+    // out still get a file in the archive explaining why.
+    PDF_EXPORT_MAX_PAGES: z.coerce.number().int().positive().default(500),
+    PDF_EXPORT_PAGE_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
+    // Ceiling for the per-export image cache. A logo repeated on every page is
+    // fetched once; beyond this the cache stops growing rather than holding a
+    // whole Space's images in memory.
+    PDF_EXPORT_IMAGE_CACHE_MB: z.coerce.number().int().positive().default(64),
   },
   runtimeEnv: process.env,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
