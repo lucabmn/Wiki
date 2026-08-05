@@ -13,8 +13,10 @@ import { notificationRouter } from "./notification";
 import { onboardingRouter } from "./onboarding";
 import { pageRouter } from "./page";
 import { pageAccessRouter } from "./page-access";
+import { pageTemplateRouter } from "./page-template";
 import { retentionRouter } from "./retention";
 import { searchRouter } from "./search";
+import { securityPolicyRouter } from "./security-policy";
 import { spaceRouter } from "./space";
 import { spaceMemberRouter } from "./space-member";
 import { tagRouter } from "./tag";
@@ -37,7 +39,9 @@ export const appRouter = {
   admin: adminRouter,
   spaces: spaceRouter,
   spaceMembers: spaceMemberRouter,
-  pages: pageRouter,
+  // Template procedures live in their own module but share the `pages` surface
+  // — they operate on the same rows and read as `pages.listTemplates` clients.
+  pages: { ...pageRouter, ...pageTemplateRouter },
   pageAccess: pageAccessRouter,
   comments: commentRouter,
   tags: tagRouter,
@@ -53,6 +57,7 @@ export const appRouter = {
   legalHolds: legalHoldRouter,
   trash: trashRouter,
   search: searchRouter,
+  securityPolicy: securityPolicyRouter,
   users: userRouter,
   me: userStateRouter,
   onboarding: onboardingRouter,

@@ -1,8 +1,7 @@
 import { ORPCError } from "@orpc/server";
-import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { Database } from "@nilovon-wiki/db";
 import { attachment, page, pageRevision } from "@nilovon-wiki/db/schema/index";
 import { env } from "@nilovon-wiki/env/server";
 
@@ -15,6 +14,13 @@ import { generateKeyBetween } from "../lib/fractional";
 import { pageNotTrashed } from "../lib/lifecycle";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { extractPageLinks, syncPageLinks } from "../lib/page-links";
+import {
+  assertNoCycle,
+  assertParentInSpace,
+  positionAtEnd,
+  positionForMove,
+  siblingsOf,
+} from "../lib/page-tree";
 import { assertPageDeletable, pageSubtreeIds } from "../lib/retention/holds";
 import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
@@ -35,106 +41,6 @@ import {
 import { IdSchema } from "../schemas/shared";
 
 const TAGS = ["Pages"];
-
-/** Sibling scope predicate: same space, same parent (null-aware). */
-function siblingsOf(spaceId: string, parentId: string | null) {
-  return and(
-    eq(page.spaceId, spaceId),
-    parentId === null ? isNull(page.parentId) : eq(page.parentId, parentId),
-  );
-}
-
-/** Position at the end of a sibling list (after the last child). */
-async function positionAtEnd(
-  db: Database,
-  spaceId: string,
-  parentId: string | null,
-  excludeId?: string,
-): Promise<string> {
-  const last = await db.query.page.findFirst({
-    where: excludeId
-      ? and(siblingsOf(spaceId, parentId), sql`${page.id} <> ${excludeId}`)
-      : siblingsOf(spaceId, parentId),
-    orderBy: [desc(page.position)],
-    columns: { position: true },
-  });
-  return generateKeyBetween(last?.position ?? null, null);
-}
-
-/**
- * Ensures a requested parent page exists in `spaceId`. Without this, a
- * client-supplied `parentId` could point into another space (or another org's
- * space), corrupting the tree and doubling as a page-existence oracle.
- */
-async function assertParentInSpace(
-  db: Database,
-  parentId: string | null,
-  spaceId: string,
-): Promise<void> {
-  if (!parentId) return;
-  const parent = await db.query.page.findFirst({
-    where: eq(page.id, parentId),
-    columns: { spaceId: true },
-  });
-  if (!parent || parent.spaceId !== spaceId) {
-    throw new ORPCError("BAD_REQUEST", { message: "Parent page is not in this space" });
-  }
-}
-
-/**
- * Walks the ancestor chain of `parentId` to ensure `movedId` is not among its
- * ancestors — otherwise the move would create a cycle in the page tree.
- */
-async function assertNoCycle(
-  db: Database,
-  movedId: string,
-  parentId: string | null,
-): Promise<void> {
-  let cursor = parentId;
-  while (cursor) {
-    if (cursor === movedId) {
-      throw new ORPCError("BAD_REQUEST", {
-        message: "Cannot move a page underneath itself",
-      });
-    }
-    const parent = await db.query.page.findFirst({
-      where: eq(page.id, cursor),
-      columns: { parentId: true },
-    });
-    cursor = parent?.parentId ?? null;
-  }
-}
-
-/** Resolves a reorder request into a fractional position within the parent. */
-async function positionForMove(
-  db: Database,
-  spaceId: string,
-  parentId: string | null,
-  movedId: string,
-  beforeId?: string,
-  afterId?: string,
-): Promise<string> {
-  const not = sql`${page.id} <> ${movedId}`;
-  if (afterId) {
-    const anchor = await loadPage(db, afterId);
-    const next = await db.query.page.findFirst({
-      where: and(siblingsOf(spaceId, parentId), gt(page.position, anchor.position), not),
-      orderBy: [asc(page.position)],
-      columns: { position: true },
-    });
-    return generateKeyBetween(anchor.position, next?.position ?? null);
-  }
-  if (beforeId) {
-    const anchor = await loadPage(db, beforeId);
-    const prev = await db.query.page.findFirst({
-      where: and(siblingsOf(spaceId, parentId), lt(page.position, anchor.position), not),
-      orderBy: [desc(page.position)],
-      columns: { position: true },
-    });
-    return generateKeyBetween(prev?.position ?? null, anchor.position);
-  }
-  return positionAtEnd(db, spaceId, parentId, movedId);
-}
 
 const IMPORT_NODE_TYPES = new Set([
   "doc",
@@ -392,6 +298,9 @@ export const pageRouter = {
               : eq(page.parentId, input.parentId),
           input.status ? eq(page.status, input.status) : undefined,
           input.includeArchived ? undefined : isNull(page.archivedAt),
+          // A template is not a page of the wiki — it belongs to the template
+          // catalogue (`pages.listTemplates`), not to the space's tree.
+          input.includeTemplates ? undefined : eq(page.isTemplate, false),
           // Trashed pages are never listed here, not even with
           // `includeArchived`: the trash has its own view, and the two states
           // are different questions ("still findable?" vs "already gone?").

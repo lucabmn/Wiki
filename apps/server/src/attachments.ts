@@ -1,6 +1,7 @@
 import { createContext } from "@nilovon-wiki/api/context";
 import { createAttachment } from "@nilovon-wiki/api/lib/attachments";
 import { getStorage } from "@nilovon-wiki/api/lib/storage";
+import { assertTwoFactorCompliance } from "@nilovon-wiki/api/lib/two-factor-policy";
 import { appRouter } from "@nilovon-wiki/api/routers/index";
 import { env } from "@nilovon-wiki/env/server";
 import { call, ORPCError } from "@orpc/server";
@@ -52,6 +53,10 @@ attachmentRoutes.post(
     }
 
     try {
+      // The read routes below authorize through `appRouter.attachments.get`, so
+      // the oRPC middleware covers them. This one writes directly and has to
+      // ask for itself.
+      await assertTwoFactorCompliance(context.db, context.session);
       const row = await createAttachment(
         { ...context, session: context.session },
         {

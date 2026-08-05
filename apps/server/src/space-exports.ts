@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { createContext, type AuthedContext } from "@nilovon-wiki/api/context";
 import { requireSpaceCapability } from "@nilovon-wiki/api/lib/authz";
 import { getStorage } from "@nilovon-wiki/api/lib/storage";
+import { assertTwoFactorCompliance } from "@nilovon-wiki/api/lib/two-factor-policy";
 import {
   attachment,
   page,
@@ -49,6 +50,10 @@ spaceExportRoutes.get("/spaces/:id", async (c) => {
   }
 
   try {
+    // A Space export is the single largest read in the product, and it never
+    // passes through oRPC — so the two-factor policy has to be asked here
+    // explicitly or it would be trivially sidestepped.
+    await assertTwoFactorCompliance(context.db, context.session);
     await requireSpaceCapability(
       context.db,
       authedContext,
@@ -69,6 +74,12 @@ spaceExportRoutes.get("/spaces/:id", async (c) => {
       });
       if (!space) return null;
       const [pages, tags, assignments, attachments, externalLinkRows] = await Promise.all([
+        // Templates stay in. Everywhere a human browses — the tree, search,
+        // backlinks, the dashboard, the digest — they are filtered out, but this
+        // is the "Datenexport": the one artifact that promises the space whole.
+        // Dropping rows from a backup to keep a listing tidy is how archives
+        // quietly lose data, and `manifest.json` flags every page's `isTemplate`
+        // so a consumer that wants only the content can filter it itself.
         tx.query.page.findMany({
           // Pages in the trash are omitted: an export is a snapshot of the space
           // as it stands, not of what is pending deletion.

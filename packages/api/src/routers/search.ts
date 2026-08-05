@@ -64,6 +64,9 @@ export const searchRouter = {
             // Only published pages are indexed for readers: an unpublished draft
             // must not surface via full-text search (its body isn't visible).
             eq(page.status, "published"),
+            // A template is scaffolding, not an answer: someone searching for
+            // "Postmortem" wants the postmortems, not the blank form.
+            eq(page.isTemplate, false),
             sql`${page.searchVector} @@ ${tsquery}`,
           ),
         )

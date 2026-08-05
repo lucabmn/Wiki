@@ -9,6 +9,7 @@ import { tag, pageTag } from "./tags";
 import { pageExternalLink } from "./external-links";
 import { pageLink } from "./links";
 import { activity } from "./activity";
+import { organizationSetting } from "./organization-settings";
 import { favorite, pageSubscription } from "./user-state";
 import { webhook, webhookDelivery } from "./webhooks";
 
@@ -109,6 +110,13 @@ export const activityRelations = relations(activity, ({ one }) => ({
   space: one(space, { fields: [activity.spaceId], references: [space.id] }),
   page: one(page, { fields: [activity.pageId], references: [page.id] }),
   actor: one(user, { fields: [activity.actorId], references: [user.id] }),
+}));
+
+export const organizationSettingRelations = relations(organizationSetting, ({ one }) => ({
+  organization: one(organization, {
+    fields: [organizationSetting.organizationId],
+    references: [organization.id],
+  }),
 }));
 
 export const favoriteRelations = relations(favorite, ({ one }) => ({

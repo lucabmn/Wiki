@@ -26,6 +26,9 @@ export const ActivityActionSchema = z.enum([
   "comment.deleted",
   "attachment.uploaded",
   "attachment.deleted",
+  "organization.two_factor_enabled",
+  "organization.two_factor_disabled",
+  "organization.two_factor_grace_updated",
   // Auditable, but never delivered to a webhook — see `lib/webhooks/events.ts`.
   "webhook.created",
   "webhook.updated",
