@@ -1,9 +1,11 @@
+import type { Editor } from "@tiptap/core";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useLocation, useRouteContext } from "@tanstack/react-router";
 import { FileText, Lock, Pencil } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { InlineComments } from "@/components/comments/inline-comments";
 import { extractHeadings } from "@/components/editor/headings";
 import { PageAside } from "@/components/editor/page-aside";
 import { PageContent } from "@/components/editor/page-content";
@@ -27,6 +29,7 @@ import {
 } from "@/components/pages/page-header-actions";
 import { PageTags } from "@/components/pages/page-tags";
 import { PageTemplateBanner, TemplateToggleButton } from "@/components/pages/page-template-banner";
+import { splitComments } from "@/lib/inline-comments";
 import { STATUS_LABEL } from "@/lib/labels";
 import { scrollIntoPageView } from "@/lib/scroll";
 import { orpc } from "@/utils/orpc";
@@ -48,7 +51,13 @@ function RouteComponent() {
   // old org-level permission check so the UI matches server enforcement.
   const { data: access } = useQuery(orpc.pageAccess.myRole.queryOptions({ input: { pageId: id } }));
   const canEdit = access?.canWrite ?? false;
+  const canComment = access?.canComment ?? false;
   const canManageAccess = access?.canManage ?? false;
+  // The document, editable or read-only: the inline-comment layer measures the
+  // rendered anchors inside it instead of reaching into the editor state, so
+  // one path serves both modes.
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [editor, setEditor] = useState<Editor | null>(null);
   // Read by everyone who can open the page: without the badge, a blocked page
   // reads as a broken "Delete" button rather than a deliberate protection.
   const holdStatus = useHoldStatus({ pageId: id });
@@ -72,6 +81,7 @@ function RouteComponent() {
   const { data: comments } = useQuery(
     orpc.comments.list.queryOptions({ input: { pageId: id }, enabled: Boolean(page) }),
   );
+  const pageComments = useMemo(() => splitComments(comments ?? []).page, [comments]);
   // A notification links straight at one comment. The anchor only exists once
   // the list has rendered, so the jump waits for the query rather than the URL.
   const { hash } = useLocation();
@@ -110,7 +120,9 @@ function RouteComponent() {
     );
   }
 
-  const openComments = comments?.filter((c) => !c.resolvedAt && !c.deletedAt) ?? [];
+  // Anchored comments live in the margin rail; only page-wide ones (and their
+  // replies) belong in the section under the document. Both kinds coexist.
+  const openComments = pageComments.filter((c) => !c.resolvedAt && !c.deletedAt);
 
   // Space › Elternseiten › Titel; falls die Space-Liste noch lädt, führt der
   // erste Eintrag neutral zur Übersicht.
@@ -126,103 +138,108 @@ function RouteComponent() {
     <DashboardLayout className="p-7">
       {/* One shell for both modes — same width, same right rail, same sections
           below — so editing swaps header actions and body in place instead of
-          re-flowing the page into a narrower column. */}
-      <div className="mx-auto flex w-full max-w-6xl gap-10">
+          re-flowing the page into a narrower column. `flex-wrap` is what lets
+          the comment rail sit beside the text on wide screens and fold under it
+          on narrow ones without a second copy of the component. */}
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap gap-x-10 gap-y-8">
         <div className="min-w-0 flex-1">
           {breadcrumb}
 
           {page.isTemplate ? <PageTemplateBanner page={page} /> : null}
 
-          {editing ? (
-            <PageEditor
-              page={page}
-              canPublish={canEdit}
-              onDone={() => setEditing(false)}
-              belowHeader={tagRow}
-              historyOpen={historyOpen}
-              onHistoryOpenChange={setHistoryOpen}
-            />
-          ) : (
-            <>
-              <div className="mt-3 flex items-start gap-3">
-                <span className="mt-1 text-2xl leading-none">
-                  {page.icon ?? <FileText className="size-6 text-muted-foreground" />}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-[30px] leading-tight font-semibold tracking-tight">
-                    {page.title}
-                  </h1>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
-                    <LegalHoldBadge status={holdStatus.data} />
-                    <span>Zuletzt geändert {dateFormat.format(page.updatedAt)}</span>
+          <div ref={contentRef}>
+            {editing ? (
+              <PageEditor
+                page={page}
+                canPublish={canEdit}
+                onDone={() => setEditing(false)}
+                belowHeader={tagRow}
+                historyOpen={historyOpen}
+                onHistoryOpenChange={setHistoryOpen}
+                onEditor={setEditor}
+              />
+            ) : (
+              <>
+                <div className="mt-3 flex items-start gap-3">
+                  <span className="mt-1 text-2xl leading-none">
+                    {page.icon ?? <FileText className="size-6 text-muted-foreground" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-[30px] leading-tight font-semibold tracking-tight">
+                      {page.title}
+                    </h1>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
+                      <LegalHoldBadge status={holdStatus.data} />
+                      <span>Zuletzt geändert {dateFormat.format(page.updatedAt)}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {canManageAccess ? (
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label="Zugriff"
+                        title="Zugriff"
+                        onClick={() => setAccessOpen(true)}
+                      >
+                        <Lock className="size-4" />
+                      </Button>
+                    ) : null}
+                    {canEdit ? <TemplateToggleButton page={page} /> : null}
+                    {canEdit ? (
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label="Bearbeiten"
+                        title="Bearbeiten"
+                        onClick={() => setEditing(true)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                    ) : null}
+                    <SubscribeButton page={page} />
+                    <FavoriteButton page={page} />
+                    {canEdit ? (
+                      <>
+                        <ArchiveButton page={page} spaceSlug={space?.slug} />
+                        <DeleteButton
+                          page={page}
+                          spaceSlug={space?.slug}
+                          held={holdStatus.data?.held === true}
+                        />
+                      </>
+                    ) : null}
+                    {canManageAccess ? (
+                      <LegalHoldControl
+                        subject="page"
+                        subjectId={page.id}
+                        subjectLabel={page.title}
+                        status={holdStatus.data}
+                        variant="ghost"
+                      />
+                    ) : null}
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {canManageAccess ? (
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      aria-label="Zugriff"
-                      title="Zugriff"
-                      onClick={() => setAccessOpen(true)}
-                    >
-                      <Lock className="size-4" />
-                    </Button>
-                  ) : null}
-                  {canEdit ? <TemplateToggleButton page={page} /> : null}
-                  {canEdit ? (
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      aria-label="Bearbeiten"
-                      title="Bearbeiten"
-                      onClick={() => setEditing(true)}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                  ) : null}
-                  <SubscribeButton page={page} />
-                  <FavoriteButton page={page} />
-                  {canEdit ? (
-                    <>
-                      <ArchiveButton page={page} spaceSlug={space?.slug} />
-                      <DeleteButton
-                        page={page}
-                        spaceSlug={space?.slug}
-                        held={holdStatus.data?.held === true}
-                      />
-                    </>
-                  ) : null}
-                  {canManageAccess ? (
-                    <LegalHoldControl
-                      subject="page"
-                      subjectId={page.id}
-                      subjectLabel={page.title}
-                      status={holdStatus.data}
-                      variant="ghost"
-                    />
-                  ) : null}
-                </div>
-              </div>
 
-              <div className="mt-3 pl-9">{tagRow}</div>
+                <div className="mt-3 pl-9">{tagRow}</div>
 
-              <div className="mt-6">
-                {/* Readers see the published projection only: an unpublished page
+                <div className="mt-6">
+                  {/* Readers see the published projection only: an unpublished page
                     (or draft with leftover content) never renders its body. */}
-                <PageContent
-                  content={page.status === "published" ? page.content : null}
-                  fallbackText={page.status === "published" ? page.textContent : ""}
-                  emptyLabel={
-                    page.status === "published"
-                      ? "Diese Seite hat noch keinen Inhalt."
-                      : "Diese Seite wurde noch nicht veröffentlicht."
-                  }
-                />
-              </div>
-            </>
-          )}
+                  <PageContent
+                    content={page.status === "published" ? page.content : null}
+                    fallbackText={page.status === "published" ? page.textContent : ""}
+                    emptyLabel={
+                      page.status === "published"
+                        ? "Diese Seite hat noch keinen Inhalt."
+                        : "Diese Seite wurde noch nicht veröffentlicht."
+                    }
+                  />
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="mt-10">
             <PageExternalLinks pageId={page.id} canEdit={canEdit} />
@@ -248,6 +265,22 @@ function RouteComponent() {
             <CommentForm pageId={page.id} spaceId={page.spaceId} />
           </section>
         </div>
+
+        {/* Collapses itself (`empty:hidden`) when the page has no anchored
+            comments and none can be written — no reserved gutter on pages that
+            never use one. */}
+        <aside className="w-full shrink-0 empty:hidden xl:w-64">
+          <InlineComments
+            pageId={page.id}
+            spaceId={page.spaceId}
+            contentRef={contentRef}
+            editor={editing ? editor : null}
+            canComment={canComment}
+            canModerate={canEdit}
+            viewerId={auth.session.user.id}
+            nameOf={nameOf}
+          />
+        </aside>
 
         <aside className="hidden w-60 shrink-0 xl:block">
           <div className="sticky top-6">

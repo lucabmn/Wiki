@@ -224,6 +224,10 @@ export const PageAccessSchema = z.object({
 
 export const MyPageRoleSchema = z.object({
   role: WikiRoleSchema.nullable(),
+  // Derived from the same role, not a second permission model: the UI needs to
+  // know whether to offer commenting (inline or page-wide) before the server
+  // rejects it.
+  canComment: z.boolean(),
   canWrite: z.boolean(),
   canManage: z.boolean(),
 });

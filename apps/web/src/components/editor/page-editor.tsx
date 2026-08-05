@@ -13,7 +13,7 @@ import type { Editor } from "@tiptap/core";
 import { useMutation } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
 import { Check, FileText, History, Loader2, Send, Users, X } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import * as Y from "yjs";
 
@@ -63,11 +63,15 @@ export function PageEditor({
   belowHeader,
   historyOpen,
   onHistoryOpenChange,
+  onEditor,
 }: {
   page: Page;
   onDone: () => void;
   // Passed from the page view, which resolves the caller's effective page role.
   canPublish: boolean;
+  // Surfaces the live editor to the route, which mounts the inline-comment
+  // layer beside the document rather than inside it.
+  onEditor?: (editor: Editor | null) => void;
   // Rendered between header and body, where the read view puts its tag row —
   // passed in rather than mounted here so the editor keeps its narrow deps.
   belowHeader?: ReactNode;
@@ -94,6 +98,7 @@ export function PageEditor({
       belowHeader={belowHeader}
       historyOpen={historyOpen}
       onHistoryOpenChange={onHistoryOpenChange}
+      onEditor={onEditor}
     />
   );
 }
@@ -106,6 +111,7 @@ function PageEditorForm({
   belowHeader,
   historyOpen,
   onHistoryOpenChange,
+  onEditor,
 }: {
   page: Page;
   onDone: () => void;
@@ -114,6 +120,7 @@ function PageEditorForm({
   belowHeader?: ReactNode;
   historyOpen?: boolean;
   onHistoryOpenChange?: (open: boolean) => void;
+  onEditor?: (editor: Editor | null) => void;
 }) {
   const [title, setTitle] = useState(page.title);
   const [status, setStatus] = useState<WebSocketStatus>(WebSocketStatus.Connecting);
@@ -123,6 +130,15 @@ function PageEditorForm({
   const [ownHistoryOpen, setOwnHistoryOpen] = useState(false);
   const setHistoryOpen = onHistoryOpenChange ?? setOwnHistoryOpen;
   const editorRef = useRef<Editor | null>(null);
+  // Stable: `RichTextEditor` re-runs its notify effect whenever this changes,
+  // and a fresh closure each render would flap the route's editor state.
+  const handleEditor = useCallback(
+    (editor: Editor | null) => {
+      editorRef.current = editor;
+      onEditor?.(editor);
+    },
+    [onEditor],
+  );
 
   const invalidatePage = useInvalidate(orpc.pages.get.key());
   const invalidateList = useInvalidate(orpc.pages.list.key());
@@ -305,9 +321,7 @@ function PageEditorForm({
           doc={doc}
           provider={provider}
           user={user}
-          onEditor={(editor) => {
-            editorRef.current = editor;
-          }}
+          onEditor={handleEditor}
         />
       </div>
 

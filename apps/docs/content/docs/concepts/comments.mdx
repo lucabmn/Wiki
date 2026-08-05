@@ -18,8 +18,29 @@ comment actions are governed by the **space role**, not organization RBAC.
 
 ## Where they live
 
-Comments attach to a page and are shown alongside it. Resolving a comment keeps it
-for the record while clearing it from the active view.
+A comment either belongs to the **page** — shown in the section under the
+document — or to a **passage of text**. Both kinds coexist, and replies inherit
+the kind of the thread they answer.
+
+### Inline comments
+
+Select text while editing and choose **Kommentieren** (⌘/Ctrl + Alt + M). The
+passage is highlighted, and the thread appears in the margin rail beside it,
+ordered by its position in the document rather than by age. Clicking a highlight
+focuses its thread and vice versa; overlapping passages are normal and each keeps
+its own thread. Readers see the highlights and the rail without opening the
+editor.
+
+The anchor is stored on the comment as opaque JSON that the API never
+interprets. It names a mark inside the document, so concurrent editing moves it
+with its text instead of leaving it pointing at a stale offset.
+
+If the annotated text is deleted, the comment is **not** deleted and does not
+jump elsewhere: it stays in the rail marked as orphaned, next to the excerpt of
+the text it was originally made on.
+
+Resolving a comment keeps it for the record while clearing it from the active
+view; resolved inline threads can be shown again from the rail.
 
 ## Related
 

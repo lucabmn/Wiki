@@ -254,3 +254,40 @@
   background-color: var(--color);
   vertical-align: middle;
 }
+
+/* Inline-comment anchor. The `comment` mark always renders `.comment-mark`, in
+   the editor and in the read-only HTML alike; the comment layer adds the state
+   classes at runtime. An anchor with no thread behind it (an abandoned
+   composer, a deleted comment) never gets `--live` and therefore reads as plain
+   text — the document heals itself without a write. */
+.tiptap .comment-mark--live {
+  border-radius: 2px;
+  cursor: pointer;
+  background-color: color-mix(in oklch, var(--primary) 13%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in oklch, var(--primary) 45%, transparent);
+  box-decoration-break: clone;
+  transition: background-color 120ms ease;
+}
+
+/* Overlapping anchors nest, so their tints stack — the darker span is the one
+   two comments talk about. */
+.tiptap .comment-mark--live:hover {
+  background-color: color-mix(in oklch, var(--primary) 22%, transparent);
+}
+
+.tiptap .comment-mark--active {
+  background-color: color-mix(in oklch, var(--primary) 30%, transparent);
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+
+.tiptap .comment-mark--resolved {
+  background-color: color-mix(in oklch, var(--muted-foreground) 12%, transparent);
+  box-shadow: none;
+}
+
+@media print {
+  .tiptap .comment-mark--live {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}

@@ -12,8 +12,11 @@ import TextAlign from "@tiptap/extension-text-align";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
 import StarterKit from "@tiptap/starter-kit";
 
+import { CommentMark } from "./comment-mark";
 import { MermaidDiagram } from "./mermaid";
 
+export * from "./comment-anchor";
+export * from "./comment-mark";
 export * from "./mermaid";
 export * from "./mermaid-document";
 
@@ -86,6 +89,11 @@ export function pageEditorExtensions(options?: {
     Superscript,
     Subscript,
     TextAlign.configure({ types: ["heading", "paragraph"] }),
+    // Inline-comment anchor. Like the mention node it is unconditionally part
+    // of the schema: the collab server drops marks it doesn't know when it
+    // projects the Yjs document into `page.content`, and the read-only renderer
+    // needs it to serialize the highlight readers click on.
+    CommentMark,
     // `@mention` node. `renderText` feeds the plaintext search projection and the
     // collab server's `textContent`, so a mention reads as "@Name" everywhere.
     Mention.configure({
