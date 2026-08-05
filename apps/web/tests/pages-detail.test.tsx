@@ -78,6 +78,8 @@ vi.mock("@tanstack/react-router", () => ({
   }),
   Link: ({ children, ...props }: { children: ReactNode }) => <a {...props}>{children}</a>,
   useNavigate: () => navigateSpy,
+  // The route jumps to `#comment-<id>` when the inbox links at one.
+  useLocation: () => ({ hash: "" }),
   useRouteContext: () => ({
     auth: {
       organization: {
@@ -198,6 +200,12 @@ vi.mock("@/utils/orpc", () => ({
     spaces: {
       list: {
         queryOptions: () => ({ queryKey: ["spaces"], queryFn: async () => data.spaces }),
+      },
+    },
+    // The comment box offers space members for `@` mentions.
+    spaceMembers: {
+      list: {
+        queryOptions: () => ({ queryKey: ["spaceMembers"], queryFn: async () => [] }),
       },
     },
     // The tag row and the aside's reference lists render alongside the page;

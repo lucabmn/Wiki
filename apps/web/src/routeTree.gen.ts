@@ -20,6 +20,7 @@ import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-pas
 import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
 import { Route as AuthTagsRouteImport } from './routes/_auth/tags'
 import { Route as AuthSearchRouteImport } from './routes/_auth/search'
+import { Route as AuthInboxRouteImport } from './routes/_auth/inbox'
 import { Route as AuthSettingsRouteRouteImport } from './routes/_auth/settings/route'
 import { Route as AuthAdminRouteRouteImport } from './routes/_auth/admin/route'
 import { Route as AuthUsersIndexRouteImport } from './routes/_auth/users/index'
@@ -100,6 +101,11 @@ const AuthTagsRoute = AuthTagsRouteImport.update({
 const AuthSearchRoute = AuthSearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthInboxRoute = AuthInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
   getParentRoute: () => AuthRouteRoute,
 } as any)
 const AuthSettingsRouteRoute = AuthSettingsRouteRouteImport.update({
@@ -249,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthIndexRoute
   '/admin': typeof AuthAdminRouteRouteWithChildren
   '/settings': typeof AuthSettingsRouteRouteWithChildren
+  '/inbox': typeof AuthInboxRoute
   '/search': typeof AuthSearchRoute
   '/tags': typeof AuthTagsRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByFullPath {
   '/admin/users/': typeof AuthAdminUsersIndexRoute
 }
 export interface FileRoutesByTo {
+  '/inbox': typeof AuthInboxRoute
   '/search': typeof AuthSearchRoute
   '/tags': typeof AuthTagsRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
@@ -326,6 +334,7 @@ export interface FileRoutesById {
   '/_auth': typeof AuthRouteRouteWithChildren
   '/_auth/admin': typeof AuthAdminRouteRouteWithChildren
   '/_auth/settings': typeof AuthSettingsRouteRouteWithChildren
+  '/_auth/inbox': typeof AuthInboxRoute
   '/_auth/search': typeof AuthSearchRoute
   '/_auth/tags': typeof AuthTagsRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
@@ -368,6 +377,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/settings'
+    | '/inbox'
     | '/search'
     | '/tags'
     | '/accept-invitation/$id'
@@ -404,6 +414,7 @@ export interface FileRouteTypes {
     | '/admin/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/inbox'
     | '/search'
     | '/tags'
     | '/accept-invitation/$id'
@@ -444,6 +455,7 @@ export interface FileRouteTypes {
     | '/_auth'
     | '/_auth/admin'
     | '/_auth/settings'
+    | '/_auth/inbox'
     | '/_auth/search'
     | '/_auth/tags'
     | '/accept-invitation/$id'
@@ -569,6 +581,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof AuthSearchRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/_auth/inbox': {
+      id: '/_auth/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof AuthInboxRouteImport
       parentRoute: typeof AuthRouteRoute
     }
     '/_auth/settings': {
@@ -826,6 +845,7 @@ const AuthSettingsRouteRouteWithChildren =
 interface AuthRouteRouteChildren {
   AuthAdminRouteRoute: typeof AuthAdminRouteRouteWithChildren
   AuthSettingsRouteRoute: typeof AuthSettingsRouteRouteWithChildren
+  AuthInboxRoute: typeof AuthInboxRoute
   AuthSearchRoute: typeof AuthSearchRoute
   AuthTagsRoute: typeof AuthTagsRoute
   AuthIndexRoute: typeof AuthIndexRoute
@@ -839,6 +859,7 @@ interface AuthRouteRouteChildren {
 const AuthRouteRouteChildren: AuthRouteRouteChildren = {
   AuthAdminRouteRoute: AuthAdminRouteRouteWithChildren,
   AuthSettingsRouteRoute: AuthSettingsRouteRouteWithChildren,
+  AuthInboxRoute: AuthInboxRoute,
   AuthSearchRoute: AuthSearchRoute,
   AuthTagsRoute: AuthTagsRoute,
   AuthIndexRoute: AuthIndexRoute,

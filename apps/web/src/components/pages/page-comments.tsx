@@ -17,7 +17,7 @@ import {
 } from "@nilovon-wiki/ui/components/alert-dialog";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
-import { Textarea } from "@nilovon-wiki/ui/components/textarea";
+import { MentionTextarea } from "./mention-textarea";
 
 const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
 
@@ -51,7 +51,9 @@ export function CommentCard({
   );
 
   return (
-    <Card>
+    // Anchor for `/pages/<id>#comment-<id>` links out of the inbox; `:target`
+    // gives the row a ring so it is obvious which comment was meant.
+    <Card id={`comment-${comment.id}`} className="scroll-mt-6 target:ring-2 target:ring-primary/50">
       <CardContent className="py-3">
         <div className="flex items-start justify-between gap-2">
           <div className="text-xs text-muted-foreground">
@@ -107,7 +109,7 @@ export function CommentCard({
   );
 }
 
-export function CommentForm({ pageId }: { pageId: string }) {
+export function CommentForm({ pageId, spaceId }: { pageId: string; spaceId: string }) {
   const invalidate = useInvalidate(orpc.comments.list.key());
   const [body, setBody] = useState("");
 
@@ -135,14 +137,19 @@ export function CommentForm({ pageId }: { pageId: string }) {
       }}
       className="mt-3 space-y-2"
     >
-      <Textarea
+      <MentionTextarea
+        spaceId={spaceId}
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={setBody}
+        onSubmit={submit}
         placeholder="Kommentar schreiben …"
         rows={3}
         maxLength={10_000}
       />
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        <span className="text-xs text-muted-foreground">
+          Mit @ jemanden erwähnen · ⌘/Strg + ⏎ zum Senden
+        </span>
         <Button type="submit" disabled={create.isPending || !body.trim()}>
           {create.isPending ? "Senden …" : "Kommentieren"}
         </Button>

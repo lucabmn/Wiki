@@ -3,6 +3,7 @@ import { initials } from "@/lib/format";
 import { isInstanceAdminSession } from "@/lib/instance-admin";
 import { usePermission } from "@/lib/permissions";
 import { orpc } from "@/utils/orpc";
+import { NotificationBell } from "./inbox/notification-bell";
 import { PageTree } from "./page-tree/page-tree";
 import { CommandPalette } from "./command-palette";
 import { QueryError } from "./query-error";
@@ -364,16 +365,17 @@ export default function MainSidebar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="px-2 pt-2">
+        <div className="flex items-center gap-1.5 px-2 pt-2">
           <Button
             variant="outline"
             onClick={() => setSearchOpen(true)}
-            className="h-8 w-full justify-start gap-2.5 px-2.5 font-normal text-muted-foreground"
+            className="h-8 min-w-0 flex-1 justify-start gap-2.5 px-2.5 font-normal text-muted-foreground"
           >
             <Search className="size-4" />
             <span className="flex-1 text-left">Suchen …</span>
             <Kbd>⌘K</Kbd>
           </Button>
+          <NotificationBell />
         </div>
       </SidebarHeader>
 

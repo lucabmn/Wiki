@@ -85,6 +85,18 @@ export const webhookDeliveryStatus = wikiSchema.enum("webhook_delivery_status", 
   "failed",
 ]);
 
+/**
+ * Directed notifications — one event, one named recipient, in contrast to the
+ * broadcast digest below. The value names the *reason* the row exists, because
+ * that is what the inbox renders; the page or comment it points at is on the
+ * row itself.
+ */
+export const notificationType = wikiSchema.enum("notification_type", [
+  "mention_page", // named in a page body
+  "mention_comment", // named in a comment
+  "comment_reply", // someone replied to the recipient's comment
+]);
+
 // ── Bundled ("digest") notifications ────────────────────────────────────────
 
 export const digestFrequency = wikiSchema.enum("digest_frequency", [

@@ -5,6 +5,7 @@ export * from "./attachments";
 export * from "./comments";
 export * from "./enums";
 export * from "./external-links";
+export * from "./inbox";
 export * from "./links";
 export * from "./notifications";
 export * from "./organization-settings";

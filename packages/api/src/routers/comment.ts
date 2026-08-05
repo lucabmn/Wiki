@@ -8,6 +8,7 @@ import { protectedProcedure } from "../index";
 import { requireOwnerOrPageCapability, requirePageCapability } from "../lib/authz";
 import { activityActor, recordActivity } from "../lib/activity";
 import { loadComment, loadPage } from "../lib/loaders";
+import { announceComment } from "../lib/notifications/sources";
 import { assertPageContentDeletable } from "../lib/retention/holds";
 import { firstRow } from "../lib/rows";
 import {
@@ -62,7 +63,7 @@ export const commentRouter = {
           });
         }
       }
-      return context.db.transaction(async (tx) => {
+      const created = await context.db.transaction(async (tx) => {
         const rows = await tx
           .insert(comment)
           .values({
@@ -84,6 +85,14 @@ export const commentRouter = {
         });
         return row;
       });
+      await announceComment(context.db, {
+        organizationId,
+        page: target,
+        comment: created,
+        actorId: context.session.user.id,
+        isNew: true,
+      });
+      return created;
     }),
 
   update: protectedProcedure
@@ -94,16 +103,29 @@ export const commentRouter = {
       const existing = await loadComment(context.db, input.id);
       const target = await loadPage(context.db, existing.pageId);
       // Authors edit their own; otherwise moderating (page editor+) is required.
-      await requireOwnerOrPageCapability(context.db, context, context.headers, target, {
-        isOwner: existing.authorId === context.session.user.id,
-        capability: "write",
-      });
+      const { organizationId } = await requireOwnerOrPageCapability(
+        context.db,
+        context,
+        context.headers,
+        target,
+        { isOwner: existing.authorId === context.session.user.id, capability: "write" },
+      );
       const rows = await context.db
         .update(comment)
         .set({ body: input.body })
         .where(eq(comment.id, existing.id))
         .returning();
-      return firstRow(rows);
+      const row = firstRow(rows);
+      // An edit notifies whoever the new text names for the first time — and
+      // nobody who was already named before it.
+      await announceComment(context.db, {
+        organizationId,
+        page: target,
+        comment: row,
+        actorId: context.session.user.id,
+        isNew: false,
+      });
+      return row;
     }),
 
   resolve: protectedProcedure

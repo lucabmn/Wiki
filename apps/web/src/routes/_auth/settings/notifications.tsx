@@ -12,6 +12,7 @@ import {
   describeSchedule,
   type DigestPreferences,
 } from "@/components/settings/digest-form";
+import { DirectNotificationSettings } from "@/components/settings/direct-notification-settings";
 import { Alert, AlertDescription, AlertTitle } from "@nilovon-wiki/ui/components/alert";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Button } from "@nilovon-wiki/ui/components/button";
@@ -96,6 +97,8 @@ function NotificationSettings() {
           </AlertDescription>
         </Alert>
       ) : null}
+
+      <DirectNotificationSettings />
 
       <SettingsSection
         title="Gebündelte Benachrichtigungen"
