@@ -22,15 +22,15 @@ const BESIDE_TEXT = "(min-width: 1280px)";
  * margin doesn't change a card's own height, so this settles in one pass and
  * never feeds back into React state.
  *
- * Skipped when the rail is not beside the text (narrow viewports, where it
- * renders under the document): there, "aligned with the text" means nothing and
- * the offsets would only tear the list apart.
+ * Skipped when the rail is not beside the text (narrow viewports, or the rail
+ * stacked into the metadata sidebar): there, "aligned with the text" means
+ * nothing and the offsets would only tear the list apart.
  */
-function alignToAnchors(list: HTMLElement): void {
+function alignToAnchors(list: HTMLElement, anchored: boolean): void {
   const cards = [...list.children].filter(
     (node): node is HTMLElement => node instanceof HTMLElement,
   );
-  const aligned = window.matchMedia(BESIDE_TEXT).matches;
+  const aligned = anchored && window.matchMedia(BESIDE_TEXT).matches;
   let cursor = 0;
   for (const [index, card] of cards.entries()) {
     const top = aligned ? Number(card.dataset.top ?? 0) : 0;
@@ -63,6 +63,7 @@ export function InlineCommentRail({
   permissions,
   nameOf,
   hint,
+  anchored = true,
 }: {
   threads: InlineThread[];
   draft: CommentDraft | null;
@@ -82,6 +83,13 @@ export function InlineCommentRail({
   nameOf: (userId: string | null) => string;
   /** Shown instead of the empty state while the reader can create comments. */
   hint?: string;
+  /**
+   * Whether the rail sits in the document's margin and should line its cards up
+   * with their highlights. False where it is stacked under the page metadata —
+   * the column no longer starts at the top of the document, so an offset
+   * measured against the text would only push every card off-screen.
+   */
+  anchored?: boolean;
 }) {
   const list = useRef<HTMLDivElement>(null);
 
@@ -90,8 +98,8 @@ export function InlineCommentRail({
   useLayoutEffect(() => {
     const element = list.current;
     if (!element) return;
-    alignToAnchors(element);
-    const observer = new ResizeObserver(() => alignToAnchors(element));
+    alignToAnchors(element, anchored);
+    const observer = new ResizeObserver(() => alignToAnchors(element, anchored));
     observer.observe(element);
     return () => observer.disconnect();
   });

@@ -22,11 +22,13 @@ function useTemplateInvalidation() {
 }
 
 /**
- * Header button that turns a page into a template and back. Marking one removes
- * the page from the tree, search and notifications, which is a big enough change
- * that the toast spells it out rather than leaving the page to silently vanish.
+ * Turning a page into a template and back. Exposed as a hook rather than a
+ * button because it lives in the page's overflow menu, where the caller owns the
+ * markup. Marking one removes the page from the tree, search and notifications,
+ * which is a big enough change that the toast spells it out rather than leaving
+ * the page to silently vanish.
  */
-export function TemplateToggleButton({ page }: { page: TemplatePage & { isTemplate: boolean } }) {
+export function useTemplateToggle(page: TemplatePage & { isTemplate: boolean }) {
   const refresh = useTemplateInvalidation();
   const update = useMutation(
     orpc.pages.update.mutationOptions({
@@ -42,19 +44,11 @@ export function TemplateToggleButton({ page }: { page: TemplatePage & { isTempla
     }),
   );
 
-  const label = page.isTemplate ? "Vorlagenstatus entfernen" : "Als Vorlage markieren";
-  return (
-    <Button
-      variant="outline"
-      size="icon-sm"
-      aria-label={label}
-      title={label}
-      disabled={update.isPending}
-      onClick={() => update.mutate({ id: page.id, isTemplate: !page.isTemplate })}
-    >
-      <LayoutTemplate className={page.isTemplate ? "size-4 text-primary" : "size-4"} />
-    </Button>
-  );
+  return {
+    label: page.isTemplate ? "Vorlagenstatus entfernen" : "Als Vorlage markieren",
+    pending: update.isPending,
+    toggle: () => update.mutate({ id: page.id, isTemplate: !page.isTemplate }),
+  };
 }
 
 /**

@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Bell, Star, Trash2 } from "lucide-react";
+import { Archive, Bell, Star } from "lucide-react";
 import { toast } from "sonner";
 
 import { toastError, useInvalidate, useOptimisticListToggle } from "@/lib/query";
@@ -18,14 +17,17 @@ import {
   AlertDialogTitle,
 } from "@nilovon-wiki/ui/components/alert-dialog";
 import { Button } from "@nilovon-wiki/ui/components/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@nilovon-wiki/ui/components/tooltip";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 
 /**
- * The controls in a page's header: watch, favorite, archive and delete.
- *
- * Extracted from the route so the four lifecycle affordances sit together — they
- * are easy to confuse, and the distinction between "archive" and "delete" only
- * reads clearly when the two are written next to each other.
+ * A page's lifecycle affordances, split by how often they are used rather than
+ * by what they do: the two personal toggles (watch, favorite) stay in the header
+ * as icon buttons, while archive and delete are confirmed operations that only
+ * appear inside the overflow menu (`page-actions.tsx`). This module therefore
+ * exports the toggles as buttons and the destructive pair as *dialogs* — a
+ * dropdown item cannot own its own dialog, because the menu unmounts the item
+ * the moment it is clicked.
  */
 
 function PageToggleButton({
@@ -45,11 +47,25 @@ function PageToggleButton({
   icon: typeof Star;
   iconOnClass: string;
 }) {
+  const label = isOn ? labelOn : labelOff;
   return (
-    <Button variant="outline" size="sm" disabled={pending} onClick={onToggle}>
-      <Icon className={cn("size-4", isOn && iconOnClass)} />
-      {isOn ? labelOn : labelOff}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={label}
+            aria-pressed={isOn}
+            disabled={pending}
+            onClick={onToggle}
+          >
+            <Icon className={cn("size-4", isOn && iconOnClass)} />
+          </Button>
+        }
+      />
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -104,34 +120,13 @@ export function SubscribeButton({ page }: { page: Page }) {
 }
 
 /**
- * Archive, or un-archive. Two labels on one control because they are one
- * decision: "is this page still current?" Restoring is not confirmed — bringing
- * something back is not a destructive act.
+ * Bringing an archived page back. Not confirmed and not hidden in a menu —
+ * un-archiving is not destructive, and an archived page has exactly one thing
+ * its reader wants to do with it.
  */
-export function ArchiveButton({
-  page,
-  spaceSlug,
-}: {
-  page: { id: string; archivedAt: Date | null };
-  spaceSlug?: string;
-}) {
-  const navigate = useNavigate();
+export function RestoreButton({ page }: { page: { id: string } }) {
   const invalidatePages = useInvalidate(orpc.pages.list.key());
   const invalidatePage = useInvalidate(orpc.pages.get.key());
-  const [open, setOpen] = useState(false);
-
-  const archive = useMutation(
-    orpc.pages.archive.mutationOptions({
-      onSuccess: () => {
-        invalidatePages();
-        setOpen(false);
-        // The page is now hidden — send the reader back to its space (or home).
-        if (spaceSlug) navigate({ to: "/spaces/$slug", params: { slug: spaceSlug } });
-        else navigate({ to: "/" });
-      },
-      onError: toastError,
-    }),
-  );
 
   const restore = useMutation(
     orpc.pages.restore.mutationOptions({
@@ -144,49 +139,74 @@ export function ArchiveButton({
     }),
   );
 
-  if (page.archivedAt) {
-    return (
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={restore.isPending}
-        onClick={() => restore.mutate({ id: page.id })}
-      >
-        <ArchiveRestore className="size-4" />
-        {restore.isPending ? "Wiederherstellen …" : "Wiederherstellen"}
-      </Button>
-    );
-  }
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={restore.isPending}
+      onClick={() => restore.mutate({ id: page.id })}
+    >
+      <Archive className="size-4" />
+      {restore.isPending ? "Wiederherstellen …" : "Wiederherstellen"}
+    </Button>
+  );
+}
+
+/**
+ * Archive confirmation. Controlled from outside so the overflow menu can trigger
+ * it: the dialog outlives the menu item that opened it.
+ */
+export function ArchiveDialog({
+  page,
+  spaceSlug,
+  open,
+  onOpenChange,
+}: {
+  page: { id: string };
+  spaceSlug?: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const navigate = useNavigate();
+  const invalidatePages = useInvalidate(orpc.pages.list.key());
+
+  const archive = useMutation(
+    orpc.pages.archive.mutationOptions({
+      onSuccess: () => {
+        invalidatePages();
+        onOpenChange(false);
+        // The page is now hidden — send the reader back to its space (or home).
+        if (spaceSlug) navigate({ to: "/spaces/$slug", params: { slug: spaceSlug } });
+        else navigate({ to: "/" });
+      },
+      onError: toastError,
+    }),
+  );
 
   return (
-    <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <Archive className="size-4" /> Archivieren
-      </Button>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Seite archivieren?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Die Seite wird ausgeblendet, bleibt aber auffindbar und vollständig erhalten. Du
-              kannst sie jederzeit wiederherstellen.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={archive.isPending}>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={archive.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                archive.mutate({ id: page.id });
-              }}
-            >
-              {archive.isPending ? "Archivieren …" : "Archivieren"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Seite archivieren?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Die Seite wird ausgeblendet, bleibt aber auffindbar und vollständig erhalten. Du kannst
+            sie jederzeit wiederherstellen.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={archive.isPending}>Abbrechen</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={archive.isPending}
+            onClick={(event) => {
+              event.preventDefault();
+              archive.mutate({ id: page.id });
+            }}
+          >
+            {archive.isPending ? "Archivieren …" : "Archivieren"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -195,26 +215,27 @@ export function ArchiveButton({
  * the page disappears from every view but stays restorable until the
  * organization's retention window expires.
  */
-export function DeleteButton({
+export function DeleteDialog({
   page,
   spaceSlug,
-  held,
+  open,
+  onOpenChange,
 }: {
   page: { id: string; title: string };
   spaceSlug?: string;
-  held: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const navigate = useNavigate();
   const invalidatePages = useInvalidate(orpc.pages.list.key());
   const invalidateTrash = useInvalidate(orpc.trash.key());
-  const [open, setOpen] = useState(false);
 
   const remove = useMutation(
     orpc.pages.delete.mutationOptions({
       onSuccess: (result) => {
         invalidatePages();
         invalidateTrash();
-        setOpen(false);
+        onOpenChange(false);
         toast.success(
           result.deleted > 1
             ? `Seite mit ${result.deleted - 1} Unterseiten in den Papierkorb verschoben`
@@ -228,43 +249,29 @@ export function DeleteButton({
   );
 
   return (
-    <>
-      <Button
-        variant="outline"
-        size="icon-sm"
-        aria-label="Löschen"
-        // Refused server-side anyway; disabled here so the reason (in the title,
-        // and in the badge next to the heading) arrives before the click.
-        disabled={held}
-        title={held ? "Löschsperre: diese Seite kann nicht gelöscht werden" : "Löschen"}
-        onClick={() => setOpen(true)}
-      >
-        <Trash2 className="size-4" />
-      </Button>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Seite in den Papierkorb?</AlertDialogTitle>
-            <AlertDialogDescription>
-              „{page.title}" verschwindet mit allen Unterseiten aus allen Ansichten — Suche,
-              Verweise und Favoriten inklusive. Bis zum Ablauf der Aufbewahrungsfrist kannst du sie
-              im Papierkorb des Bereichs wiederherstellen.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={remove.isPending}>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={remove.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                remove.mutate({ id: page.id });
-              }}
-            >
-              {remove.isPending ? "Verschieben …" : "In den Papierkorb"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Seite in den Papierkorb?</AlertDialogTitle>
+          <AlertDialogDescription>
+            „{page.title}" verschwindet mit allen Unterseiten aus allen Ansichten — Suche, Verweise
+            und Favoriten inklusive. Bis zum Ablauf der Aufbewahrungsfrist kannst du sie im
+            Papierkorb des Bereichs wiederherstellen.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={remove.isPending}>Abbrechen</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={remove.isPending}
+            onClick={(event) => {
+              event.preventDefault();
+              remove.mutate({ id: page.id });
+            }}
+          >
+            {remove.isPending ? "Verschieben …" : "In den Papierkorb"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

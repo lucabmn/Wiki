@@ -279,6 +279,16 @@ import { Route } from "@/routes/_auth/pages/$id";
 
 const PageView = (Route as unknown as { component: () => ReactNode }).component;
 
+/**
+ * Opens the header's overflow menu and returns it. The rare and destructive
+ * actions moved behind it so the header stops reading as a toolbar, so every
+ * assertion about them has to walk the same path a user does.
+ */
+async function openActionsMenu() {
+  fireEvent.click(await screen.findByRole("button", { name: "Weitere Aktionen" }));
+  return await screen.findByRole("menu");
+}
+
 function renderView() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -529,8 +539,9 @@ describe("page view route", () => {
     data.spaces = [{ id: "s1", slug: "ops", name: "Operations", visibility: "public" }];
     renderView();
 
-    // Open the confirm dialog, then confirm inside it.
-    fireEvent.click(await screen.findByRole("button", { name: "Archivieren" }));
+    // Open the confirm dialog from the overflow menu, then confirm inside it.
+    const menu = await openActionsMenu();
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Archivieren" }));
     const dialog = await screen.findByRole("alertdialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Archivieren" }));
 
@@ -558,7 +569,8 @@ describe("page view route", () => {
     data.spaces = [{ id: "s1", slug: "ops", name: "Operations", visibility: "public" }];
     renderView();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Löschen" }));
+    const menu = await openActionsMenu();
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Löschen" }));
     const dialog = await screen.findByRole("alertdialog");
     // The copy has to distinguish this from a permanent delete, or nobody can
     // tell the two buttons apart.
@@ -580,7 +592,10 @@ describe("page view route", () => {
     // Without the badge a blocked page reads as a broken button, so both the
     // marker and the disabled state are asserted together.
     expect(await screen.findByText("Löschsperre")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Löschen" })).toHaveProperty("disabled", true);
+    const menu = await openActionsMenu();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Löschen" }).getAttribute("data-disabled"),
+    ).not.toBeNull();
   });
 
   it("hides the edit affordance without update permission", async () => {
@@ -596,7 +611,8 @@ describe("page view route", () => {
     data.canEdit = true;
     renderView();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Als Vorlage markieren" }));
+    const menu = await openActionsMenu();
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Als Vorlage markieren" }));
     await waitFor(() =>
       expect(updateSpy.mock.calls[0]?.[0]).toEqual({ id: "p1", isTemplate: true }),
     );

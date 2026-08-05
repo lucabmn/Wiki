@@ -60,6 +60,7 @@ export function PageEditor({
   page,
   onDone,
   canPublish,
+  breadcrumb,
   belowHeader,
   historyOpen,
   onHistoryOpenChange,
@@ -69,11 +70,14 @@ export function PageEditor({
   onDone: () => void;
   // Passed from the page view, which resolves the caller's effective page role.
   canPublish: boolean;
+  // The route's trail, rendered on the editor's own action row so the title
+  // keeps the full width instead of sharing it with four buttons.
+  breadcrumb?: ReactNode;
   // Surfaces the live editor to the route, which mounts the inline-comment
   // layer beside the document rather than inside it.
   onEditor?: (editor: Editor | null) => void;
-  // Rendered between header and body, where the read view puts its tag row —
-  // passed in rather than mounted here so the editor keeps its narrow deps.
+  // Rendered in the meta line under the title, where the read view puts its tag
+  // row — passed in rather than mounted here so the editor keeps its narrow deps.
   belowHeader?: ReactNode;
   // The right rail (route-owned) opens the same history sheet the header button
   // does; pass these to share one open state. Uncontrolled works standalone.
@@ -95,6 +99,7 @@ export function PageEditor({
       onDone={onDone}
       canPublish={canPublish}
       user={user}
+      breadcrumb={breadcrumb}
       belowHeader={belowHeader}
       historyOpen={historyOpen}
       onHistoryOpenChange={onHistoryOpenChange}
@@ -108,6 +113,7 @@ function PageEditorForm({
   onDone,
   canPublish,
   user,
+  breadcrumb,
   belowHeader,
   historyOpen,
   onHistoryOpenChange,
@@ -117,6 +123,7 @@ function PageEditorForm({
   onDone: () => void;
   canPublish: boolean;
   user: { name: string; color: string };
+  breadcrumb?: ReactNode;
   belowHeader?: ReactNode;
   historyOpen?: boolean;
   onHistoryOpenChange?: (open: boolean) => void;
@@ -258,31 +265,16 @@ function PageEditorForm({
 
   return (
     <>
-      {/* Mirrors the read view's header row exactly — same spacing, same icon
-          slot, same action rail — so nothing shifts when modes switch. */}
-      <div className="mt-3 flex items-start gap-3">
-        <span className="mt-1 text-2xl leading-none">
-          {page.icon ?? <FileText className="size-6 text-muted-foreground" />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <Input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Seitentitel"
-            aria-label="Seitentitel"
-            maxLength={300}
-            className="h-auto rounded-none border-0 bg-transparent p-0 text-[30px] leading-tight font-semibold tracking-tight shadow-none focus-visible:border-0 focus-visible:ring-0 md:text-[30px] dark:bg-transparent"
-          />
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
-            <ConnectionIndicator status={status} saving={busy} />
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
+      {/* Mirrors the read view's header exactly — trail and actions share the
+          top row, the title owns the one below — so nothing shifts when modes
+          switch and a long title never competes with four buttons for width. */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">{breadcrumb}</div>
+        <div className="flex shrink-0 items-center gap-1.5">
           {/* The right rail's history entry is `xl`-only, so keep a trigger in
               the header — same icon-only idiom as the read view's actions. */}
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon-sm"
             aria-label="Versionsverlauf"
             title="Versionsverlauf"
@@ -290,7 +282,7 @@ function PageEditorForm({
           >
             <History className="size-4" />
           </Button>
-          <Button variant="outline" size="sm" disabled={busy} onClick={handleClose}>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={handleClose}>
             <X className="size-4" /> Schließen
           </Button>
           {showSave ? (
@@ -306,15 +298,35 @@ function PageEditorForm({
         </div>
       </div>
 
-      {belowHeader ? <div className="mt-3 pl-9">{belowHeader}</div> : null}
+      <div className="mt-4 flex items-start gap-3">
+        <span className="mt-1 text-2xl leading-none">
+          {page.icon ?? <FileText className="size-6 text-muted-foreground" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Seitentitel"
+            aria-label="Seitentitel"
+            maxLength={300}
+            className="h-auto rounded-none border-0 bg-transparent p-0 text-[30px] leading-tight font-semibold tracking-tight shadow-none focus-visible:border-0 focus-visible:ring-0 md:text-[30px] dark:bg-transparent"
+          />
+          {/* One meta line: state, live-collaboration status, tags and the
+              publish hint, instead of four stacked rows above the toolbar. */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+            <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
+            <ConnectionIndicator status={status} saving={busy} />
+            {belowHeader}
+            <span>
+              {page.status === "published"
+                ? "Änderungen werden erst mit „Veröffentlichen“ sichtbar."
+                : "Sichtbar erst nach dem Veröffentlichen."}
+            </span>
+          </div>
+        </div>
+      </div>
 
-      <p className="mt-3 pl-9 text-xs text-muted-foreground">
-        {page.status === "published"
-          ? "Änderungen sind erst nach „Veröffentlichen“ für andere sichtbar — bis dahin sehen Leser die zuletzt veröffentlichte Fassung."
-          : "Änderungen sind erst nach „Veröffentlichen“ für andere sichtbar."}
-      </p>
-
-      <div className="mt-6">
+      <div className="mt-5">
         <RichTextEditor
           pageId={page.id}
           spaceId={page.spaceId}

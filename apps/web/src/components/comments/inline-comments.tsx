@@ -36,6 +36,7 @@ export function InlineComments({
   canModerate,
   viewerId,
   nameOf,
+  anchored = true,
 }: {
   pageId: string;
   spaceId: string;
@@ -47,6 +48,8 @@ export function InlineComments({
   canModerate: boolean;
   viewerId: string | null;
   nameOf: (userId: string | null) => string;
+  /** Passed through to the rail: false when it is stacked under the metadata. */
+  anchored?: boolean;
 }) {
   const invalidate = useInvalidate(orpc.comments.list.key());
   const { data } = useQuery(orpc.comments.list.queryOptions({ input: { pageId } }));
@@ -187,6 +190,7 @@ export function InlineComments({
         spaceId={spaceId}
         permissions={{ canComment, canModerate, viewerId }}
         nameOf={nameOf}
+        anchored={anchored}
         hint={
           canComment
             ? "Markiere Text im Dokument und wähle „Kommentieren“."
