@@ -105,6 +105,16 @@
   font-size: 0.875em;
 }
 
+/* A diagram as it comes out of the serializer. The read view puts the rendered
+   SVG in front of this block and hides it (`mermaid/read-view.ts`), but until
+   the script has run — server-rendered HTML, a failed chunk, printing — the
+   source stays visible and legible instead of masquerading as body text. */
+.tiptap pre.mermaid {
+  font-size: 0.8em;
+  color: var(--muted-foreground);
+  white-space: pre-wrap;
+}
+
 .tiptap hr {
   border: none;
   border-top: 1px solid var(--border);

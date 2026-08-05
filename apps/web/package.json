@@ -59,6 +59,7 @@
     "dotenv": "catalog:",
     "evlog": "catalog:",
     "lucide-react": "catalog:",
+    "mermaid": "^11.16.1",
     "next-themes": "catalog:",
     "nitro": "^3.0.260610-beta",
     "qrcode.react": "^4.2.0",

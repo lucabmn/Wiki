@@ -1,3 +1,9 @@
+import {
+  MERMAID_LANGUAGE,
+  MERMAID_NODE_NAME,
+  MERMAID_SOURCE_LIMIT,
+} from "@nilovon-wiki/editor/mermaid-document";
+
 export type ImportedDocumentNode = {
   type: string;
   attrs?: Record<string, unknown>;
@@ -80,6 +86,16 @@ function safeHref(raw: string): string | null {
   const href = raw.trim();
   if (/^(https?:|mailto:|\/|#)/i.test(href)) return href;
   return null;
+}
+
+/** Mermaid source of a `<pre>`, or `null` when it is an ordinary code block. */
+function mermaidSource(element: Element): string | null {
+  const fenced = element.querySelector("code")?.classList.contains(`language-${MERMAID_LANGUAGE}`)
+    ? (element.querySelector("code")?.textContent ?? "")
+    : element.classList.contains(MERMAID_LANGUAGE)
+      ? (element.textContent ?? "")
+      : null;
+  return fenced === null ? null : fenced.slice(0, MERMAID_SOURCE_LIMIT);
 }
 
 function compactText(value: string) {
@@ -326,11 +342,20 @@ function blocks(
             ],
       });
     } else if (tag === "PRE") {
-      result.push({
-        type: "codeBlock",
-        attrs: { language: null },
-        content: textNode(child.textContent ?? "", []),
-      });
+      // ` ```mermaid ` fences (`<pre><code class="language-mermaid">`) and our
+      // own export shape (`<pre class="mermaid">`) come back as diagrams, so an
+      // export → import round trip keeps them rendering instead of degrading to
+      // a wall of source. Every other <pre> stays a code block.
+      const mermaid = mermaidSource(child);
+      result.push(
+        mermaid === null
+          ? {
+              type: "codeBlock",
+              attrs: { language: null },
+              content: textNode(child.textContent ?? "", []),
+            }
+          : { type: MERMAID_NODE_NAME, attrs: { source: mermaid, caption: null } },
+      );
     } else if (tag === "HR") {
       result.push({ type: "horizontalRule" });
     } else if (tag === "TABLE") {

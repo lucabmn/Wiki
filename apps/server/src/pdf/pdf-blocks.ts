@@ -1,3 +1,5 @@
+import { MERMAID_NODE_NAME } from "@nilovon-wiki/editor/mermaid-document";
+
 import type { RichTextNode } from "../space-export-format";
 import { collectRuns, writeRuns } from "./pdf-inline";
 import {
@@ -67,6 +69,9 @@ function renderBlock(ctx: BlockContext, node: RichTextNode, indent: number): voi
       break;
     case "table":
       renderTable(ctx, node, left, width);
+      break;
+    case MERMAID_NODE_NAME:
+      renderDiagram(ctx, node, left, width);
       break;
     default:
       if (node.content?.length) renderBlocks(ctx, node.content, indent);
@@ -241,6 +246,27 @@ function renderRule(doc: PdfDoc, left: number, width: number): void {
     .stroke()
     .restore();
   doc.y = y + SPACING.block;
+}
+
+/**
+ * A diagram prints as its Mermaid source, set as code, with the caption below —
+ * the same call the HTML export makes and documents: drawing it needs a browser
+ * engine, and this exporter deliberately has none. Without this case the node
+ * would be an atom the block renderer skips, so the diagram would silently
+ * disappear from the PDF.
+ */
+function renderDiagram(ctx: BlockContext, node: RichTextNode, left: number, width: number): void {
+  const caption = String(node.attrs?.caption ?? "").trim();
+  const source = String(node.attrs?.source ?? "");
+  renderCodeBlock(ctx, { content: [{ type: "text", text: source }] }, left, width);
+  if (!caption) return;
+  ctx.doc.x = left;
+  writeRuns(ctx.doc, [{ text: caption, italic: true }], {
+    width,
+    size: SIZE.small,
+    color: COLOR.muted,
+  });
+  ctx.doc.y += SPACING.block;
 }
 
 function renderImage(ctx: BlockContext, node: RichTextNode, left: number, width: number): void {

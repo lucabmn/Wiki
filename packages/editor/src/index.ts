@@ -1,4 +1,4 @@
-import type { Extensions } from "@tiptap/core";
+import type { Extensions, NodeViewRenderer } from "@tiptap/core";
 import Highlight from "@tiptap/extension-highlight";
 import Image from "@tiptap/extension-image";
 import Mention, { type MentionOptions } from "@tiptap/extension-mention";
@@ -11,6 +11,11 @@ import TaskList from "@tiptap/extension-task-list";
 import TextAlign from "@tiptap/extension-text-align";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
 import StarterKit from "@tiptap/starter-kit";
+
+import { MermaidDiagram } from "./mermaid";
+
+export * from "./mermaid";
+export * from "./mermaid-document";
 
 /**
  * The single TipTap schema used everywhere a page document is touched — the
@@ -46,6 +51,14 @@ export function pageEditorExtensions(options?: {
    * inert on the server/renderer, which never pass it.
    */
   mention?: Partial<MentionOptions["suggestion"]>;
+  /**
+   * Browser-only renderer for the diagram node. The NODE is always in the
+   * schema — the collab server has to know it, or it drops every diagram when
+   * it projects the Yjs document back to `content`. Only the view that turns
+   * the source into an SVG (and lazy-loads Mermaid) is passed in here, by
+   * `apps/web`; the server and the read-only renderer never do.
+   */
+  mermaidNodeView?: NodeViewRenderer;
 }): Extensions {
   return [
     StarterKit.configure({
@@ -81,6 +94,9 @@ export function pageEditorExtensions(options?: {
       renderText: ({ node }) => `@${node.attrs.label ?? node.attrs.id}`,
       ...(options?.mention ? { suggestion: options.mention as MentionOptions["suggestion"] } : {}),
     }),
+    options?.mermaidNodeView
+      ? MermaidDiagram.extend({ addNodeView: () => options.mermaidNodeView! })
+      : MermaidDiagram,
     Placeholder.configure({
       placeholder: options?.placeholder ?? 'Schreibe etwas, oder tippe "/" für Befehle …',
       emptyEditorClass:

@@ -15,6 +15,7 @@
     "@nilovon-wiki/api": "workspace:*",
     "@nilovon-wiki/auth": "workspace:*",
     "@nilovon-wiki/db": "workspace:*",
+    "@nilovon-wiki/editor": "workspace:*",
     "@nilovon-wiki/env": "workspace:*",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",

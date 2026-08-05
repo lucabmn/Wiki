@@ -46,6 +46,7 @@ import {
   Table as TableIcon,
   Underline as UnderlineIcon,
   Undo2,
+  Workflow,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -479,6 +480,12 @@ export function EditorToolbar({
           onClick={onImage}
         />
       ) : null}
+
+      <ToolButton
+        icon={Workflow}
+        label="Diagramm einfügen"
+        onClick={() => editor.chain().focus().insertMermaidDiagram({ source: "" }).run()}
+      />
 
       <Separator orientation="vertical" className="mx-1 h-5" />
 

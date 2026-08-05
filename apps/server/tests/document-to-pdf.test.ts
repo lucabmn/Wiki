@@ -120,6 +120,26 @@ describe("documentToPdf", () => {
     expect(imageSources(richDocument as never)).toEqual(["/attachments/a1/inline"]);
   });
 
+  it("prints a diagram as its source instead of dropping it", async () => {
+    // The diagram node is an atom: without an explicit case the block renderer
+    // would skip it and the PDF would lose the diagram without a trace.
+    const diagram = {
+      type: "doc",
+      content: [
+        {
+          type: "mermaidDiagram",
+          attrs: { source: "flowchart TD\n  A[Start] --> B[Ende]", caption: "Freigabe" },
+        },
+      ],
+    };
+    const withDiagram = await documentToPdf(diagram, meta);
+    const empty = await documentToPdf({ type: "doc", content: [] }, meta);
+
+    expect(isPdf(withDiagram)).toBe(true);
+    expect(pdfPageCount(withDiagram)).toBe(1);
+    expect(withDiagram.length).toBeGreaterThan(empty.length);
+  });
+
   it("renders a single-page placeholder carrying the reason", async () => {
     const bytes = await placeholderPdf(meta, "Obergrenze erreicht.");
     expect(isPdf(bytes)).toBe(true);

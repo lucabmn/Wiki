@@ -1,3 +1,5 @@
+import { MERMAID_LANGUAGE, MERMAID_NODE_NAME } from "@nilovon-wiki/editor/mermaid-document";
+
 import { htmlEscape, type RichTextNode } from "./space-export-format";
 
 /**
@@ -87,6 +89,19 @@ function markdownNode(node: RichTextNode, depth = 0): string {
       return `![${markdownEscape(String(node.attrs?.alt ?? ""))}](${String(node.attrs?.src ?? "")}${node.attrs?.title ? ` "${String(node.attrs.title).replace(/"/g, '\\"')}"` : ""})`;
     case "mention":
       return `@${markdownEscape(String(node.attrs?.label ?? node.attrs?.id ?? ""))}`;
+    // The de-facto standard: GitHub, GitLab and most Markdown viewers render a
+    // ```mermaid fence, and `adoptMermaidCodeBlocks` reads it back on import.
+    case MERMAID_NODE_NAME: {
+      const source = String(node.attrs?.source ?? "");
+      // A source containing backticks needs a longer fence than the run inside.
+      const fence = "`".repeat(
+        Math.max(3, ...(source.match(/`+/g) ?? []).map((run) => run.length + 1)),
+      );
+      const caption = node.attrs?.caption
+        ? `\n\n_${markdownEscape(String(node.attrs.caption))}_`
+        : "";
+      return `${fence}${MERMAID_LANGUAGE}\n${source}\n${fence}${caption}`;
+    }
     case "table": {
       const rows = (node.content ?? []).map((row) => markdownNode(row, depth));
       const columns = node.content?.[0]?.content?.length ?? 1;
