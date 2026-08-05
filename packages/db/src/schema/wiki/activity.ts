@@ -18,6 +18,13 @@ export const activity = wikiSchema.table(
     spaceId: text("space_id").references(() => space.id, { onDelete: "set null" }),
     pageId: text("page_id").references(() => page.id, { onDelete: "set null" }),
     actorId: text("actor_id").references(() => user.id, { onDelete: "set null" }),
+    /**
+     * The instance admin behind `actorId` when the row was written during an
+     * impersonated session. Without it the feed would credit an edit purely to
+     * the impersonated account and the admin's involvement would only be
+     * reconstructable by lining up timestamps against `admin.admin_audit`.
+     */
+    impersonatedBy: text("impersonated_by").references(() => user.id, { onDelete: "set null" }),
     action: activityAction("action").notNull(),
     metadata: jsonb("metadata"),
     createdAt: timestamps.createdAt,

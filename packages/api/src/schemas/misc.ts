@@ -8,7 +8,10 @@ export const ActivityActionSchema = z.enum([
   "space.created",
   "space.updated",
   "space.archived",
+  "space.restored",
   "space.deleted",
+  "space.untrashed",
+  "space.purged",
   "page.created",
   "page.updated",
   "page.published",
@@ -16,6 +19,8 @@ export const ActivityActionSchema = z.enum([
   "page.archived",
   "page.restored",
   "page.deleted",
+  "page.untrashed",
+  "page.purged",
   "comment.created",
   "comment.resolved",
   "comment.deleted",
@@ -24,6 +29,19 @@ export const ActivityActionSchema = z.enum([
   "organization.two_factor_enabled",
   "organization.two_factor_disabled",
   "organization.two_factor_grace_updated",
+  // Auditable, but never delivered to a webhook — see `lib/webhooks/events.ts`.
+  "webhook.created",
+  "webhook.updated",
+  "webhook.deleted",
+  // Mirrored from the instance audit log so the impersonated account sees, in
+  // its own feed, that somebody signed in as them. Carries no digest category —
+  // `categoryForAction` drops it, which keeps it out of summary mails.
+  "impersonation.started",
+  "impersonation.ended",
+  "retention.updated",
+  "retention.purged",
+  "hold.created",
+  "hold.released",
 ]);
 
 export const ActivitySchema = z.object({
@@ -32,6 +50,8 @@ export const ActivitySchema = z.object({
   spaceId: IdSchema.nullable(),
   pageId: IdSchema.nullable(),
   actorId: IdSchema.nullable(),
+  /** The instance admin behind `actorId` when the row was written while impersonating. */
+  impersonatedBy: IdSchema.nullable(),
   action: ActivityActionSchema,
   metadata: z.unknown().nullable(),
   createdAt: z.date(),

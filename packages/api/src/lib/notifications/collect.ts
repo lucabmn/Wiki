@@ -144,6 +144,13 @@ export async function collectDigest(
         // template. Templates are hidden from every reader view; the digest is
         // no exception.
         or(isNull(activity.pageId), eq(page.isTemplate, false)),
+        // Nothing about a page in the trash, not even the deletion itself. The
+        // trash is a staging area: while a page sits in it the deletion is still
+        // reversible, and mailing "Ada deleted X" for something that may be back
+        // tomorrow trains people to ignore the digest. The final removal is
+        // announced as `page.purged`, which carries no page id and so survives
+        // this filter.
+        or(isNull(activity.pageId), isNull(page.deletedAt)),
       ),
     )
     .orderBy(desc(activity.createdAt))

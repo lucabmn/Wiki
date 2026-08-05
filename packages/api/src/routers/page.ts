@@ -8,9 +8,10 @@ import { env } from "@nilovon-wiki/env/server";
 import { isOrgManager, protectedProcedure } from "../index";
 import { filterReadablePages, loadSpaceRole } from "../lib/access";
 import { requirePageCapability, requireSpaceCapabilityById } from "../lib/authz";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { COLLAB_TOKEN_TTL_SECONDS, collabDocName, signCollabToken } from "../lib/collab-token";
 import { generateKeyBetween } from "../lib/fractional";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { extractPageLinks, syncPageLinks } from "../lib/page-links";
 import {
@@ -20,6 +21,7 @@ import {
   positionForMove,
   siblingsOf,
 } from "../lib/page-tree";
+import { assertPageDeletable, pageSubtreeIds } from "../lib/retention/holds";
 import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
@@ -299,6 +301,10 @@ export const pageRouter = {
           // A template is not a page of the wiki — it belongs to the template
           // catalogue (`pages.listTemplates`), not to the space's tree.
           input.includeTemplates ? undefined : eq(page.isTemplate, false),
+          // Trashed pages are never listed here, not even with
+          // `includeArchived`: the trash has its own view, and the two states
+          // are different questions ("still findable?" vs "already gone?").
+          pageNotTrashed(),
         ),
         orderBy: [asc(page.position)],
       });
@@ -452,7 +458,7 @@ export const pageRouter = {
               await recordActivity(tx, {
                 organizationId,
                 action: "page.created",
-                actorId: userId,
+                ...activityActor(context),
                 spaceId: row.spaceId,
                 pageId: row.id,
                 metadata: { title: row.title, source: "html-import", sourcePath: item.sourcePath },
@@ -546,7 +552,7 @@ export const pageRouter = {
           await recordActivity(tx, {
             organizationId: item.organizationId,
             action: "page.updated",
-            actorId: context.session.user.id,
+            ...activityActor(context),
             spaceId: item.row.spaceId,
             pageId: item.row.id,
             metadata: { title: item.row.title, source: "html-import-assets" },
@@ -611,7 +617,7 @@ export const pageRouter = {
             await recordActivity(tx, {
               organizationId,
               action: "page.created",
-              actorId: userId,
+              ...activityActor(context),
               spaceId: row.spaceId,
               pageId: row.id,
               metadata: { title: row.title },
@@ -661,7 +667,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.updated",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -750,7 +756,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.published",
-          actorId: userId,
+          ...activityActor(context),
           spaceId: existing.spaceId,
           pageId: existing.id,
           metadata: { title: nextTitle },
@@ -798,7 +804,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.moved",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -839,12 +845,67 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.archived",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
         });
         return row;
+      });
+    }),
+
+  /**
+   * Soft delete: the page moves to the trash and disappears from every view, but
+   * stays restorable until the org's trash window expires. Archiving is *not*
+   * the same thing and neither replaces the other — archived means "no longer
+   * current, still findable", deleted means "gone, recoverable for now".
+   */
+  delete: protectedProcedure
+    .route({
+      method: "DELETE",
+      path: "/pages/{id}",
+      tags: TAGS,
+      summary: "Move a page (and its subtree) to the trash",
+    })
+    .input(z.object({ id: IdSchema }))
+    .output(z.object({ id: IdSchema, deleted: z.number().int() }))
+    .handler(async ({ input, context }) => {
+      const existing = await loadPage(context.db, input.id);
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        existing,
+        "write",
+      );
+      // A deletion block that only stopped the background purge would not be a
+      // block at all; the manual path has to refuse too, and say why.
+      await assertPageDeletable(context.db, {
+        id: existing.id,
+        spaceId: existing.spaceId,
+        organizationId,
+      });
+      // Child pages go with the parent: leaving them behind would strand them
+      // under a parent no reader can reach.
+      const subtree = await pageSubtreeIds(context.db, existing.id);
+      const now = new Date();
+      return context.db.transaction(async (tx) => {
+        const deleted = await tx
+          .update(page)
+          .set({ deletedAt: now, deletedBy: context.session.user.id })
+          .where(and(inArray(page.id, subtree), isNull(page.deletedAt)))
+          .returning({ id: page.id });
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.deleted",
+          ...activityActor(context),
+          spaceId: existing.spaceId,
+          pageId: existing.id,
+          // The page row survives a soft delete, but the title is denormalized
+          // anyway so the feed still reads correctly after the purge.
+          metadata: { title: existing.title, pages: deleted.length },
+        });
+        return { id: existing.id, deleted: deleted.length };
       });
     }),
 
@@ -876,7 +937,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.restored",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -953,7 +1014,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.updated",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title, restoredVersion: revision.version },

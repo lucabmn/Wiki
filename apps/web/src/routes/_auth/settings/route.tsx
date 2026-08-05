@@ -8,9 +8,11 @@ import {
   Palette,
   ShieldAlert,
   ShieldCheck,
+  Timer,
   User,
   Users,
   UsersRound,
+  Webhook,
 } from "lucide-react";
 
 import DashboardLayout from "@/components/layouts/dashboard-layout";
@@ -37,6 +39,8 @@ const ORGANIZATION_TABS = [
   { to: "/settings/teams", label: "Teams", icon: UsersRound },
   { to: "/settings/notification-defaults", label: "Benachrichtigungen", icon: BellRing },
   { to: "/settings/security-policy", label: "Sicherheit", icon: ShieldAlert },
+  { to: "/settings/webhooks", label: "Webhooks", icon: Webhook },
+  { to: "/settings/data-lifecycle", label: "Daten & Fristen", icon: Timer },
 ] as const;
 
 /**

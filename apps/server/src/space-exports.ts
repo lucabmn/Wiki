@@ -13,7 +13,7 @@ import {
   tag,
 } from "@nilovon-wiki/db/schema/index";
 import { ZipArchive } from "archiver";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { Hono } from "hono";
 
@@ -43,7 +43,11 @@ spaceExportRoutes.get("/spaces/:id", async (c) => {
   const authorizationSpace = await context.db.query.space.findFirst({
     where: eq(spaceTable.id, c.req.param("id")),
   });
-  if (!authorizationSpace) return c.json({ message: "Space not found" }, 404);
+  // A trashed space behaves as missing everywhere, exports included — otherwise
+  // "deleted" would still be one URL away from a full archive of its contents.
+  if (!authorizationSpace || authorizationSpace.deletedAt) {
+    return c.json({ message: "Space not found" }, 404);
+  }
 
   try {
     // A Space export is the single largest read in the product, and it never
@@ -77,7 +81,9 @@ spaceExportRoutes.get("/spaces/:id", async (c) => {
         // quietly lose data, and `manifest.json` flags every page's `isTemplate`
         // so a consumer that wants only the content can filter it itself.
         tx.query.page.findMany({
-          where: eq(page.spaceId, space.id),
+          // Pages in the trash are omitted: an export is a snapshot of the space
+          // as it stands, not of what is pending deletion.
+          where: and(eq(page.spaceId, space.id), isNull(page.deletedAt)),
           orderBy: [asc(page.position), asc(page.createdAt)],
         }),
         tx.query.tag.findMany({
@@ -88,7 +94,7 @@ spaceExportRoutes.get("/spaces/:id", async (c) => {
           .select({ pageId: pageTag.pageId, tagId: pageTag.tagId })
           .from(pageTag)
           .innerJoin(page, eq(page.id, pageTag.pageId))
-          .where(eq(page.spaceId, space.id)),
+          .where(and(eq(page.spaceId, space.id), isNull(page.deletedAt))),
         tx.query.attachment.findMany({
           where: eq(attachment.spaceId, space.id),
           orderBy: [asc(attachment.createdAt)],
@@ -97,7 +103,7 @@ spaceExportRoutes.get("/spaces/:id", async (c) => {
           .select({ externalLink: pageExternalLink })
           .from(pageExternalLink)
           .innerJoin(page, eq(page.id, pageExternalLink.pageId))
-          .where(eq(page.spaceId, space.id))
+          .where(and(eq(page.spaceId, space.id), isNull(page.deletedAt)))
           .orderBy(asc(pageExternalLink.position)),
       ]);
       return {

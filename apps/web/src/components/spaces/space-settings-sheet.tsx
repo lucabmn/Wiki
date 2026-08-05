@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import { Check, Download, Globe, Lock, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { MemberAccessManager } from "@/components/access/member-access-manager";
 import { SpaceIconPicker } from "@/components/spaces/space-icon-picker";
+import { SpaceLifecycleSections } from "@/components/spaces/space-lifecycle-sections";
 import { SpaceTemplates } from "@/components/spaces/space-templates";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { VISIBILITY_LABEL } from "@/lib/labels";
@@ -14,16 +14,6 @@ import { env } from "@nilovon-wiki/env/web";
 import { membersQueryOptions, rolesQueryOptions } from "@/lib/org-queries";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@nilovon-wiki/ui/components/alert-dialog";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import {
@@ -63,6 +53,7 @@ export function SpaceSettingsSheet({
   onOpenChange,
   space,
   organizationId,
+  nameOf,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -72,10 +63,12 @@ export function SpaceSettingsSheet({
     visibility: string;
     color: string | null;
     icon: string | null;
+    archivedAt: Date | null;
   };
   organizationId: string;
+  /** Resolves a user id to a display name, for the trash listing. */
+  nameOf: (userId: string | null) => string;
 }) {
-  const navigate = useNavigate();
   const invalidateMembers = useInvalidate(orpc.spaceMembers.list.key());
   const invalidateSpaces = useInvalidate(orpc.spaces.list.key());
   const invalidateMyRole = useInvalidate(orpc.spaceMembers.myRole.key());
@@ -93,9 +86,6 @@ export function SpaceSettingsSheet({
   const grantedRoleNames = new Set(members.map((m) => m.roleName).filter(Boolean));
   const addableUsers = orgMembers.filter((m) => !memberUserIds.has(m.user.id));
   const addableGroups = groups.filter((g) => !grantedRoleNames.has(g.role));
-
-  const [confirmArchive, setConfirmArchive] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Draft for the "Allgemein" section; re-seeded from the space each time the
   // sheet opens (and after a save, when the fresh space props arrive).
@@ -140,34 +130,6 @@ export function SpaceSettingsSheet({
         setVisibility(space.visibility);
         toastError(error);
       },
-    }),
-  );
-
-  const archiveSpace = useMutation(
-    orpc.spaces.archive.mutationOptions({
-      onSuccess: () => {
-        invalidateSpaces();
-        setConfirmArchive(false);
-        onOpenChange(false);
-        toast.success("Space archiviert");
-        // Archived spaces drop out of the default list, so the slug route
-        // would show "nicht gefunden" — send the user back to the overview.
-        navigate({ to: "/spaces" });
-      },
-      onError: toastError,
-    }),
-  );
-
-  const deleteSpace = useMutation(
-    orpc.spaces.delete.mutationOptions({
-      onSuccess: () => {
-        invalidateSpaces();
-        setConfirmDelete(false);
-        onOpenChange(false);
-        toast.success("Space gelöscht");
-        navigate({ to: "/spaces" });
-      },
-      onError: toastError,
     }),
   );
 
@@ -379,94 +341,14 @@ export function SpaceSettingsSheet({
             </div>
           </section>
 
-          {/* Gefahrenzone: der Sheet wird vom Aufrufer nur für Space-Admins
-              gerendert (myRole === "admin"), dieselbe Schranke gilt hier. */}
-          <section className="space-y-2">
-            <h3 className="text-sm font-semibold text-destructive">Gefahrenzone</h3>
-            <div className="divide-y divide-border rounded-lg border border-destructive/30">
-              <div className="flex items-center justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">Space archivieren</div>
-                  <p className="text-xs text-muted-foreground">
-                    Der Space wird ausgeblendet, Seiten bleiben erhalten.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={archiveSpace.isPending}
-                  onClick={() => setConfirmArchive(true)}
-                >
-                  Archivieren
-                </Button>
-              </div>
-              <div className="flex items-center justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">Space löschen</div>
-                  <p className="text-xs text-muted-foreground">
-                    Löscht den Space und alle Inhalte dauerhaft.
-                  </p>
-                </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={deleteSpace.isPending}
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  Löschen
-                </Button>
-              </div>
-            </div>
-          </section>
+          {/* Trash, deletion block, archive and delete — grouped in one place
+              because those four are the ones users mix up. */}
+          <SpaceLifecycleSections
+            space={{ id: space.id, name: space.name, archivedAt: space.archivedAt }}
+            onClose={() => onOpenChange(false)}
+            nameOf={nameOf}
+          />
         </div>
-
-        <AlertDialog open={confirmArchive} onOpenChange={setConfirmArchive}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Space archivieren?</AlertDialogTitle>
-              <AlertDialogDescription>
-                „{space.name}" wird ausgeblendet und erscheint nicht mehr in der Übersicht. Die
-                Seiten bleiben erhalten.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={archiveSpace.isPending}>Abbrechen</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={archiveSpace.isPending}
-                onClick={(event) => {
-                  event.preventDefault();
-                  archiveSpace.mutate({ id: space.id });
-                }}
-              >
-                {archiveSpace.isPending ? "Archivieren …" : "Archivieren"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Space löschen?</AlertDialogTitle>
-              <AlertDialogDescription>
-                „{space.name}" wird dauerhaft gelöscht. Alle Seiten in diesem Space werden
-                unwiderruflich gelöscht.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleteSpace.isPending}>Abbrechen</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={deleteSpace.isPending}
-                onClick={(event) => {
-                  event.preventDefault();
-                  deleteSpace.mutate({ id: space.id });
-                }}
-              >
-                {deleteSpace.isPending ? "Löschen …" : "Löschen"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

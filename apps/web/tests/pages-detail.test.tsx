@@ -13,6 +13,8 @@ const {
   archiveSpy,
   updateSpy,
   createFromTemplateSpy,
+  restorePageSpy,
+  deletePageSpy,
   navigateSpy,
 } = vi.hoisted(() => ({
   data: {
@@ -23,6 +25,13 @@ const {
     subscriptions: [] as Array<{ id: string }>,
     canEdit: false,
     error: false,
+    // The effective deletion block for this page, as `legalHolds.status` reports it.
+    hold: { held: false, source: "none", reason: null, holdId: null } as {
+      held: boolean;
+      source: string;
+      reason: string | null;
+      holdId: string | null;
+    },
   },
   createCommentSpy: vi.fn((_vars?: { pageId: string; body: string }) => Promise.resolve({})),
   addFavoriteSpy: vi.fn((_vars?: { pageId: string }) => Promise.resolve({})),
@@ -34,6 +43,8 @@ const {
   createFromTemplateSpy: vi.fn((_vars?: { templateId: string; spaceId: string }) =>
     Promise.resolve({ id: "p2", title: "Kopie" }),
   ),
+  restorePageSpy: vi.fn((_vars?: { id: string }) => Promise.resolve({})),
+  deletePageSpy: vi.fn((_vars?: { id: string }) => Promise.resolve({ id: "p1", deleted: 1 })),
   navigateSpy: vi.fn(),
 }));
 
@@ -99,6 +110,18 @@ vi.mock("@/utils/orpc", () => ({
       createFromTemplate: {
         mutationOptions: (opts: Record<string, unknown>) => ({
           mutationFn: createFromTemplateSpy,
+          ...opts,
+        }),
+      },
+      restore: {
+        mutationOptions: (opts: Record<string, unknown>) => ({
+          mutationFn: restorePageSpy,
+          ...opts,
+        }),
+      },
+      delete: {
+        mutationOptions: (opts: Record<string, unknown>) => ({
+          mutationFn: deletePageSpy,
           ...opts,
         }),
       },
@@ -227,6 +250,19 @@ vi.mock("@/utils/orpc", () => ({
         }),
       },
     },
+    legalHolds: {
+      status: {
+        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
+          queryKey: ["hold", data.hold],
+          queryFn: async () => data.hold,
+          enabled,
+        }),
+      },
+      key: () => ["legalHolds"],
+    },
+    trash: {
+      key: () => ["trash"],
+    },
   },
 }));
 
@@ -252,6 +288,7 @@ describe("page view route", () => {
     data.subscriptions = [];
     data.canEdit = false;
     data.error = false;
+    data.hold = { held: false, source: "none", reason: null, holdId: null };
     vi.restoreAllMocks();
     document.body.replaceChildren();
   });
@@ -477,6 +514,9 @@ describe("page view route", () => {
 
   it("archives the page after confirming and returns to the space", async () => {
     data.page = somePage;
+    // Archiving writes to the page, so the affordance follows write access — it
+    // used to be offered to readers whose click the server then refused.
+    data.canEdit = true;
     data.spaces = [{ id: "s1", slug: "ops", name: "Operations", visibility: "public" }];
     renderView();
 
@@ -489,6 +529,49 @@ describe("page view route", () => {
     await waitFor(() =>
       expect(navigateSpy).toHaveBeenCalledWith({ to: "/spaces/$slug", params: { slug: "ops" } }),
     );
+  });
+
+  it("offers a restore instead of an archive for an archived page", async () => {
+    data.page = { ...somePage, status: "archived", archivedAt: new Date("2026-01-03T10:00:00Z") };
+    data.canEdit = true;
+    renderView();
+
+    // Archived and deleted are different states, and only the former is undone
+    // from here — the trash lives in the space's own view.
+    fireEvent.click(await screen.findByRole("button", { name: "Wiederherstellen" }));
+    await waitFor(() => expect(restorePageSpy.mock.calls[0]?.[0]).toEqual({ id: "p1" }));
+    expect(screen.queryByRole("button", { name: "Archivieren" })).toBeNull();
+  });
+
+  it("moves the page to the trash after confirming, and says it is recoverable", async () => {
+    data.page = somePage;
+    data.canEdit = true;
+    data.spaces = [{ id: "s1", slug: "ops", name: "Operations", visibility: "public" }];
+    renderView();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Löschen" }));
+    const dialog = await screen.findByRole("alertdialog");
+    // The copy has to distinguish this from a permanent delete, or nobody can
+    // tell the two buttons apart.
+    expect(within(dialog).getByText(/Papierkorb des Bereichs wiederherstellen/)).toBeDefined();
+    fireEvent.click(within(dialog).getByRole("button", { name: "In den Papierkorb" }));
+
+    await waitFor(() => expect(deletePageSpy.mock.calls[0]?.[0]).toEqual({ id: "p1" }));
+    await waitFor(() =>
+      expect(navigateSpy).toHaveBeenCalledWith({ to: "/spaces/$slug", params: { slug: "ops" } }),
+    );
+  });
+
+  it("marks a blocked page and disables its delete button", async () => {
+    data.page = somePage;
+    data.canEdit = true;
+    data.hold = { held: true, source: "page", reason: "Rechtsstreit", holdId: "h1" };
+    renderView();
+
+    // Without the badge a blocked page reads as a broken button, so both the
+    // marker and the disabled state are asserted together.
+    expect(await screen.findByText("Löschsperre")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Löschen" })).toHaveProperty("disabled", true);
   });
 
   it("hides the edit affordance without update permission", async () => {

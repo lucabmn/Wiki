@@ -6,6 +6,7 @@ import { page, pageLink } from "@nilovon-wiki/db/schema/index";
 import { isOrgManager, protectedProcedure } from "../index";
 import { filterReadablePages, loadSpaceRole } from "../lib/access";
 import { requirePageCapability } from "../lib/authz";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { PageSchema } from "../schemas/page";
 import { IdSchema } from "../schemas/shared";
@@ -41,6 +42,8 @@ export const linkRouter = {
             eq(pageLink.targetPageId, input.id),
             eq(page.status, "published"),
             eq(page.isTemplate, false),
+            // A trashed page is not a real backlink any more.
+            pageNotTrashed(),
           ),
         )
         .orderBy(asc(page.title));
@@ -72,7 +75,9 @@ export const linkRouter = {
         .select({ page })
         .from(pageLink)
         .innerJoin(page, eq(pageLink.targetPageId, page.id))
-        .where(and(eq(pageLink.sourcePageId, input.id), eq(page.isTemplate, false)))
+        .where(
+          and(eq(pageLink.sourcePageId, input.id), eq(page.isTemplate, false), pageNotTrashed()),
+        )
         .orderBy(asc(page.title));
       return filterReadablePages(
         context.db,
