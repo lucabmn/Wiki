@@ -16,14 +16,19 @@ export const activityAction = wikiSchema.enum("activity_action", [
   "space.created",
   "space.updated",
   "space.archived",
-  "space.deleted",
+  "space.restored",
+  "space.deleted", // moved to the trash — recoverable until it expires
+  "space.untrashed",
+  "space.purged", // gone for good, from the trash or by an admin
   "page.created",
   "page.updated",
   "page.published",
   "page.moved",
   "page.archived",
   "page.restored",
-  "page.deleted",
+  "page.deleted", // moved to the trash — recoverable until it expires
+  "page.untrashed",
+  "page.purged",
   "comment.created",
   "comment.resolved",
   "comment.deleted",
@@ -35,9 +40,62 @@ export const activityAction = wikiSchema.enum("activity_action", [
   "organization.two_factor_enabled",
   "organization.two_factor_disabled",
   "organization.two_factor_grace_updated",
+  // Webhook configuration is itself auditable. These three are deliberately
+  // *not* deliverable over webhooks (see `enqueueWebhookDeliveries`): a webhook
+  // reporting its own creation would loop, and the row carries the endpoint.
+  "webhook.created",
+  "webhook.updated",
+  "webhook.deleted",
+  // Instance-admin events are logged in `admin.admin_audit`, but these two are
+  // mirrored here as well: someone whose account was used has a right to see it
+  // in their own feed, not only in a log they cannot open.
+  "impersonation.started",
+  "impersonation.ended",
+  // ── Data lifecycle ────────────────────────────────────────────────────────
+  // These four are never removed by the audit-retention purge itself: a
+  // shortened window that erased the record of who shortened it, or of a
+  // deletion block, would defeat the purpose of keeping an audit log at all.
+  "retention.updated",
+  "retention.purged",
+  "hold.created",
+  "hold.released",
+]);
+
+/**
+ * What a deletion block ("legal hold") is attached to. A hold on a space covers
+ * everything inside it; a hold on the organization covers everything, which is
+ * the blunt instrument for "freeze this tenant, we are in litigation".
+ */
+export const legalHoldSubject = wikiSchema.enum("legal_hold_subject", [
+  "organization",
+  "space",
+  "page",
 ]);
 
 export const wikiRole = wikiSchema.enum("wiki_role", ["viewer", "commenter", "editor", "admin"]);
+
+/**
+ * Lifecycle of one queued webhook POST. `failed` is terminal — it means the
+ * attempt ceiling ran out, not that a single attempt errored; a retryable
+ * failure stays `pending` with a later `next_attempt_at`.
+ */
+export const webhookDeliveryStatus = wikiSchema.enum("webhook_delivery_status", [
+  "pending",
+  "delivered",
+  "failed",
+]);
+
+/**
+ * Directed notifications — one event, one named recipient, in contrast to the
+ * broadcast digest below. The value names the *reason* the row exists, because
+ * that is what the inbox renders; the page or comment it points at is on the
+ * row itself.
+ */
+export const notificationType = wikiSchema.enum("notification_type", [
+  "mention_page", // named in a page body
+  "mention_comment", // named in a comment
+  "comment_reply", // someone replied to the recipient's comment
+]);
 
 // ── Bundled ("digest") notifications ────────────────────────────────────────
 

@@ -1,377 +1,44 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link, createFileRoute, useLocation, useRouteContext } from "@tanstack/react-router";
+import { FileText, Lock, Pencil } from "lucide-react";
+import { useEffect, useState } from "react";
+
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { extractHeadings } from "@/components/editor/headings";
 import { PageAside } from "@/components/editor/page-aside";
 import { PageContent } from "@/components/editor/page-content";
 import { PageEditor } from "@/components/editor/page-editor";
-import { PageAccessSheet } from "@/components/pages/page-access-sheet";
-import { PageAttachments } from "@/components/pages/page-attachments";
-import { PageExternalLinks } from "@/components/pages/page-external-links";
-import { PageTags } from "@/components/pages/page-tags";
 import { RevisionHistory } from "@/components/editor/revision-history";
-import { extractHeadings } from "@/components/editor/headings";
+import {
+  LegalHoldBadge,
+  LegalHoldControl,
+  useHoldStatus,
+} from "@/components/lifecycle/legal-hold-control";
+import { PageAccessSheet } from "@/components/pages/page-access-sheet";
+import { PageBreadcrumb } from "@/components/pages/page-breadcrumb";
+import { PageAttachments } from "@/components/pages/page-attachments";
+import { CommentCard, CommentForm } from "@/components/pages/page-comments";
+import { PageExternalLinks } from "@/components/pages/page-external-links";
+import {
+  ArchiveButton,
+  DeleteButton,
+  FavoriteButton,
+  SubscribeButton,
+} from "@/components/pages/page-header-actions";
+import { PageTags } from "@/components/pages/page-tags";
+import { PageTemplateBanner, TemplateToggleButton } from "@/components/pages/page-template-banner";
 import { STATUS_LABEL } from "@/lib/labels";
-import { toastError, useInvalidate, useOptimisticListToggle } from "@/lib/query";
 import { scrollIntoPageView } from "@/lib/scroll";
 import { orpc } from "@/utils/orpc";
-import type { Page } from "@nilovon-wiki/api/schemas/page";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@nilovon-wiki/ui/components/alert-dialog";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
-import {
-  Breadcrumb,
-  BreadcrumbEllipsis,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@nilovon-wiki/ui/components/breadcrumb";
 import { Button } from "@nilovon-wiki/ui/components/button";
-import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
-import { Textarea } from "@nilovon-wiki/ui/components/textarea";
-import { cn } from "@nilovon-wiki/ui/lib/utils";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link, createFileRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
-import { Archive, Bell, Check, FileText, Lock, Pencil, Star, Trash2 } from "lucide-react";
-import { Fragment, useState } from "react";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_auth/pages/$id")({
   component: RouteComponent,
 });
 
 const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
-
-/** Outline button that flips a per-page flag (favorite, subscription, …). */
-function PageToggleButton({
-  isOn,
-  pending,
-  onToggle,
-  labelOn,
-  labelOff,
-  icon: Icon,
-  iconOnClass,
-}: {
-  isOn: boolean;
-  pending: boolean;
-  onToggle: () => void;
-  labelOn: string;
-  labelOff: string;
-  icon: typeof Star;
-  iconOnClass: string;
-}) {
-  return (
-    <Button variant="outline" size="sm" disabled={pending} onClick={onToggle}>
-      <Icon className={cn("size-4", isOn && iconOnClass)} />
-      {isOn ? labelOn : labelOff}
-    </Button>
-  );
-}
-
-function FavoriteButton({ page }: { page: Page }) {
-  const listOptions = orpc.me.listFavorites.queryOptions({ input: {} });
-  const { data: favorites } = useQuery(listOptions);
-  const isFavorite = favorites?.some((favorite) => favorite.id === page.id) ?? false;
-
-  const optimistic = useOptimisticListToggle<Page>(
-    listOptions.queryKey,
-    orpc.me.listFavorites.key(),
-  );
-  const add = useMutation(orpc.me.addFavorite.mutationOptions(optimistic(page, true)));
-  const remove = useMutation(orpc.me.removeFavorite.mutationOptions(optimistic(page, false)));
-
-  return (
-    <PageToggleButton
-      isOn={isFavorite}
-      pending={add.isPending || remove.isPending}
-      onToggle={() => (isFavorite ? remove : add).mutate({ pageId: page.id })}
-      labelOn="Favorit"
-      labelOff="Merken"
-      icon={Star}
-      iconOnClass="fill-amber-500 text-amber-500"
-    />
-  );
-}
-
-function SubscribeButton({ page }: { page: Page }) {
-  const listOptions = orpc.me.listSubscriptions.queryOptions({ input: {} });
-  const { data: subscriptions } = useQuery(listOptions);
-  const isSubscribed = subscriptions?.some((subscription) => subscription.id === page.id) ?? false;
-
-  const optimistic = useOptimisticListToggle<Page>(
-    listOptions.queryKey,
-    orpc.me.listSubscriptions.key(),
-  );
-  const subscribe = useMutation(orpc.me.subscribe.mutationOptions(optimistic(page, true)));
-  const unsubscribe = useMutation(orpc.me.unsubscribe.mutationOptions(optimistic(page, false)));
-
-  return (
-    <PageToggleButton
-      isOn={isSubscribed}
-      pending={subscribe.isPending || unsubscribe.isPending}
-      onToggle={() => (isSubscribed ? unsubscribe : subscribe).mutate({ pageId: page.id })}
-      labelOn="Abonniert"
-      labelOff="Abonnieren"
-      icon={Bell}
-      iconOnClass="fill-current"
-    />
-  );
-}
-
-function ArchiveButton({ pageId, spaceSlug }: { pageId: string; spaceSlug?: string }) {
-  const navigate = useNavigate();
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
-  const [open, setOpen] = useState(false);
-
-  const archive = useMutation(
-    orpc.pages.archive.mutationOptions({
-      onSuccess: () => {
-        invalidatePages();
-        setOpen(false);
-        // The page is now hidden — send the reader back to its space (or home).
-        if (spaceSlug) navigate({ to: "/spaces/$slug", params: { slug: spaceSlug } });
-        else navigate({ to: "/" });
-      },
-      onError: toastError,
-    }),
-  );
-
-  return (
-    <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <Archive className="size-4" /> Archivieren
-      </Button>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Seite archivieren?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Die Seite wird ausgeblendet. Du kannst sie später wiederherstellen.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={archive.isPending}>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={archive.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                archive.mutate({ id: pageId });
-              }}
-            >
-              {archive.isPending ? "Archivieren …" : "Archivieren"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
-}
-
-/**
- * Space › Ancestors › Title trail for nested pages. Resolves ancestors from
- * the space's flat page list — the same query key the sidebar tree uses — so
- * the chain comes from cache instead of one request per level.
- */
-function PageBreadcrumb({
-  page,
-  space,
-}: {
-  page: { id: string; title: string; parentId: string | null; spaceId: string };
-  space?: { slug: string; name: string };
-}) {
-  const { data: allPages } = useQuery(
-    orpc.pages.list.queryOptions({ input: { spaceId: page.spaceId } }),
-  );
-
-  const byId = new Map((allPages ?? []).map((p) => [p.id, p]));
-  const ancestors: { id: string; title: string }[] = [];
-  const seen = new Set<string>([page.id]);
-  let cursor = page.parentId;
-  while (cursor && !seen.has(cursor)) {
-    const node = byId.get(cursor);
-    if (!node) break;
-    seen.add(node.id);
-    ancestors.unshift({ id: node.id, title: node.title });
-    cursor = node.parentId;
-  }
-
-  // Deep trails collapse to first › … › last so the header stays one line.
-  const first = ancestors[0];
-  const last = ancestors[ancestors.length - 1];
-  const trail: ({ id: string; title: string } | "ellipsis")[] =
-    ancestors.length > 3 && first && last ? [first, "ellipsis", last] : ancestors;
-
-  return (
-    <Breadcrumb>
-      <BreadcrumbList className="text-[13px] font-medium">
-        <BreadcrumbItem>
-          {space ? (
-            <BreadcrumbLink render={<Link to="/spaces/$slug" params={{ slug: space.slug }} />}>
-              {space.name}
-            </BreadcrumbLink>
-          ) : (
-            <BreadcrumbLink render={<Link to="/" />}>Übersicht</BreadcrumbLink>
-          )}
-        </BreadcrumbItem>
-        {trail.map((item, index) => (
-          <Fragment key={item === "ellipsis" ? `ellipsis-${index}` : item.id}>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              {item === "ellipsis" ? (
-                <BreadcrumbEllipsis />
-              ) : (
-                <BreadcrumbLink
-                  className="inline-block max-w-40 truncate"
-                  render={<Link to="/pages/$id" params={{ id: item.id }} />}
-                >
-                  {item.title || "Ohne Titel"}
-                </BreadcrumbLink>
-              )}
-            </BreadcrumbItem>
-          </Fragment>
-        ))}
-        <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          <BreadcrumbPage className="max-w-52 truncate">
-            {page.title || "Ohne Titel"}
-          </BreadcrumbPage>
-        </BreadcrumbItem>
-      </BreadcrumbList>
-    </Breadcrumb>
-  );
-}
-
-function CommentCard({ comment }: { comment: { id: string; body: string; createdAt: Date } }) {
-  const invalidate = useInvalidate(orpc.comments.list.key());
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const resolve = useMutation(
-    orpc.comments.resolve.mutationOptions({
-      onSuccess: () => {
-        invalidate();
-        toast.success("Kommentar aufgelöst");
-      },
-      onError: toastError,
-    }),
-  );
-  const remove = useMutation(
-    orpc.comments.delete.mutationOptions({
-      onSuccess: () => {
-        invalidate();
-        setConfirmDelete(false);
-        toast.success("Kommentar gelöscht");
-      },
-      onError: toastError,
-    }),
-  );
-
-  return (
-    <Card>
-      <CardContent className="py-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="text-xs text-muted-foreground">
-            {dateFormat.format(comment.createdAt)}
-          </div>
-          <div className="-my-1 flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7"
-              disabled={resolve.isPending}
-              onClick={() => resolve.mutate({ id: comment.id, resolved: true })}
-            >
-              <Check className="size-3.5" /> Auflösen
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 text-muted-foreground hover:text-destructive"
-              disabled={remove.isPending}
-              aria-label="Kommentar löschen"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-        <p className="mt-1 text-sm whitespace-pre-wrap">{comment.body}</p>
-      </CardContent>
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Kommentar löschen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Der Kommentar wird dauerhaft entfernt. Das kann nicht rückgängig gemacht werden.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={remove.isPending}>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={remove.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                remove.mutate({ id: comment.id });
-              }}
-            >
-              {remove.isPending ? "Löschen …" : "Löschen"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Card>
-  );
-}
-
-function CommentForm({ pageId }: { pageId: string }) {
-  const invalidate = useInvalidate(orpc.comments.list.key());
-  const [body, setBody] = useState("");
-
-  const create = useMutation(
-    orpc.comments.create.mutationOptions({
-      onSuccess: () => {
-        invalidate();
-        setBody("");
-        toast.success("Kommentar hinzugefügt");
-      },
-      onError: toastError,
-    }),
-  );
-
-  const submit = () => {
-    const trimmed = body.trim();
-    if (trimmed) create.mutate({ pageId, body: trimmed });
-  };
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit();
-      }}
-      className="mt-3 space-y-2"
-    >
-      <Textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Kommentar schreiben …"
-        rows={3}
-        maxLength={10_000}
-      />
-      <div className="flex justify-end">
-        <Button type="submit" disabled={create.isPending || !body.trim()}>
-          {create.isPending ? "Senden …" : "Kommentieren"}
-        </Button>
-      </div>
-    </form>
-  );
-}
 
 function RouteComponent() {
   const { id } = Route.useParams();
@@ -382,6 +49,9 @@ function RouteComponent() {
   const { data: access } = useQuery(orpc.pageAccess.myRole.queryOptions({ input: { pageId: id } }));
   const canEdit = access?.canWrite ?? false;
   const canManageAccess = access?.canManage ?? false;
+  // Read by everyone who can open the page: without the badge, a blocked page
+  // reads as a broken "Delete" button rather than a deliberate protection.
+  const holdStatus = useHoldStatus({ pageId: id });
   const [accessOpen, setAccessOpen] = useState(false);
 
   // Resolve author/editor ids to names via the org's member list.
@@ -402,6 +72,15 @@ function RouteComponent() {
   const { data: comments } = useQuery(
     orpc.comments.list.queryOptions({ input: { pageId: id }, enabled: Boolean(page) }),
   );
+  // A notification links straight at one comment. The anchor only exists once
+  // the list has rendered, so the jump waits for the query rather than the URL.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash.startsWith("comment-") || !comments) return;
+    const target = document.getElementById(hash);
+    if (target) scrollIntoPageView(target);
+  }, [hash, comments]);
+
   // Resolve the owning space for the back-link; cached from the sidebar.
   const { data: spaces } = useQuery(orpc.spaces.list.queryOptions({ input: {} }));
   const space = spaces?.find((s) => s.id === page?.spaceId);
@@ -452,6 +131,8 @@ function RouteComponent() {
         <div className="min-w-0 flex-1">
           {breadcrumb}
 
+          {page.isTemplate ? <PageTemplateBanner page={page} /> : null}
+
           {editing ? (
             <PageEditor
               page={page}
@@ -473,6 +154,7 @@ function RouteComponent() {
                   </h1>
                   <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <Badge variant="outline">{STATUS_LABEL[page.status] ?? page.status}</Badge>
+                    <LegalHoldBadge status={holdStatus.data} />
                     <span>Zuletzt geändert {dateFormat.format(page.updatedAt)}</span>
                   </div>
                 </div>
@@ -488,6 +170,7 @@ function RouteComponent() {
                       <Lock className="size-4" />
                     </Button>
                   ) : null}
+                  {canEdit ? <TemplateToggleButton page={page} /> : null}
                   {canEdit ? (
                     <Button
                       variant="outline"
@@ -501,7 +184,25 @@ function RouteComponent() {
                   ) : null}
                   <SubscribeButton page={page} />
                   <FavoriteButton page={page} />
-                  <ArchiveButton pageId={page.id} spaceSlug={space?.slug} />
+                  {canEdit ? (
+                    <>
+                      <ArchiveButton page={page} spaceSlug={space?.slug} />
+                      <DeleteButton
+                        page={page}
+                        spaceSlug={space?.slug}
+                        held={holdStatus.data?.held === true}
+                      />
+                    </>
+                  ) : null}
+                  {canManageAccess ? (
+                    <LegalHoldControl
+                      subject="page"
+                      subjectId={page.id}
+                      subjectLabel={page.title}
+                      status={holdStatus.data}
+                      variant="ghost"
+                    />
+                  ) : null}
                 </div>
               </div>
 
@@ -544,7 +245,7 @@ function RouteComponent() {
                 ))}
               </div>
             )}
-            <CommentForm pageId={page.id} />
+            <CommentForm pageId={page.id} spaceId={page.spaceId} />
           </section>
         </div>
 

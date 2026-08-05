@@ -4,7 +4,7 @@ import {
   MERMAID_NODE_NAME,
 } from "@nilovon-wiki/editor/mermaid-document";
 
-export type ExportFormat = "markdown" | "html" | "json";
+export type ExportFormat = "markdown" | "html" | "json" | "pdf";
 
 export type RichTextNode = {
   type?: string;
@@ -74,7 +74,16 @@ export function safeArchiveName(value: string, fallback = "item"): string {
 }
 
 export function contentFileName(format: ExportFormat): string {
-  return format === "markdown" ? "content.md" : format === "html" ? "index.html" : "content.json";
+  switch (format) {
+    case "markdown":
+      return "content.md";
+    case "html":
+      return "index.html";
+    case "pdf":
+      return "content.pdf";
+    default:
+      return "content.json";
+  }
 }
 
 export function rewriteDocumentUrls(value: unknown, resolveUrl: (url: string) => string): unknown {
@@ -92,16 +101,12 @@ export function rewriteDocumentUrls(value: unknown, resolveUrl: (url: string) =>
   return result;
 }
 
-function htmlEscape(value: unknown): string {
+export function htmlEscape(value: unknown): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-function markdownEscape(value: string): string {
-  return value.replace(/([\\`*_[\]<>])/g, "\\$1");
 }
 
 function markHtml(value: string, node: RichTextNode): string {
@@ -226,116 +231,4 @@ export function documentToHtml(content: unknown, title: string): string {
     ? `<p class="export-note">${htmlEscape(MERMAID_EXPORT_NOTE)}</p>\n`
     : "";
   return `<!doctype html>\n<html lang="de">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">\n<title>${htmlEscape(title)}</title>\n<style>body{font:16px/1.6 system-ui,sans-serif;max-width:76ch;margin:3rem auto;padding:0 1rem}img{max-width:100%}table{border-collapse:collapse}th,td{border:1px solid #bbb;padding:.35rem .5rem}blockquote{border-left:3px solid #bbb;padding-left:1rem;color:#555}pre{overflow:auto;background:#f5f5f5;padding:1rem}figure{margin:1.5rem 0}figcaption{color:#555;font-size:.9em;text-align:center}.export-note{color:#555;font-size:.9em;border-left:3px solid #bbb;padding-left:1rem}</style>\n</head>\n<body>\n<h1>${htmlEscape(title)}</h1>\n${note}${body}\n</body>\n</html>\n`;
-}
-
-function markMarkdown(value: string, node: RichTextNode): string {
-  return (node.marks ?? []).reduce((result, mark) => {
-    switch (mark.type) {
-      case "bold":
-        return `**${result}**`;
-      case "italic":
-        return `_${result}_`;
-      case "strike":
-        return `~~${result}~~`;
-      case "underline":
-        return `<u>${result}</u>`;
-      case "code":
-        return `\`${result.replace(/`/g, "\\`")}\``;
-      case "highlight":
-        return `<mark>${result}</mark>`;
-      case "textStyle":
-        return typeof mark.attrs?.color === "string"
-          ? `<span style="color:${htmlEscape(mark.attrs.color)}">${result}</span>`
-          : result;
-      case "subscript":
-        return `<sub>${result}</sub>`;
-      case "superscript":
-        return `<sup>${result}</sup>`;
-      case "link":
-        return `[${result}](${String(mark.attrs?.href ?? "")})`;
-      default:
-        return result;
-    }
-  }, value);
-}
-
-function markdownListItem(node: RichTextNode, marker: string, depth: number): string {
-  const children = (node.content ?? []).map((item) => markdownNode(item, depth + 1)).join("\n");
-  return `${"  ".repeat(depth)}${marker} ${children.replace(/\n/g, `\n${"  ".repeat(depth + 1)}`)}`;
-}
-
-function markdownNode(node: RichTextNode, depth = 0): string {
-  const children = (node.content ?? []).map((item) => markdownNode(item, depth)).join("");
-  switch (node.type) {
-    case "doc":
-      return (node.content ?? []).map((item) => markdownNode(item, depth)).join("\n\n");
-    case "text":
-      return markMarkdown(markdownEscape(node.text ?? ""), node);
-    case "paragraph":
-      return children;
-    case "heading":
-      return `${"#".repeat(Math.min(6, Math.max(1, Number(node.attrs?.level) || 1)))} ${children}`;
-    case "bulletList":
-      return (node.content ?? []).map((item) => markdownListItem(item, "-", depth)).join("\n");
-    case "orderedList": {
-      const start = Number(node.attrs?.start) || 1;
-      return (node.content ?? [])
-        .map((item, index) => markdownListItem(item, `${start + index}.`, depth))
-        .join("\n");
-    }
-    case "taskList":
-      return (node.content ?? [])
-        .map((item) => markdownListItem(item, `- [${item.attrs?.checked ? "x" : " "}]`, depth))
-        .join("\n");
-    case "listItem":
-    case "taskItem":
-      return (node.content ?? []).map((item) => markdownNode(item, depth)).join("\n");
-    case "blockquote":
-      return children
-        .split("\n")
-        .map((line) => `> ${line}`)
-        .join("\n");
-    case "codeBlock":
-      return `\`\`\`${String(node.attrs?.language ?? "")}\n${(node.content ?? []).map((item) => item.text ?? "").join("")}\n\`\`\``;
-    case "hardBreak":
-      return "  \n";
-    case "horizontalRule":
-      return "---";
-    case "image":
-      return `![${markdownEscape(String(node.attrs?.alt ?? ""))}](${String(node.attrs?.src ?? "")}${node.attrs?.title ? ` "${String(node.attrs.title).replace(/"/g, '\\"')}"` : ""})`;
-    case "mention":
-      return `@${markdownEscape(String(node.attrs?.label ?? node.attrs?.id ?? ""))}`;
-    // The de-facto standard: GitHub, GitLab and most Markdown viewers render a
-    // ```mermaid fence, and `adoptMermaidCodeBlocks` reads it back on import.
-    case MERMAID_NODE_NAME: {
-      const source = String(node.attrs?.source ?? "");
-      // A source containing backticks needs a longer fence than the run inside.
-      const fence = "`".repeat(
-        Math.max(3, ...(source.match(/`+/g) ?? []).map((run) => run.length + 1)),
-      );
-      const caption = node.attrs?.caption
-        ? `\n\n_${markdownEscape(String(node.attrs.caption))}_`
-        : "";
-      return `${fence}${MERMAID_LANGUAGE}\n${source}\n${fence}${caption}`;
-    }
-    case "table": {
-      const rows = (node.content ?? []).map((row) => markdownNode(row, depth));
-      const columns = node.content?.[0]?.content?.length ?? 1;
-      if (rows.length)
-        rows.splice(1, 0, `| ${Array.from({ length: columns }, () => "---").join(" | ")} |`);
-      return rows.join("\n");
-    }
-    case "tableRow":
-      return `| ${(node.content ?? []).map((cell) => markdownNode(cell, depth).replace(/\|/g, "\\|")).join(" | ")} |`;
-    case "tableHeader":
-    case "tableCell":
-      return children.replace(/\n+/g, " ");
-    default:
-      return children;
-  }
-}
-
-export function documentToMarkdown(content: unknown, title: string): string {
-  const body = markdownNode((content ?? { type: "doc" }) as RichTextNode).trim();
-  return `# ${markdownEscape(title)}\n\n${body}\n`;
 }

@@ -1,10 +1,24 @@
 import { ORPCError } from "@orpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  attachmentRow,
+  exportContext,
+  exportEnv,
+  spaceFixture,
+  streamOf,
+} from "./helpers/space-export";
+
 const mocks = vi.hoisted(() => ({
   createContext: vi.fn(),
   requireSpaceCapability: vi.fn(),
   getStorage: vi.fn(),
+  env: {
+    ATTACHMENT_MAX_MB: 25,
+    PDF_EXPORT_MAX_PAGES: 500,
+    PDF_EXPORT_PAGE_TIMEOUT_MS: 15000,
+    PDF_EXPORT_IMAGE_CACHE_MB: 64,
+  },
 }));
 
 vi.mock("@nilovon-wiki/api/context", () => ({ createContext: mocks.createContext }));
@@ -12,55 +26,9 @@ vi.mock("@nilovon-wiki/api/lib/authz", () => ({
   requireSpaceCapability: mocks.requireSpaceCapability,
 }));
 vi.mock("@nilovon-wiki/api/lib/storage", () => ({ getStorage: mocks.getStorage }));
+vi.mock("@nilovon-wiki/env/server", () => ({ env: mocks.env }));
 
 import { resolveArchiveUrl, spaceExportRoutes } from "../src/space-exports";
-
-const space = {
-  id: "s1",
-  organizationId: "o1",
-  slug: "handbook",
-  name: "Handbook",
-  description: null,
-  icon: null,
-  color: null,
-  visibility: "private",
-  createdBy: "u1",
-  archivedAt: null,
-  deletionPendingAt: null as Date | null,
-  createdAt: new Date("2025-01-01T00:00:00Z"),
-  updatedAt: new Date("2025-01-02T00:00:00Z"),
-};
-
-function context() {
-  const query = {
-    space: { findFirst: vi.fn().mockResolvedValue(space) },
-    page: { findMany: vi.fn().mockResolvedValue([]) },
-    tag: { findMany: vi.fn().mockResolvedValue([]) },
-    attachment: { findMany: vi.fn().mockResolvedValue([]) },
-  };
-  const select = vi
-    .fn()
-    .mockImplementationOnce(() => ({
-      from: () => ({ innerJoin: () => ({ where: () => Promise.resolve([]) }) }),
-    }))
-    .mockImplementationOnce(() => ({
-      from: () => ({
-        innerJoin: () => ({
-          where: () => ({ orderBy: () => Promise.resolve([]) }),
-        }),
-      }),
-    }));
-  const tx = { query, select };
-  return {
-    session: { user: { id: "u1" } },
-    headers: new Headers(),
-    db: {
-      query,
-      select,
-      transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)),
-    },
-  };
-}
 
 describe("portable export links", () => {
   const pagePaths = new Map([["p1", "pages/one--p1/content.md"]]);
@@ -86,13 +54,14 @@ describe("portable export links", () => {
 describe("Space export route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.createContext.mockResolvedValue(context());
+    Object.assign(mocks.env, exportEnv());
+    mocks.createContext.mockResolvedValue(exportContext());
     mocks.requireSpaceCapability.mockResolvedValue(undefined);
     mocks.getStorage.mockReturnValue(null);
   });
 
   it("rejects invalid formats before querying authenticated data", async () => {
-    const response = await spaceExportRoutes.request("/spaces/s1?format=pdf");
+    const response = await spaceExportRoutes.request("/spaces/s1?format=docx");
     expect(response.status).toBe(400);
     expect(mocks.createContext).not.toHaveBeenCalled();
   });
@@ -115,10 +84,33 @@ describe("Space export route", () => {
     expect(response.status).toBe(403);
   });
 
+  it("does not disclose a Space from another organization", async () => {
+    const foreign = exportContext();
+    foreign.db.query.space.findFirst.mockResolvedValue(undefined);
+    mocks.createContext.mockResolvedValue(foreign);
+
+    const response = await spaceExportRoutes.request("/spaces/other?format=pdf");
+    expect(response.status).toBe(404);
+    expect(mocks.requireSpaceCapability).not.toHaveBeenCalled();
+  });
+
+  it("treats a trashed Space as missing rather than exporting it", async () => {
+    const trashed = exportContext();
+    trashed.db.query.space.findFirst.mockResolvedValue({
+      ...spaceFixture,
+      deletedAt: new Date("2025-01-03T00:00:00Z"),
+    });
+    mocks.createContext.mockResolvedValue(trashed);
+
+    const response = await spaceExportRoutes.request("/spaces/s1?format=pdf");
+    expect(response.status).toBe(404);
+    expect(mocks.requireSpaceCapability).not.toHaveBeenCalled();
+  });
+
   it("refuses an archive while deletion is pending", async () => {
-    const pending = context();
+    const pending = exportContext();
     pending.db.query.space.findFirst.mockResolvedValue({
-      ...space,
+      ...spaceFixture,
       deletionPendingAt: new Date("2025-01-03T00:00:00Z"),
     });
     mocks.createContext.mockResolvedValue(pending);
@@ -128,34 +120,8 @@ describe("Space export route", () => {
   });
 
   it("opens attachment storage lazily and verifies the streamed size", async () => {
-    const withAttachment = context();
-    withAttachment.db.query.attachment.findMany.mockResolvedValue([
-      {
-        id: "a1",
-        spaceId: "s1",
-        pageId: null,
-        fileName: "proof.bin",
-        mimeType: "application/octet-stream",
-        size: 2,
-        storageKey: "spaces/s1/a1.bin",
-        checksum: null,
-        uploadedBy: "u1",
-        isDraft: false,
-        publishOnNextPublish: false,
-        deletionPendingAt: null,
-        createdAt: new Date("2025-01-01T00:00:00Z"),
-      },
-    ]);
-    mocks.createContext.mockResolvedValue(withAttachment);
-    const download = vi.fn().mockResolvedValue({
-      stream: () =>
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue(Uint8Array.from([1, 2]));
-            controller.close();
-          },
-        }),
-    });
+    mocks.createContext.mockResolvedValue(exportContext({ attachments: [attachmentRow()] }));
+    const download = vi.fn().mockResolvedValue({ stream: streamOf(Uint8Array.from([1, 2])) });
     mocks.getStorage.mockReturnValue({ download });
 
     const response = await spaceExportRoutes.request("/spaces/s1?format=json");
@@ -165,35 +131,11 @@ describe("Space export route", () => {
   });
 
   it("aborts the ZIP when attachment bytes do not match metadata", async () => {
-    const withAttachment = context();
-    withAttachment.db.query.attachment.findMany.mockResolvedValue([
-      {
-        id: "a1",
-        spaceId: "s1",
-        pageId: null,
-        fileName: "short.bin",
-        mimeType: "application/octet-stream",
-        size: 3,
-        storageKey: "spaces/s1/a1.bin",
-        checksum: null,
-        uploadedBy: "u1",
-        isDraft: false,
-        publishOnNextPublish: false,
-        deletionPendingAt: null,
-        createdAt: new Date("2025-01-01T00:00:00Z"),
-      },
-    ]);
-    mocks.createContext.mockResolvedValue(withAttachment);
+    mocks.createContext.mockResolvedValue(
+      exportContext({ attachments: [attachmentRow({ size: 3, fileName: "short.bin" })] }),
+    );
     mocks.getStorage.mockReturnValue({
-      download: vi.fn().mockResolvedValue({
-        stream: () =>
-          new ReadableStream({
-            start(controller) {
-              controller.enqueue(Uint8Array.from([1, 2]));
-              controller.close();
-            },
-          }),
-      }),
+      download: vi.fn().mockResolvedValue({ stream: streamOf(Uint8Array.from([1, 2])) }),
     });
 
     const response = await spaceExportRoutes.request("/spaces/s1?format=json");

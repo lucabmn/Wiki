@@ -1,0 +1,133 @@
+---
+title: Retention, trash & deletion blocks
+description: How long data lives, what comes back, and what may never disappear.
+icon: Timer
+---
+
+Three questions, one mechanism: how long data is kept, what happens to something
+you delete, and how to declare that a particular thing must not disappear
+regardless of either answer.
+
+They share infrastructure deliberately. One policy table, one background runner,
+one set of rules — because two cleanup jobs with different ideas about what may
+be removed will eventually disagree, and the more permissive one wins by deleting
+first.
+
+## Retention windows
+
+Set under **Einstellungen → Daten & Fristen** by an organization administrator.
+
+| Window              | Default        | What it governs                                   |
+| ------------------- | -------------- | ------------------------------------------------- |
+| Aktivitätsprotokoll | **unbegrenzt** | How long audit rows are kept                      |
+| Papierkorb          | **30 Tage**    | How long deleted pages and spaces stay restorable |
+
+Audit retention is unlimited by default, and that is not laziness. The audit log
+is the evidence of who changed what; an update that quietly started trimming it
+would destroy exactly what the log exists to provide. Shortening it is an
+explicit administrative decision.
+
+<Callout type="info">
+  Four kinds of audit row are **never** removed by the audit window, whatever it is set to:
+  `retention.updated`, `retention.purged`, `hold.created` and `hold.released`. Otherwise shortening
+  the window to a week would, a week later, erase the only record of who shortened it — and of every
+  deletion block that ever existed.
+</Callout>
+
+Shortening a window is confirmed against real numbers. The dialog asks the server
+what the next run would actually remove under the proposed policy, so the question
+is "delete 41 200 audit entries?" rather than "are you sure?".
+
+## Archived is not deleted
+
+Two different states, kept separate on purpose. Merging them would lose
+information a restore needs.
+
+|            | Archiviert                              | Gelöscht (Papierkorb)                     |
+| ---------- | --------------------------------------- | ----------------------------------------- |
+| Meaning    | No longer current, still findable       | Gone from every view, recoverable for now |
+| Visible in | Explicit "include archived" views       | Only the trash                            |
+| Search     | No                                      | No                                        |
+| Expires    | Never                                   | After the trash window                    |
+| Undo       | "Wiederherstellen" on the page or space | Restore from the trash                    |
+
+A page can be both. Archiving and then deleting keeps the archive marker, so
+restoring from the trash returns the page **archived** — the state its author last
+chose — rather than silently reactivating it.
+
+## The trash
+
+Deleting a page or a space is a soft delete. The row survives, disappears from
+every view, and stays restorable until the window expires.
+
+Deleting a page takes its **whole subtree** with it, and restoring brings the same
+subtree back. Anything else would leave child pages stranded under a parent no
+reader can open.
+
+A deleted page is gone from `pages.list`, search, backlinks, favorites,
+subscriptions, tag listings, the dashboard counters, member statistics, space
+exports, the collaborative editor and the notification digest — every one of them,
+which is the part that actually takes the work.
+
+<Callout type="warn">
+  When a page finally leaves the trash, its attachments go from the object store too. That order
+  matters: the bytes are removed before the row, because `attachment.pageId` nulls on delete rather
+  than cascading, so dropping the row first would leave objects nothing references and nothing ever
+  collects.
+</Callout>
+
+Deleted **spaces** are listed under **Einstellungen → Daten & Fristen**, not in
+the space list — a trashed space has no page left to open, so its own settings
+sheet is unreachable by design.
+
+## Deletion blocks (legal hold)
+
+A block is a statement about one object: _this must not disappear, whatever window
+applies_. Set it on a page, on a space, or on the whole organization.
+
+It stops **everything**:
+
+- the audit purge skips rows pointing at the blocked object;
+- the trash expiry skips it;
+- the manual "delete permanently" is refused;
+- and so is an ordinary delete by a user. A block that only halted background
+  jobs would not be a block at all.
+
+### Inheritance
+
+A block on a space covers its pages, their comments, their attachments and every
+audit row pointing at them. A block on the organization covers everything in it.
+
+It also works upwards: a block on a single page prevents its **space** from being
+deleted, because the cascade would otherwise take the blocked page with it.
+
+The UI marks blocked objects, and disables the delete affordance rather than
+letting the click fail. An inherited block cannot be lifted where it is felt —
+the button says where to go instead.
+
+### Setting and lifting
+
+Both are audited, both require a written reason, and lifting is its own event.
+The `legal_hold` row is **kept** after release rather than deleted: that a block
+once existed, and why it was lifted, is itself evidence.
+
+<Callout type="warn">
+  Setting and lifting currently require the same right (`organization:update`). A block is often
+  aimed at the very administrator who can lift it, so the guarantee this gives is *evidentiary*, not
+  preventive: a release cannot happen quietly. True four-eyes control needs an authority above the
+  organization — an instance-admin role, tracked separately.
+</Callout>
+
+## Related
+
+<Cards>
+  <Card title="Activity log & audit" href="/docs/concepts/activity-log">
+    What the audit window applies to.
+  </Card>
+  <Card title="Configuration" href="/docs/self-hosting/configuration">
+    The runner's environment variables.
+  </Card>
+  <Card title="Backups" href="/docs/self-hosting/backups">
+    Retention does not reach into backups.
+  </Card>
+</Cards>

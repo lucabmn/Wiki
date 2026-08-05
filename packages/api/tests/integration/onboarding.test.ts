@@ -9,6 +9,7 @@ import {
   organization,
   user,
   member,
+  page,
   space,
   spaceMember,
   activity,
@@ -43,14 +44,22 @@ describe("onboarding.seedSampleData", () => {
     const result = await call(onboardingRouter.seedSampleData, {}, { context: ctx() });
     expect(result.spaces).toBe(3);
     expect(result.pages).toBe(9);
+    expect(result.templates).toBe(3);
 
     const spaces = await db.query.space.findMany({ where: eq(space.organizationId, "oA") });
     expect(spaces).toHaveLength(3);
     expect(spaces.every((s) => s.visibility === "public" && s.createdBy === "u1")).toBe(true);
 
-    const pages = await db.query.page.findMany();
+    const pages = await db.query.page.findMany({ where: eq(page.isTemplate, false) });
     expect(pages).toHaveLength(9);
     expect(pages.every((p) => p.status === "published" && p.publishedAt !== null)).toBe(true);
+
+    // The starter templates land in exactly one space, published so their body
+    // reaches `content` and can actually be copied out.
+    const templates = await db.query.page.findMany({ where: eq(page.isTemplate, true) });
+    expect(templates).toHaveLength(3);
+    expect(new Set(templates.map((t) => t.spaceId)).size).toBe(1);
+    expect(templates.every((t) => t.status === "published" && t.content !== null)).toBe(true);
     // positions within a space are strictly ordered (fractional indexing)
     const firstSpacePages = pages
       .filter((p) => p.spaceId === spaces[0]!.id)
@@ -64,13 +73,13 @@ describe("onboarding.seedSampleData", () => {
     expect(memberships.every((m) => m.role === "admin")).toBe(true);
 
     const acts = await db.query.activity.findMany({ where: eq(activity.organizationId, "oA") });
-    // 3 space.created + 9 page.created
+    // 3 space.created + 9 page.created; templates write no activity row.
     expect(acts).toHaveLength(12);
   });
 
   it("is idempotent — re-seeding an org with content is a no-op", async () => {
     const result = await call(onboardingRouter.seedSampleData, {}, { context: ctx() });
-    expect(result).toEqual({ spaces: 0, pages: 0 });
+    expect(result).toEqual({ spaces: 0, pages: 0, templates: 0 });
     expect(await db.query.space.findMany({ where: eq(space.organizationId, "oA") })).toHaveLength(
       3,
     );

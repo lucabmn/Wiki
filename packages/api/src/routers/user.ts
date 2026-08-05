@@ -8,6 +8,7 @@ import { activity, comment, member, page, space, user } from "@nilovon-wiki/db/s
 import { protectedProcedure, requireActiveOrg } from "../index";
 import { readableSpaceIds } from "../lib/access";
 import { filterReadablePagesAcrossSpaces } from "../lib/authz";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { firstRow } from "../lib/rows";
 import {
   ListUserPagesInputSchema,
@@ -128,7 +129,7 @@ export const userRouter = {
         };
       }
 
-      const inReadableSpace = inArray(page.spaceId, spaceIds);
+      const inReadableSpace = and(inArray(page.spaceId, spaceIds), pageNotTrashed());
       const live = and(inReadableSpace, isNull(page.archivedAt));
       // Like the dashboard's aggregates, these counts stop at space-level read
       // access — a page carrying a stricter per-page override still counts,
@@ -207,6 +208,7 @@ export const userRouter = {
           and(
             inArray(page.spaceId, spaceIds),
             isNull(page.archivedAt),
+            pageNotTrashed(),
             byCreator ? eq(page.createdBy, input.userId) : eq(page.lastEditedBy, input.userId),
           ),
         )

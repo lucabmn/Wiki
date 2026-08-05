@@ -4,7 +4,7 @@ import { attachment } from "@nilovon-wiki/db/schema/index";
 
 import type { AuthedContext } from "../context";
 import type { Attachment } from "../schemas/attachment";
-import { recordActivity } from "./activity";
+import { activityActor, recordActivity } from "./activity";
 import { requirePageCapability, requireSpaceCapabilityById } from "./authz";
 import { loadPage, loadSpace } from "./loaders";
 import { firstRow } from "./rows";
@@ -98,7 +98,7 @@ export async function createAttachment(
       await recordActivity(tx, {
         organizationId,
         action: "attachment.uploaded",
-        actorId: context.session.user.id,
+        ...activityActor(context),
         spaceId: row.spaceId,
         pageId: row.pageId,
         metadata: { fileName: row.fileName, attachmentId: row.id },

@@ -17,6 +17,7 @@ import {
   loadOrganizationDigestSettings,
   ORGANIZATION_DIGEST_DEFAULTS,
 } from "../lib/notifications/settings";
+import { directNotificationRouter } from "./notification-direct";
 import {
   DigestPreviewSchema,
   MyDigestSettingsSchema,
@@ -40,6 +41,13 @@ const PREVIEW_FALLBACK_DAYS = 7;
  * organization settings area.
  */
 export const notificationRouter = {
+  /**
+   * Mentions and replies. Nested rather than merged in: they are directed at
+   * one person and delivered in-app, which is a different mechanism from the
+   * scheduled broadcast the rest of this router configures.
+   */
+  direct: directNotificationRouter,
+
   getOrganizationDefaults: protectedProcedure
     .route({
       method: "GET",

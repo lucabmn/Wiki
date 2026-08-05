@@ -35,14 +35,22 @@ const ACTION_PHRASES: Record<ActivityAction, { verb: string; noun: string }> = {
   "space.created": { verb: "hat den Bereich erstellt", noun: "Bereich" },
   "space.updated": { verb: "hat den Bereich bearbeitet", noun: "Bereich" },
   "space.archived": { verb: "hat den Bereich archiviert", noun: "Bereich" },
-  "space.deleted": { verb: "hat den Bereich gelöscht", noun: "Bereich" },
+  "space.restored": { verb: "hat den Bereich wiederhergestellt", noun: "Bereich" },
+  "space.deleted": { verb: "hat den Bereich in den Papierkorb verschoben", noun: "Bereich" },
+  "space.untrashed": {
+    verb: "hat den Bereich aus dem Papierkorb geholt",
+    noun: "Bereich",
+  },
+  "space.purged": { verb: "hat den Bereich endgültig gelöscht", noun: "Bereich" },
   "page.created": { verb: "hat die Seite erstellt", noun: "Seite" },
   "page.updated": { verb: "hat die Seite bearbeitet", noun: "Seite" },
   "page.published": { verb: "hat die Seite veröffentlicht", noun: "Seite" },
   "page.moved": { verb: "hat die Seite verschoben", noun: "Seite" },
   "page.archived": { verb: "hat die Seite archiviert", noun: "Seite" },
   "page.restored": { verb: "hat die Seite wiederhergestellt", noun: "Seite" },
-  "page.deleted": { verb: "hat die Seite gelöscht", noun: "Seite" },
+  "page.deleted": { verb: "hat die Seite in den Papierkorb verschoben", noun: "Seite" },
+  "page.untrashed": { verb: "hat die Seite aus dem Papierkorb geholt", noun: "Seite" },
+  "page.purged": { verb: "hat die Seite endgültig gelöscht", noun: "Seite" },
   "comment.created": { verb: "hat kommentiert:", noun: "Seite" },
   "comment.resolved": { verb: "hat einen Kommentar aufgelöst:", noun: "Seite" },
   "comment.deleted": { verb: "hat einen Kommentar gelöscht:", noun: "Seite" },
@@ -64,6 +72,22 @@ const ACTION_PHRASES: Record<ActivityAction, { verb: string; noun: string }> = {
     verb: "hat die Zwei-Faktor-Pflicht geändert",
     noun: "Organisation",
   },
+  // Webhook administration never reaches a digest — no category maps to it, so
+  // `collectDigest` drops those rows. Present only to keep the record total.
+  "webhook.created": { verb: "hat einen Webhook angelegt", noun: "Webhook" },
+  "webhook.updated": { verb: "hat einen Webhook geändert", noun: "Webhook" },
+  "webhook.deleted": { verb: "hat einen Webhook gelöscht", noun: "Webhook" },
+  // Same for the impersonation events, which are mirrored into the target's
+  // feed rather than mailed out.
+  "impersonation.started": { verb: "wurde von der Administration übernommen", noun: "Konto" },
+  "impersonation.ended": { verb: "ist nicht mehr übernommen", noun: "Konto" },
+  // Governance events. Unmapped to a digest category (see
+  // `DIGEST_CATEGORY_ACTIONS`), so these never actually reach a mail — the
+  // record has to be exhaustive over the enum, not over what gets sent.
+  "retention.updated": { verb: "hat die Aufbewahrungsfristen geändert", noun: "Organisation" },
+  "retention.purged": { verb: "hat abgelaufene Daten gelöscht", noun: "Organisation" },
+  "hold.created": { verb: "hat eine Löschsperre gesetzt", noun: "Objekt" },
+  "hold.released": { verb: "hat eine Löschsperre aufgehoben", noun: "Objekt" },
 };
 
 const UNKNOWN_ACTOR = "Jemand";
