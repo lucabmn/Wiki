@@ -35,10 +35,13 @@ export const linkRouter = {
         .innerJoin(page, eq(pageLink.sourcePageId, page.id))
         // A backlink is only real once the linking page is published — an
         // unpublished draft's links must not surface as incoming references.
+        // Templates are excluded for the same reason they are hidden elsewhere:
+        // "3 Seiten verlinken hierher" must not count a blank form.
         .where(
           and(
             eq(pageLink.targetPageId, input.id),
             eq(page.status, "published"),
+            eq(page.isTemplate, false),
             // A trashed page is not a real backlink any more.
             pageNotTrashed(),
           ),
@@ -72,7 +75,9 @@ export const linkRouter = {
         .select({ page })
         .from(pageLink)
         .innerJoin(page, eq(pageLink.targetPageId, page.id))
-        .where(and(eq(pageLink.sourcePageId, input.id), pageNotTrashed()))
+        .where(
+          and(eq(pageLink.sourcePageId, input.id), eq(page.isTemplate, false), pageNotTrashed()),
+        )
         .orderBy(asc(page.title));
       return filterReadablePages(
         context.db,

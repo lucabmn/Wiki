@@ -1,3 +1,4 @@
+import { TemplatePicker, type TemplateChoice } from "@/components/pages/template-picker";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
 import { Button } from "@nilovon-wiki/ui/components/button";
@@ -12,13 +13,14 @@ import {
 import { Input } from "@nilovon-wiki/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 
 /**
- * Creates a page as a draft. When `spaceId` is given the page goes straight into
- * that space; without it (e.g. from the org-level dashboard) the dialog shows a
- * space picker first. Real content enters via this flow — nothing seeded.
+ * Creates a page as a draft, either blank or from one of the space's templates.
+ * When `spaceId` is given the page goes straight into that space; without it
+ * (e.g. from the org-level dashboard) the dialog shows a space picker first.
+ * Real content enters via this flow — nothing seeded.
  */
 export function CreatePageDialog({
   open,
@@ -29,8 +31,10 @@ export function CreatePageDialog({
   onOpenChange: (open: boolean) => void;
   spaceId?: string | null;
 }) {
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [pickedSpaceId, setPickedSpaceId] = useState("");
+  const [templateId, setTemplateId] = useState<TemplateChoice>(null);
   const invalidatePages = useInvalidate(orpc.pages.list.key());
 
   const needsPicker = spaceId == null;
@@ -40,20 +44,32 @@ export function CreatePageDialog({
   // Default the picker to the first space once the list arrives.
   const effectiveSpaceId = spaceId ?? (pickedSpaceId || spaces?.[0]?.id || "");
 
-  const create = useMutation(
-    orpc.pages.create.mutationOptions({
-      onSuccess: () => {
-        invalidatePages();
-        setTitle("");
-        onOpenChange(false);
-      },
-      onError: toastError,
-    }),
+  // Templates are space-local, so a selection made in one space is meaningless
+  // in the next one.
+  useEffect(() => setTemplateId(null), [effectiveSpaceId]);
+
+  const onSuccess = (page: { id: string }) => {
+    invalidatePages();
+    setTitle("");
+    setTemplateId(null);
+    onOpenChange(false);
+    // Straight into the new draft: creating a page is never the goal, writing
+    // in it is — and a page created from a template has content to look at.
+    navigate({ to: "/pages/$id", params: { id: page.id } });
+  };
+
+  const create = useMutation(orpc.pages.create.mutationOptions({ onSuccess, onError: toastError }));
+  const createFromTemplate = useMutation(
+    orpc.pages.createFromTemplate.mutationOptions({ onSuccess, onError: toastError }),
   );
+  const pending = create.isPending || createFromTemplate.isPending;
 
   const submit = () => {
     const trimmed = title.trim();
-    if (effectiveSpaceId && trimmed) {
+    if (!effectiveSpaceId || !trimmed) return;
+    if (templateId) {
+      createFromTemplate.mutate({ templateId, spaceId: effectiveSpaceId, title: trimmed });
+    } else {
       create.mutate({ spaceId: effectiveSpaceId, title: trimmed });
     }
   };
@@ -80,6 +96,7 @@ export function CreatePageDialog({
             <>
               <NativeSelect
                 className="w-full"
+                aria-label="Space"
                 value={effectiveSpaceId}
                 onChange={(e) => setPickedSpaceId(e.target.value)}
                 disabled={!spaces?.length}
@@ -109,19 +126,28 @@ export function CreatePageDialog({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Seitentitel"
+            aria-label="Seitentitel"
             maxLength={300}
           />
+          {effectiveSpaceId ? (
+            <TemplatePicker
+              spaceId={effectiveSpaceId}
+              value={templateId}
+              onChange={setTemplateId}
+              disabled={pending}
+            />
+          ) : null}
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={create.isPending}
+              disabled={pending}
             >
               Abbrechen
             </Button>
-            <Button type="submit" disabled={create.isPending || !effectiveSpaceId || !title.trim()}>
-              {create.isPending ? "Erstellen …" : "Erstellen"}
+            <Button type="submit" disabled={pending || !effectiveSpaceId || !title.trim()}>
+              {pending ? "Erstellen …" : "Erstellen"}
             </Button>
           </DialogFooter>
         </form>

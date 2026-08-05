@@ -1,5 +1,5 @@
 {
-  "id": "e32a6fcb-0a8c-4396-a9c2-235ada85cf0a",
+  "id": "a9296d2e-f9cf-46de-b5b1-7135162573d8",
   "prevId": "9c749202-86ec-4900-85df-68a05bca61aa",
   "version": "7",
   "dialect": "postgresql",
@@ -2724,479 +2724,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "wiki.mention_notice": {
-      "name": "mention_notice",
-      "schema": "wiki",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "page_id": {
-          "name": "page_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "comment_id": {
-          "name": "comment_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "mention_notice_page_uq": {
-          "name": "mention_notice_page_uq",
-          "columns": [
-            {
-              "expression": "page_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "comment_id is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "mention_notice_comment_uq": {
-          "name": "mention_notice_comment_uq",
-          "columns": [
-            {
-              "expression": "comment_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "comment_id is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "mention_notice_page_idx": {
-          "name": "mention_notice_page_idx",
-          "columns": [
-            {
-              "expression": "page_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "mention_notice_page_id_page_id_fk": {
-          "name": "mention_notice_page_id_page_id_fk",
-          "tableFrom": "mention_notice",
-          "tableTo": "page",
-          "schemaTo": "wiki",
-          "columnsFrom": ["page_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mention_notice_comment_id_comment_id_fk": {
-          "name": "mention_notice_comment_id_comment_id_fk",
-          "tableFrom": "mention_notice",
-          "tableTo": "comment",
-          "schemaTo": "wiki",
-          "columnsFrom": ["comment_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mention_notice_user_id_user_id_fk": {
-          "name": "mention_notice_user_id_user_id_fk",
-          "tableFrom": "mention_notice",
-          "tableTo": "user",
-          "schemaTo": "auth",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "wiki.notification": {
-      "name": "notification",
-      "schema": "wiki",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "type": {
-          "name": "type",
-          "type": "notification_type",
-          "typeSchema": "wiki",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actor_id": {
-          "name": "actor_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "page_id": {
-          "name": "page_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "comment_id": {
-          "name": "comment_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "notification_recipient_idx": {
-          "name": "notification_recipient_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "notification_unread_idx": {
-          "name": "notification_unread_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "read_at is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "notification_page_idx": {
-          "name": "notification_page_idx",
-          "columns": [
-            {
-              "expression": "page_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "notification_organization_id_organization_id_fk": {
-          "name": "notification_organization_id_organization_id_fk",
-          "tableFrom": "notification",
-          "tableTo": "organization",
-          "schemaTo": "auth",
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "notification_user_id_user_id_fk": {
-          "name": "notification_user_id_user_id_fk",
-          "tableFrom": "notification",
-          "tableTo": "user",
-          "schemaTo": "auth",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "notification_actor_id_user_id_fk": {
-          "name": "notification_actor_id_user_id_fk",
-          "tableFrom": "notification",
-          "tableTo": "user",
-          "schemaTo": "auth",
-          "columnsFrom": ["actor_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "notification_page_id_page_id_fk": {
-          "name": "notification_page_id_page_id_fk",
-          "tableFrom": "notification",
-          "tableTo": "page",
-          "schemaTo": "wiki",
-          "columnsFrom": ["page_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "notification_comment_id_comment_id_fk": {
-          "name": "notification_comment_id_comment_id_fk",
-          "tableFrom": "notification",
-          "tableTo": "comment",
-          "schemaTo": "wiki",
-          "columnsFrom": ["comment_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "wiki.organization_direct_notification_setting": {
-      "name": "organization_direct_notification_setting",
-      "schema": "wiki",
-      "columns": {
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "mentions": {
-          "name": "mentions",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "comment_replies": {
-          "name": "comment_replies",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "allow_user_override": {
-          "name": "allow_user_override",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "organization_direct_notification_setting_organization_id_organization_id_fk": {
-          "name": "organization_direct_notification_setting_organization_id_organization_id_fk",
-          "tableFrom": "organization_direct_notification_setting",
-          "tableTo": "organization",
-          "schemaTo": "auth",
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "wiki.user_direct_notification_setting": {
-      "name": "user_direct_notification_setting",
-      "schema": "wiki",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mentions": {
-          "name": "mentions",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "comment_replies": {
-          "name": "comment_replies",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "user_direct_notification_setting_org_idx": {
-          "name": "user_direct_notification_setting_org_idx",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "user_direct_notification_setting_user_id_user_id_fk": {
-          "name": "user_direct_notification_setting_user_id_user_id_fk",
-          "tableFrom": "user_direct_notification_setting",
-          "tableTo": "user",
-          "schemaTo": "auth",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "user_direct_notification_setting_organization_id_organization_id_fk": {
-          "name": "user_direct_notification_setting_organization_id_organization_id_fk",
-          "tableFrom": "user_direct_notification_setting",
-          "tableTo": "organization",
-          "schemaTo": "auth",
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "user_direct_notification_setting_user_id_organization_id_pk": {
-          "name": "user_direct_notification_setting_user_id_organization_id_pk",
-          "columns": ["user_id", "organization_id"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "wiki.page_link": {
       "name": "page_link",
       "schema": "wiki",
@@ -3670,6 +3197,70 @@
           "columns": ["user_id", "organization_id"]
         }
       },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "wiki.organization_setting": {
+      "name": "organization_setting",
+      "schema": "wiki",
+      "columns": {
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "two_factor_required": {
+          "name": "two_factor_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "two_factor_grace_until": {
+          "name": "two_factor_grace_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "two_factor_require_for_sso": {
+          "name": "two_factor_require_for_sso",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "organization_setting_organization_id_organization_id_fk": {
+          "name": "organization_setting_organization_id_organization_id_fk",
+          "tableFrom": "organization_setting",
+          "tableTo": "organization",
+          "schemaTo": "auth",
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -5563,6 +5154,9 @@
         "comment.deleted",
         "attachment.uploaded",
         "attachment.deleted",
+        "organization.two_factor_enabled",
+        "organization.two_factor_disabled",
+        "organization.two_factor_grace_updated",
         "webhook.created",
         "webhook.updated",
         "webhook.deleted",
@@ -5605,11 +5199,6 @@
       "name": "legal_hold_subject",
       "schema": "wiki",
       "values": ["organization", "space", "page"]
-    },
-    "wiki.notification_type": {
-      "name": "notification_type",
-      "schema": "wiki",
-      "values": ["mention_page", "mention_comment", "comment_reply"]
     },
     "wiki.page_status": {
       "name": "page_status",

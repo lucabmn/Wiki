@@ -26,6 +26,7 @@ import {
   SubscribeButton,
 } from "@/components/pages/page-header-actions";
 import { PageTags } from "@/components/pages/page-tags";
+import { PageTemplateBanner, TemplateToggleButton } from "@/components/pages/page-template-banner";
 import { STATUS_LABEL } from "@/lib/labels";
 import { scrollIntoPageView } from "@/lib/scroll";
 import { orpc } from "@/utils/orpc";
@@ -130,6 +131,8 @@ function RouteComponent() {
         <div className="min-w-0 flex-1">
           {breadcrumb}
 
+          {page.isTemplate ? <PageTemplateBanner page={page} /> : null}
+
           {editing ? (
             <PageEditor
               page={page}
@@ -167,6 +170,7 @@ function RouteComponent() {
                       <Lock className="size-4" />
                     </Button>
                   ) : null}
+                  {canEdit ? <TemplateToggleButton page={page} /> : null}
                   {canEdit ? (
                     <Button
                       variant="outline"

@@ -140,6 +140,10 @@ export async function collectDigest(
         // signal — archiving changes `status` but not this. Authors still hear
         // about their own drafts, so nothing they can act on goes missing.
         or(isNull(activity.pageId), isNotNull(page.publishedAt), eq(page.createdBy, userId)),
+        // Nobody wants a mail because someone fixed a typo in the meeting-notes
+        // template. Templates are hidden from every reader view; the digest is
+        // no exception.
+        or(isNull(activity.pageId), eq(page.isTemplate, false)),
         // Nothing about a page in the trash, not even the deletion itself. The
         // trash is a staging area: while a page sits in it the deletion is still
         // reversible, and mailing "Ada deleted X" for something that may be back

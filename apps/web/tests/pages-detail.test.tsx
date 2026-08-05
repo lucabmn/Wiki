@@ -11,6 +11,8 @@ const {
   subscribeSpy,
   deleteCommentSpy,
   archiveSpy,
+  updateSpy,
+  createFromTemplateSpy,
   restorePageSpy,
   deletePageSpy,
   navigateSpy,
@@ -37,6 +39,10 @@ const {
   subscribeSpy: vi.fn((_vars?: { pageId: string }) => Promise.resolve({})),
   deleteCommentSpy: vi.fn((_vars?: { id: string }) => Promise.resolve({})),
   archiveSpy: vi.fn((_vars?: { id: string }) => Promise.resolve({})),
+  updateSpy: vi.fn((vars?: { id: string; isTemplate?: boolean }) => Promise.resolve({ ...vars })),
+  createFromTemplateSpy: vi.fn((_vars?: { templateId: string; spaceId: string }) =>
+    Promise.resolve({ id: "p2", title: "Kopie" }),
+  ),
   restorePageSpy: vi.fn((_vars?: { id: string }) => Promise.resolve({})),
   deletePageSpy: vi.fn((_vars?: { id: string }) => Promise.resolve({ id: "p1", deleted: 1 })),
   navigateSpy: vi.fn(),
@@ -98,6 +104,16 @@ vi.mock("@/utils/orpc", () => ({
       },
       archive: {
         mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: archiveSpy, ...opts }),
+      },
+      update: {
+        mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: updateSpy, ...opts }),
+      },
+      listTemplates: { key: () => ["templates"] },
+      createFromTemplate: {
+        mutationOptions: (opts: Record<string, unknown>) => ({
+          mutationFn: createFromTemplateSpy,
+          ...opts,
+        }),
       },
       restore: {
         mutationOptions: (opts: Record<string, unknown>) => ({
@@ -572,6 +588,35 @@ describe("page view route", () => {
     renderView();
     await screen.findByText("body");
     expect(screen.queryByRole("button", { name: "Bearbeiten" })).toBeNull();
+  });
+
+  it("marks a page as a template from the header", async () => {
+    data.page = somePage;
+    data.canEdit = true;
+    renderView();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Als Vorlage markieren" }));
+    await waitFor(() =>
+      expect(updateSpy.mock.calls[0]?.[0]).toEqual({ id: "p1", isTemplate: true }),
+    );
+  });
+
+  it("explains a template and creates a page from it", async () => {
+    data.page = { ...somePage, isTemplate: true };
+    data.canEdit = true;
+    renderView();
+
+    expect(await screen.findByText(/Diese Seite ist eine Vorlage/)).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Vorlage verwenden" }));
+    await waitFor(() =>
+      expect(createFromTemplateSpy.mock.calls[0]?.[0]).toEqual({
+        templateId: "p1",
+        spaceId: "s1",
+      }),
+    );
+    await waitFor(() =>
+      expect(navigateSpy).toHaveBeenCalledWith({ to: "/pages/$id", params: { id: "p2" } }),
+    );
   });
 
   it("opens and closes the editor when permitted", async () => {

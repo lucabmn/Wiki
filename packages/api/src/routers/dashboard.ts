@@ -41,9 +41,15 @@ export const dashboardRouter = {
       }
 
       const weekAgo = new Date(Date.now() - WEEK_MS);
-      // `spaceIds` already excludes trashed spaces; this drops individually
-      // trashed pages, which would otherwise still be counted.
-      const inReadableSpace = and(inArray(page.spaceId, spaceIds), pageNotTrashed());
+      // Templates never count: "142 Seiten" should be the wiki's size, not the
+      // size of the wiki plus its stationery drawer. `spaceIds` already excludes
+      // trashed spaces; `pageNotTrashed` drops individually trashed pages. The
+      // comment counts join through page, so all of it applies to them too.
+      const inReadableSpace = and(
+        inArray(page.spaceId, spaceIds),
+        eq(page.isTemplate, false),
+        pageNotTrashed(),
+      );
       // Comment counts join through page so they inherit the same space scope.
       const commentInReadableSpace = () =>
         context.db

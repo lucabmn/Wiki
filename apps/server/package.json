@@ -25,12 +25,15 @@
     "drizzle-orm": "^0.45.2",
     "evlog": "catalog:",
     "hono": "catalog:",
+    "pdfkit": "^0.17.2",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@nilovon-wiki/config": "workspace:*",
     "@types/archiver": "^8.0.0",
     "@types/bun": "catalog:",
+    "@types/pdfkit": "^0.17.6",
+    "fflate": "^0.8.3",
     "tsdown": "^0.22.3",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -8,6 +8,7 @@ export * from "./external-links";
 export * from "./inbox";
 export * from "./links";
 export * from "./notifications";
+export * from "./organization-settings";
 export * from "./pages";
 export * from "./retention";
 export * from "./spaces";

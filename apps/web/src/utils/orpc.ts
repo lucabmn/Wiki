@@ -27,6 +27,11 @@ export function friendlyErrorMessage(error: Error): string {
       return "Das kollidiert mit einem vorhandenen Eintrag.";
     case "BAD_REQUEST":
       return "Die Eingabe ist ungültig. Bitte prüfe deine Angaben.";
+    // The gate normally renders the setup screen before any of this is reached;
+    // a toast only shows up in the race where the policy is switched on while a
+    // request is already in flight.
+    case "TWO_FACTOR_REQUIRED":
+      return "Diese Organisation verlangt einen zweiten Faktor. Bitte richte ihn ein.";
   }
   if (error.name === "TypeError" || /fetch|network/i.test(error.message)) {
     return "Der Server ist gerade nicht erreichbar. Prüfe deine Verbindung.";
