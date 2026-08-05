@@ -1,19 +1,27 @@
 import { ORPCError } from "@orpc/server";
-import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { Database } from "@nilovon-wiki/db";
 import { attachment, page, pageRevision } from "@nilovon-wiki/db/schema/index";
 import { env } from "@nilovon-wiki/env/server";
 
 import { isOrgManager, protectedProcedure } from "../index";
 import { filterReadablePages, loadSpaceRole } from "../lib/access";
 import { requirePageCapability, requireSpaceCapabilityById } from "../lib/authz";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { COLLAB_TOKEN_TTL_SECONDS, collabDocName, signCollabToken } from "../lib/collab-token";
 import { generateKeyBetween } from "../lib/fractional";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { extractPageLinks, syncPageLinks } from "../lib/page-links";
+import {
+  assertNoCycle,
+  assertParentInSpace,
+  positionAtEnd,
+  positionForMove,
+  siblingsOf,
+} from "../lib/page-tree";
+import { assertPageDeletable, pageSubtreeIds } from "../lib/retention/holds";
 import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
@@ -33,106 +41,6 @@ import {
 import { IdSchema } from "../schemas/shared";
 
 const TAGS = ["Pages"];
-
-/** Sibling scope predicate: same space, same parent (null-aware). */
-function siblingsOf(spaceId: string, parentId: string | null) {
-  return and(
-    eq(page.spaceId, spaceId),
-    parentId === null ? isNull(page.parentId) : eq(page.parentId, parentId),
-  );
-}
-
-/** Position at the end of a sibling list (after the last child). */
-async function positionAtEnd(
-  db: Database,
-  spaceId: string,
-  parentId: string | null,
-  excludeId?: string,
-): Promise<string> {
-  const last = await db.query.page.findFirst({
-    where: excludeId
-      ? and(siblingsOf(spaceId, parentId), sql`${page.id} <> ${excludeId}`)
-      : siblingsOf(spaceId, parentId),
-    orderBy: [desc(page.position)],
-    columns: { position: true },
-  });
-  return generateKeyBetween(last?.position ?? null, null);
-}
-
-/**
- * Ensures a requested parent page exists in `spaceId`. Without this, a
- * client-supplied `parentId` could point into another space (or another org's
- * space), corrupting the tree and doubling as a page-existence oracle.
- */
-async function assertParentInSpace(
-  db: Database,
-  parentId: string | null,
-  spaceId: string,
-): Promise<void> {
-  if (!parentId) return;
-  const parent = await db.query.page.findFirst({
-    where: eq(page.id, parentId),
-    columns: { spaceId: true },
-  });
-  if (!parent || parent.spaceId !== spaceId) {
-    throw new ORPCError("BAD_REQUEST", { message: "Parent page is not in this space" });
-  }
-}
-
-/**
- * Walks the ancestor chain of `parentId` to ensure `movedId` is not among its
- * ancestors — otherwise the move would create a cycle in the page tree.
- */
-async function assertNoCycle(
-  db: Database,
-  movedId: string,
-  parentId: string | null,
-): Promise<void> {
-  let cursor = parentId;
-  while (cursor) {
-    if (cursor === movedId) {
-      throw new ORPCError("BAD_REQUEST", {
-        message: "Cannot move a page underneath itself",
-      });
-    }
-    const parent = await db.query.page.findFirst({
-      where: eq(page.id, cursor),
-      columns: { parentId: true },
-    });
-    cursor = parent?.parentId ?? null;
-  }
-}
-
-/** Resolves a reorder request into a fractional position within the parent. */
-async function positionForMove(
-  db: Database,
-  spaceId: string,
-  parentId: string | null,
-  movedId: string,
-  beforeId?: string,
-  afterId?: string,
-): Promise<string> {
-  const not = sql`${page.id} <> ${movedId}`;
-  if (afterId) {
-    const anchor = await loadPage(db, afterId);
-    const next = await db.query.page.findFirst({
-      where: and(siblingsOf(spaceId, parentId), gt(page.position, anchor.position), not),
-      orderBy: [asc(page.position)],
-      columns: { position: true },
-    });
-    return generateKeyBetween(anchor.position, next?.position ?? null);
-  }
-  if (beforeId) {
-    const anchor = await loadPage(db, beforeId);
-    const prev = await db.query.page.findFirst({
-      where: and(siblingsOf(spaceId, parentId), lt(page.position, anchor.position), not),
-      orderBy: [desc(page.position)],
-      columns: { position: true },
-    });
-    return generateKeyBetween(prev?.position ?? null, anchor.position);
-  }
-  return positionAtEnd(db, spaceId, parentId, movedId);
-}
 
 const IMPORT_NODE_TYPES = new Set([
   "doc",
@@ -390,6 +298,13 @@ export const pageRouter = {
               : eq(page.parentId, input.parentId),
           input.status ? eq(page.status, input.status) : undefined,
           input.includeArchived ? undefined : isNull(page.archivedAt),
+          // A template is not a page of the wiki — it belongs to the template
+          // catalogue (`pages.listTemplates`), not to the space's tree.
+          input.includeTemplates ? undefined : eq(page.isTemplate, false),
+          // Trashed pages are never listed here, not even with
+          // `includeArchived`: the trash has its own view, and the two states
+          // are different questions ("still findable?" vs "already gone?").
+          pageNotTrashed(),
         ),
         orderBy: [asc(page.position)],
       });
@@ -543,7 +458,7 @@ export const pageRouter = {
               await recordActivity(tx, {
                 organizationId,
                 action: "page.created",
-                actorId: userId,
+                ...activityActor(context),
                 spaceId: row.spaceId,
                 pageId: row.id,
                 metadata: { title: row.title, source: "html-import", sourcePath: item.sourcePath },
@@ -637,7 +552,7 @@ export const pageRouter = {
           await recordActivity(tx, {
             organizationId: item.organizationId,
             action: "page.updated",
-            actorId: context.session.user.id,
+            ...activityActor(context),
             spaceId: item.row.spaceId,
             pageId: item.row.id,
             metadata: { title: item.row.title, source: "html-import-assets" },
@@ -702,7 +617,7 @@ export const pageRouter = {
             await recordActivity(tx, {
               organizationId,
               action: "page.created",
-              actorId: userId,
+              ...activityActor(context),
               spaceId: row.spaceId,
               pageId: row.id,
               metadata: { title: row.title },
@@ -752,7 +667,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.updated",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -841,7 +756,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.published",
-          actorId: userId,
+          ...activityActor(context),
           spaceId: existing.spaceId,
           pageId: existing.id,
           metadata: { title: nextTitle },
@@ -889,7 +804,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.moved",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -930,12 +845,67 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.archived",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
         });
         return row;
+      });
+    }),
+
+  /**
+   * Soft delete: the page moves to the trash and disappears from every view, but
+   * stays restorable until the org's trash window expires. Archiving is *not*
+   * the same thing and neither replaces the other — archived means "no longer
+   * current, still findable", deleted means "gone, recoverable for now".
+   */
+  delete: protectedProcedure
+    .route({
+      method: "DELETE",
+      path: "/pages/{id}",
+      tags: TAGS,
+      summary: "Move a page (and its subtree) to the trash",
+    })
+    .input(z.object({ id: IdSchema }))
+    .output(z.object({ id: IdSchema, deleted: z.number().int() }))
+    .handler(async ({ input, context }) => {
+      const existing = await loadPage(context.db, input.id);
+      const { organizationId } = await requirePageCapability(
+        context.db,
+        context,
+        context.headers,
+        existing,
+        "write",
+      );
+      // A deletion block that only stopped the background purge would not be a
+      // block at all; the manual path has to refuse too, and say why.
+      await assertPageDeletable(context.db, {
+        id: existing.id,
+        spaceId: existing.spaceId,
+        organizationId,
+      });
+      // Child pages go with the parent: leaving them behind would strand them
+      // under a parent no reader can reach.
+      const subtree = await pageSubtreeIds(context.db, existing.id);
+      const now = new Date();
+      return context.db.transaction(async (tx) => {
+        const deleted = await tx
+          .update(page)
+          .set({ deletedAt: now, deletedBy: context.session.user.id })
+          .where(and(inArray(page.id, subtree), isNull(page.deletedAt)))
+          .returning({ id: page.id });
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.deleted",
+          ...activityActor(context),
+          spaceId: existing.spaceId,
+          pageId: existing.id,
+          // The page row survives a soft delete, but the title is denormalized
+          // anyway so the feed still reads correctly after the purge.
+          metadata: { title: existing.title, pages: deleted.length },
+        });
+        return { id: existing.id, deleted: deleted.length };
       });
     }),
 
@@ -967,7 +937,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.restored",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title },
@@ -1044,7 +1014,7 @@ export const pageRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "page.updated",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: row.spaceId,
           pageId: row.id,
           metadata: { title: row.title, restoredVersion: revision.version },

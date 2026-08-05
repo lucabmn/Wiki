@@ -11,6 +11,7 @@ import { pageLink } from "./links";
 import { activity } from "./activity";
 import { organizationSetting } from "./organization-settings";
 import { favorite, pageSubscription } from "./user-state";
+import { webhook, webhookDelivery } from "./webhooks";
 
 /**
  * Relations live in a single file so they can reference tables across modules
@@ -126,4 +127,18 @@ export const favoriteRelations = relations(favorite, ({ one }) => ({
 export const pageSubscriptionRelations = relations(pageSubscription, ({ one }) => ({
   user: one(user, { fields: [pageSubscription.userId], references: [user.id] }),
   page: one(page, { fields: [pageSubscription.pageId], references: [page.id] }),
+}));
+
+export const webhookRelations = relations(webhook, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [webhook.organizationId],
+    references: [organization.id],
+  }),
+  space: one(space, { fields: [webhook.spaceId], references: [space.id] }),
+  deliveries: many(webhookDelivery),
+}));
+
+export const webhookDeliveryRelations = relations(webhookDelivery, ({ one }) => ({
+  webhook: one(webhook, { fields: [webhookDelivery.webhookId], references: [webhook.id] }),
+  activity: one(activity, { fields: [webhookDelivery.activityId], references: [activity.id] }),
 }));

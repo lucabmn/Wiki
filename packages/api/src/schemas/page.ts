@@ -44,6 +44,9 @@ export const ListPagesInputSchema = z.object({
   parentId: IdSchema.nullish(),
   status: PageStatusSchema.optional(),
   includeArchived: z.boolean().default(false),
+  // Templates are authoring scaffolding, not part of a space's page tree. They
+  // stay out of every normal view unless a caller asks for them explicitly.
+  includeTemplates: z.boolean().default(false),
 });
 
 export const CreatePageInputSchema = z.object({
@@ -56,6 +59,39 @@ export const CreatePageInputSchema = z.object({
   content: DocumentSchema.optional(),
   textContent: z.string().default(""),
   isTemplate: z.boolean().default(false),
+});
+
+// --- Page templates ---------------------------------------------------------
+
+/**
+ * Catalogue entry for the template picker — deliberately not `PageSchema`.
+ * Reader APIs redact the body of a page that was never published
+ * (`redactDraftBody`), which would leave every picker card blank, while
+ * shipping whole documents to build a preview is wasteful. A short,
+ * server-truncated excerpt is what the picker actually needs.
+ */
+export const PageTemplateSchema = z.object({
+  id: IdSchema,
+  spaceId: IdSchema,
+  title: z.string(),
+  icon: z.string().nullable(),
+  excerpt: z.string(),
+  /** False while the template has no published body — there is nothing to copy yet. */
+  hasContent: z.boolean(),
+  status: PageStatusSchema,
+  updatedAt: z.date(),
+});
+export type PageTemplate = z.infer<typeof PageTemplateSchema>;
+
+export const ListTemplatesInputSchema = z.object({ spaceId: IdSchema });
+
+export const CreateFromTemplateInputSchema = z.object({
+  templateId: IdSchema,
+  /** Destination space — a template may be applied outside its own space. */
+  spaceId: IdSchema,
+  parentId: IdSchema.nullish(),
+  /** Defaults to the template's title. */
+  title: z.string().min(1).max(300).optional(),
 });
 
 const ImportPageSchema = z.object({

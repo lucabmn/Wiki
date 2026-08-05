@@ -78,11 +78,18 @@ pages.list lädt für den Baum alle Seiten inklusive vollständigem Content:
 
 Für große Wikis braucht es einen schlanken Tree-Endpunkt mit nur ID, Titel, Parent, Reihenfolge, Status und Slug.
 
-### Archiv-Wiederherstellung vollständig machen
+### ~~Archiv-Wiederherstellung vollständig machen~~ — erledigt
 
-- Spaces können archiviert, aber offenbar nicht regulär wiederhergestellt werden.
-- Für Seiten existiert eine Restore-API, aber keine passende UI.
-- Die UI verspricht Wiederherstellung dennoch.
+Geschlossen mit dem Datenlebenszyklus (`tickets/T04-data-lifecycle.md`):
+
+- `spaces.restore` hebt die Archivierung auf; die Aktion sitzt in den
+  Space-Einstellungen, erreichbar über den Filter „Archiviert" in der
+  Space-Übersicht.
+- Der Seiten-Kopf zeigt für eine archivierte Seite „Wiederherstellen" statt
+  „Archivieren" — die vorhandene `pages.restore`-API hat damit eine UI.
+- Zusätzlich gibt es jetzt einen Papierkorb: Löschen ist ein Soft-Delete mit
+  Frist, Wiederherstellen und endgültiges Löschen sind eigene Aktionen. Siehe
+  `apps/docs/content/docs/concepts/data-lifecycle.mdx`.
 
 ### Audit Log ehrlich vervollständigen
 
@@ -153,10 +160,12 @@ Keine davon ist aktuell „high“, aber sie sollten geprüft und automatisiert 
 Für Betreiber sollte dokumentiert werden:
 
 - welche personenbezogenen Daten gespeichert werden,
-- Log- und Audit-Retention,
+- ~~Log- und Audit-Retention~~ — umgesetzt und dokumentiert (`DEPLOY.md`,
+  „Which data lives how long"; Fristen pro Organisation in der App),
 - Account-/Org-Löschung,
 - Datenexport,
-- Backup-Löschung,
+- Backup-Löschung (Aufbewahrungsfristen greifen bewusst **nicht** in Backups —
+  ein Dump von vor einem Purge enthält die gelöschten Zeilen weiterhin),
 - Telemetrieverhalten,
 - Verantwortlichkeiten des Self-Hosters.
 

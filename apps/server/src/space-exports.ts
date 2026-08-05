@@ -46,7 +46,11 @@ spaceExportRoutes.get("/spaces/:id", async (c) => {
   const authorizationSpace = await context.db.query.space.findFirst({
     where: eq(spaceTable.id, c.req.param("id")),
   });
-  if (!authorizationSpace) return c.json({ message: "Space not found" }, 404);
+  // A trashed space behaves as missing everywhere, exports included — otherwise
+  // "deleted" would still be one URL away from a full archive of its contents.
+  if (!authorizationSpace || authorizationSpace.deletedAt) {
+    return c.json({ message: "Space not found" }, 404);
+  }
 
   try {
     // A Space export is the single largest read in the product, and it never

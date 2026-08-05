@@ -20,7 +20,7 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { FolderPlus, Plus, Search, X } from "lucide-react";
+import { Archive, FolderPlus, Plus, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/_auth/spaces/")({
@@ -28,14 +28,18 @@ export const Route = createFileRoute("/_auth/spaces/")({
 });
 
 type Visibility = "public" | "private" | "restricted";
+type Filter = "all" | Visibility | "archived";
 
 // Filter pills: "all" plus one per visibility. Kept as a plain button row rather
 // than a ToggleGroup so selection is a single string, not a value array.
-const VISIBILITY_FILTERS: { value: "all" | Visibility; label: string }[] = [
+const VISIBILITY_FILTERS: { value: Filter; label: string }[] = [
   { value: "all", label: "Alle" },
   { value: "public", label: VISIBILITY_LABEL.public },
   { value: "private", label: VISIBILITY_LABEL.private },
   { value: "restricted", label: VISIBILITY_LABEL.restricted },
+  // Archived spaces are hidden by default but reachable — without this the
+  // un-archive action in the settings sheet had no route to it at all.
+  { value: "archived", label: "Archiviert" },
 ];
 
 function RouteComponent() {
@@ -45,17 +49,24 @@ function RouteComponent() {
     isError,
     error,
     refetch,
-  } = useQuery(orpc.spaces.list.queryOptions({ input: {} }));
+    // Archived spaces come along so the "Archiviert" filter can show them; they
+    // are filtered out of every other view below.
+  } = useQuery(orpc.spaces.list.queryOptions({ input: { includeArchived: true } }));
 
   const [createOpen, setCreateOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [visibility, setVisibility] = useState<"all" | Visibility>("all");
+  const [visibility, setVisibility] = useState<Filter>("all");
 
   const filtered = useMemo(() => {
     if (!spaces) return [];
     const q = query.trim().toLowerCase();
     return spaces.filter((space) => {
-      if (visibility !== "all" && space.visibility !== visibility) return false;
+      // Archived is a state, not a visibility, so it is its own branch: any
+      // other filter means "active spaces only".
+      if (visibility === "archived" ? !space.archivedAt : space.archivedAt) return false;
+      if (visibility !== "all" && visibility !== "archived" && space.visibility !== visibility) {
+        return false;
+      }
       if (!q) return true;
       return (
         space.name.toLowerCase().includes(q) ||
@@ -64,7 +75,7 @@ function RouteComponent() {
     });
   }, [spaces, query, visibility]);
 
-  const total = spaces?.length ?? 0;
+  const total = spaces?.filter((space) => !space.archivedAt).length ?? 0;
 
   const clearFilters = () => {
     setQuery("");
@@ -163,9 +174,11 @@ function RouteComponent() {
             <EmptyMedia variant="icon">
               <Search className="size-6" />
             </EmptyMedia>
-            <EmptyTitle>Keine Treffer</EmptyTitle>
+            <EmptyTitle>{visibility === "archived" ? "Kein Archiv" : "Keine Treffer"}</EmptyTitle>
             <EmptyDescription>
-              Kein Space passt zu deiner Suche{query.trim() ? ` „${query.trim()}“` : ""}.
+              {visibility === "archived"
+                ? "Es ist kein Space archiviert. Gelöschte Bereiche findest du unter Einstellungen › Daten & Fristen."
+                : `Kein Space passt zu deiner Suche${query.trim() ? ` „${query.trim()}“` : ""}.`}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -191,9 +204,16 @@ function RouteComponent() {
                     )}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-medium">{space.name}</span>
-                  <Badge variant="outline" className="shrink-0">
-                    {VISIBILITY_LABEL[space.visibility] ?? space.visibility}
-                  </Badge>
+                  {space.archivedAt ? (
+                    <Badge variant="secondary" className="shrink-0 gap-1">
+                      <Archive className="size-3" />
+                      Archiviert
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="shrink-0">
+                      {VISIBILITY_LABEL[space.visibility] ?? space.visibility}
+                    </Badge>
+                  )}
                 </div>
                 <p
                   className={cn(

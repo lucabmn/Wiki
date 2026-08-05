@@ -57,6 +57,13 @@ export const page = wikiSchema.table(
     }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
+    // Archived and deleted are different states and must not be merged:
+    // archived means "no longer current, still findable", deleted means "gone
+    // from every view, but restorable until the trash window expires". A page
+    // can be both — archiving then deleting must not lose the archive marker,
+    // because restoring from the trash has to put the page back as it was.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: text("deleted_by").references(() => user.id, { onDelete: "set null" }),
     ...timestamps,
     // Generated German FTS vector: title weighted higher (A) than body (B).
     // Keep this configuration aligned with the query and headline functions in
@@ -73,6 +80,8 @@ export const page = wikiSchema.table(
     index("page_created_by_idx").on(t.createdBy),
     index("page_last_edited_by_idx").on(t.lastEditedBy),
     index("page_search_idx").using("gin", t.searchVector),
+    // The trash-expiry sweep's hot path: "which deleted pages are due?".
+    index("page_deleted_idx").on(t.deletedAt),
   ],
 );
 

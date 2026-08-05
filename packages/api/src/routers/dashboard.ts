@@ -5,6 +5,7 @@ import { activity, comment, page } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg } from "../index";
 import { readableSpaceIds } from "../lib/access";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { firstRow } from "../lib/rows";
 import { DashboardOverviewSchema } from "../schemas/misc";
 
@@ -40,7 +41,15 @@ export const dashboardRouter = {
       }
 
       const weekAgo = new Date(Date.now() - WEEK_MS);
-      const inReadableSpace = inArray(page.spaceId, spaceIds);
+      // Templates never count: "142 Seiten" should be the wiki's size, not the
+      // size of the wiki plus its stationery drawer. `spaceIds` already excludes
+      // trashed spaces; `pageNotTrashed` drops individually trashed pages. The
+      // comment counts join through page, so all of it applies to them too.
+      const inReadableSpace = and(
+        inArray(page.spaceId, spaceIds),
+        eq(page.isTemplate, false),
+        pageNotTrashed(),
+      );
       // Comment counts join through page so they inherit the same space scope.
       const commentInReadableSpace = () =>
         context.db

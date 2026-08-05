@@ -8,8 +8,11 @@ import { admin, organization, twoFactor } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { scim } from "@better-auth/scim";
 import { sso } from "@better-auth/sso";
+import { adminAuditPlugin } from "./admin-hooks";
+import { INSTANCE_ADMIN_ROLES, INSTANCE_ROLE_ADMIN, isInitialAdminEmail } from "./instance-admin";
 import { actionMail, sendMail } from "./mail";
 import { ac, roles } from "./permissions";
+import { cachedSessionVersion } from "./session-revocation";
 import { SSO_DOMAIN_TOKEN_PREFIX } from "./sso-domain";
 import { localization } from "better-auth-localization";
 
@@ -37,9 +40,24 @@ export function createAuth() {
       cookieCache: {
         enabled: true,
         maxAge: 5 * 60, // Cache session for 5 minutes
+        // Without this, a ban or an admin session revocation would not bite for
+        // up to those five minutes: `getSession` answers from the signed cookie
+        // and never notices the session rows are gone. See session-revocation.ts.
+        version: (_session, cachedUser) => cachedSessionVersion(cachedUser.id),
       },
     },
     databaseHooks: {
+      user: {
+        create: {
+          // Bootstraps the very first instance admin. `ensureInitialAdmin` covers
+          // the case where the account already exists; this covers the other
+          // order — the operator configures the address, then registers.
+          before: async (candidate) => {
+            if (!isInitialAdminEmail(candidate.email)) return;
+            return { data: { ...candidate, role: INSTANCE_ROLE_ADMIN } };
+          },
+        },
+      },
       session: {
         create: {
           // Stamp the active org onto the session *row at creation*, before the
@@ -142,7 +160,21 @@ export function createAuth() {
       },
     },
     plugins: [
-      admin(),
+      // Instance administration. Distinct from the organization roles below:
+      // this governs the deployment (accounts, sessions, health), not one
+      // tenant's content — see docs/permissions.md.
+      admin({
+        adminRoles: INSTANCE_ADMIN_ROLES,
+        // Short by design. An impersonated session is a support tool, not a
+        // second login; a forgotten tab must not stay signed in as somebody
+        // else for a working day.
+        impersonationSessionDuration: env.IMPERSONATION_MAX_MINUTES * 60,
+        bannedUserMessage:
+          "Dieses Konto wurde gesperrt. Wende dich an die Administration deiner Instanz.",
+      }),
+      // Must follow `admin()`: it hooks that plugin's endpoints to write the
+      // instance audit log and to enforce the impersonation kill-switch.
+      adminAuditPlugin(db),
       twoFactor(),
       passkey(),
       organization({

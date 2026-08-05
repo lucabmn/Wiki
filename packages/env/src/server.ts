@@ -26,6 +26,14 @@ export const env = createEnv({
     APP_NAME: z.string().min(1).default("Wiki"),
     // Port the real-time collaboration service (`apps/collab`) listens on.
     COLLAB_PORT: z.coerce.number().int().positive().default(1234),
+    // Where this process reaches the collab service, for the admin console's
+    // "collab reachable" probe. Defaults to loopback (the dev layout, where all
+    // three apps share a host); under docker-compose the service lives on its
+    // own container and this must point at it.
+    COLLAB_INTERNAL_URL: z.url().optional(),
+    // Reported verbatim in the admin console's instance overview — the first
+    // thing anyone asks for in a support case. Set from the image tag.
+    APP_VERSION: z.string().min(1).default("dev"),
     // Per-IP request ceilings (requests per minute). The general limit covers
     // /rpc and the REST surface; the auth limit protects /api/auth/* against
     // credential stuffing. Set high enough that normal usage never hits them.
@@ -35,6 +43,26 @@ export const env = createEnv({
     // not a person signing in: one request per user, all from one IP. It needs
     // a ceiling sized for a full directory push, not for credential stuffing.
     RATE_LIMIT_SCIM_MAX: z.coerce.number().int().positive().default(1200),
+
+    // ── Instance administration ─────────────────────────────────────────────
+    // Bootstraps the first instance admin. `user.role` is nullable and nothing
+    // sets it at registration, so on a fresh instance nobody can open the admin
+    // console — a chicken-and-egg the operator has to break from outside the
+    // app. The address is matched case-insensitively and promoted at startup as
+    // well as at registration, so it works whether the account already exists
+    // or is created later. Existing admins are never demoted by changing it.
+    INITIAL_ADMIN_EMAIL: z.email().optional(),
+    // Hard kill-switch for impersonation. Some operators (works councils,
+    // regulated industries) must be able to prove the capability is absent
+    // rather than merely audited, so this is enforced server-side — the UI only
+    // mirrors it.
+    IMPERSONATION_ENABLED: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
+    // How long an impersonated session survives on its own. Short by design: a
+    // forgotten tab must not stay signed in as someone else for a working day.
+    IMPERSONATION_MAX_MINUTES: z.coerce.number().int().min(1).max(480).default(30),
 
     // ── SMTP ────────────────────────────────────────────────────────────────
     // Optional as a whole: with SMTP_HOST unset the app still boots but mail is
@@ -66,9 +94,58 @@ export const env = createEnv({
     // How often the ticker looks for due digests. Sub-minute granularity buys
     // nothing for a daily mail, and every tick is a database round-trip.
     DIGEST_TICK_SECONDS: z.coerce.number().int().min(30).default(300),
-    // Bearer token for POST /internal/digests/run. Unset leaves the endpoint
-    // disabled — an unauthenticated trigger would let anyone drain the queue.
+    // Legacy alias of INTERNAL_RUN_TOKEN below, kept working so existing
+    // deployments keep triggering digests after an update. Prefer the new name.
     DIGEST_RUN_TOKEN: z.string().min(16).optional(),
+
+    // ── Machine-triggered runners (/internal/**) ────────────────────────────
+    // Bearer token for every POST /internal/*/run endpoint. Unset leaves them
+    // disabled — an unauthenticated trigger would let anyone drain a queue.
+    INTERNAL_RUN_TOKEN: z.string().min(16).optional(),
+
+    // ── Outbound webhooks ───────────────────────────────────────────────────
+    // Same trade-off as the digest ticker: on for the long-lived container,
+    // off where an external scheduler owns the cadence. The runner claims its
+    // work in the database, so both triggers may be active at once.
+    WEBHOOK_SCHEDULER_ENABLED: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
+    // Webhooks are near-real-time by expectation, so this ticks far more often
+    // than the digest runner. Each tick is one indexed query when idle.
+    WEBHOOK_TICK_SECONDS: z.coerce.number().int().min(5).default(30),
+    // Per-request ceiling. A receiver that accepts the connection and then
+    // stalls must not hold the batch — this is what bounds a run's worst case.
+    WEBHOOK_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(60).default(10),
+    // Attempts before a delivery is given up on as `failed`. The backoff starts
+    // at a minute and doubles, so the default spans a good half hour.
+    WEBHOOK_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(6),
+    // On a multi-tenant instance an org admin pointing a webhook at
+    // `http://localhost:5432` or a cloud metadata IP is a privilege escalation,
+    // so private, loopback and link-local targets are refused by default. Turn
+    // this on for a single-tenant install whose receiver (n8n, a compose
+    // sidecar) genuinely lives on the internal network.
+    WEBHOOK_ALLOW_PRIVATE_HOSTS: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+
+    // ── Data retention (audit window, trash expiry) ──────────────────────────
+    // Same shape again: a ticker for the long-lived container, plus
+    // POST /internal/retention/run where an external scheduler owns the cadence.
+    // The runner claims work per organization, so both may be active without
+    // deleting anything twice.
+    RETENTION_SCHEDULER_ENABLED: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
+    // Hourly by default. Retention windows are measured in days, so a tighter
+    // cadence buys nothing and only costs database round-trips.
+    RETENTION_TICK_SECONDS: z.coerce.number().int().min(60).default(3600),
+    // Rows removed per category per run. The ceiling is the difference between
+    // a first run that trims a year-old audit log in the background and one
+    // that issues a single DELETE over millions of rows and stalls the app.
+    RETENTION_BATCH_LIMIT: z.coerce.number().int().min(1).max(100_000).default(1000),
 
     // ── Object storage (S3-compatible: RustFS, MinIO, AWS S3, …) ────────────
     // Optional for the same reason: attachments stay disabled until configured.
@@ -104,3 +181,13 @@ export const env = createEnv({
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: true,
 });
+
+/**
+ * The shared secret guarding the `/internal` runner endpoints.
+ *
+ * The token was originally digest-specific (`DIGEST_RUN_TOKEN`), which stopped
+ * fitting once a second runner needed the same door. The new name wins where
+ * both are set; the old one keeps working so an existing deployment's scheduler
+ * does not start getting 401s after an update.
+ */
+export const internalRunToken: string | undefined = env.INTERNAL_RUN_TOKEN ?? env.DIGEST_RUN_TOKEN;

@@ -1,7 +1,8 @@
 import { createContext } from "@nilovon-wiki/api/context";
 import { appRouter } from "@nilovon-wiki/api/routers/index";
 import { auth } from "@nilovon-wiki/auth";
-import { closeDb, pingDb } from "@nilovon-wiki/db";
+import { ensureInitialAdmin } from "@nilovon-wiki/auth/instance-admin";
+import { closeDb, db, pingDb } from "@nilovon-wiki/db";
 import { env } from "@nilovon-wiki/env/server";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -19,7 +20,9 @@ import { attachmentRoutes } from "./attachments";
 import { digestRoutes, startDigestScheduler, stopDigestScheduler } from "./digests";
 import { pageExportRoutes } from "./page-exports";
 import { rateLimit } from "./rate-limit";
+import { retentionRoutes, startRetentionScheduler, stopRetentionScheduler } from "./retention";
 import { spaceExportRoutes } from "./space-exports";
+import { startWebhookScheduler, stopWebhookScheduler, webhookRoutes } from "./webhooks";
 
 initLogger({
   env: { service: "nilovon-wiki-server" },
@@ -116,6 +119,8 @@ app.route("/exports", pageExportRoutes);
 // be used to hammer the database.
 app.use("/internal/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "internal" }));
 app.route("/internal", digestRoutes);
+app.route("/internal", webhookRoutes);
+app.route("/internal", retentionRoutes);
 
 export const apiHandler = new OpenAPIHandler(appRouter, {
   plugins: [
@@ -191,6 +196,8 @@ async function shutdown(signal: string): Promise<void> {
   shuttingDown = true;
   log.info({ source: "server", msg: "shutting down", signal });
   stopDigestScheduler();
+  stopWebhookScheduler();
+  stopRetentionScheduler();
   try {
     await closeDb();
   } catch (error) {
@@ -204,5 +211,24 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 // Bundled notifications. A no-op where the ticker is disabled (serverless, or
 // an install that drives /internal/digests/run from an external scheduler).
 startDigestScheduler();
+
+// Outbound webhooks. Same deal: a no-op where the ticker is disabled and an
+// external scheduler drives /internal/webhooks/run instead.
+startWebhookScheduler();
+
+// Data retention: the audit window and the trash expiry. Same arrangement, and
+// a no-op under the same conditions.
+startRetentionScheduler();
+
+// Bootstraps the first instance admin from INITIAL_ADMIN_EMAIL. Deliberately
+// not awaited: an unreachable database at boot must not stop the process from
+// serving its health endpoint, and the promotion is idempotent on every start.
+void ensureInitialAdmin(db)
+  .then((promoted) => {
+    if (promoted) log.info({ source: "server", msg: "initial admin promoted" });
+  })
+  .catch((error) => {
+    log.error({ source: "server", msg: "initial admin bootstrap failed", ...parseError(error) });
+  });
 
 export default app;

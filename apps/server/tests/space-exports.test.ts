@@ -94,6 +94,19 @@ describe("Space export route", () => {
     expect(mocks.requireSpaceCapability).not.toHaveBeenCalled();
   });
 
+  it("treats a trashed Space as missing rather than exporting it", async () => {
+    const trashed = exportContext();
+    trashed.db.query.space.findFirst.mockResolvedValue({
+      ...spaceFixture,
+      deletedAt: new Date("2025-01-03T00:00:00Z"),
+    });
+    mocks.createContext.mockResolvedValue(trashed);
+
+    const response = await spaceExportRoutes.request("/spaces/s1?format=pdf");
+    expect(response.status).toBe(404);
+    expect(mocks.requireSpaceCapability).not.toHaveBeenCalled();
+  });
+
   it("refuses an archive while deletion is pending", async () => {
     const pending = exportContext();
     pending.db.query.space.findFirst.mockResolvedValue({

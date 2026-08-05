@@ -53,6 +53,10 @@ paths unique even when titles or file names collide.
 The page tree is reconstructed by joining `pages[].parentId` to `pages[].id` and ordering siblings
 by `position`. A `null` parent is a root page.
 
+Page templates are exported like any other page and are marked with `pages[].isTemplate: true`.
+They are hidden from the in-app page tree, search, backlinks, the dashboard and the digest, but an
+export represents the complete Space — consumers that want content only should filter on the flag.
+
 JSON page files contain `{ "page": <manifest page>, "content": <TipTap JSON document> }`.
 Markdown, HTML and PDF are projections of the same TipTap document. Unsupported future node
 or mark types degrade to their child text rather than being discarded wholesale. Malformed legacy

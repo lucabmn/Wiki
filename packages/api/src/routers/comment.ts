@@ -6,8 +6,9 @@ import { comment } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure } from "../index";
 import { requireOwnerOrPageCapability, requirePageCapability } from "../lib/authz";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { loadComment, loadPage } from "../lib/loaders";
+import { assertPageContentDeletable } from "../lib/retention/holds";
 import { firstRow } from "../lib/rows";
 import {
   CommentSchema,
@@ -76,7 +77,7 @@ export const commentRouter = {
         await recordActivity(tx, {
           organizationId,
           action: "comment.created",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: target.spaceId,
           pageId: target.id,
           metadata: { commentId: row.id },
@@ -141,7 +142,7 @@ export const commentRouter = {
           await recordActivity(tx, {
             organizationId,
             action: "comment.resolved",
-            actorId: context.session.user.id,
+            ...activityActor(context),
             spaceId: target.spaceId,
             pageId: target.id,
             metadata: { commentId: row.id },
@@ -171,12 +172,19 @@ export const commentRouter = {
         target,
         { isOwner: existing.authorId === context.session.user.id, capability: "write" },
       );
+      // A hold on the page (or its space, or the org) covers its comments too:
+      // "this must not disappear" is worthless if the discussion around it can.
+      await assertPageContentDeletable(context.db, {
+        id: target.id,
+        spaceId: target.spaceId,
+        organizationId,
+      });
       return context.db.transaction(async (tx) => {
         await tx.update(comment).set({ deletedAt: new Date() }).where(eq(comment.id, existing.id));
         await recordActivity(tx, {
           organizationId,
           action: "comment.deleted",
-          actorId: context.session.user.id,
+          ...activityActor(context),
           spaceId: target.spaceId,
           pageId: target.id,
           metadata: { commentId: existing.id },

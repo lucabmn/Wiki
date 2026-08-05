@@ -1,6 +1,6 @@
-ALTER TYPE "wiki"."activity_action" ADD VALUE 'organization.two_factor_enabled';--> statement-breakpoint
-ALTER TYPE "wiki"."activity_action" ADD VALUE 'organization.two_factor_disabled';--> statement-breakpoint
-ALTER TYPE "wiki"."activity_action" ADD VALUE 'organization.two_factor_grace_updated';--> statement-breakpoint
+ALTER TYPE "wiki"."activity_action" ADD VALUE 'organization.two_factor_enabled' BEFORE 'webhook.created';--> statement-breakpoint
+ALTER TYPE "wiki"."activity_action" ADD VALUE 'organization.two_factor_disabled' BEFORE 'webhook.created';--> statement-breakpoint
+ALTER TYPE "wiki"."activity_action" ADD VALUE 'organization.two_factor_grace_updated' BEFORE 'webhook.created';--> statement-breakpoint
 CREATE TABLE "wiki"."organization_setting" (
 	"organization_id" text PRIMARY KEY NOT NULL,
 	"two_factor_required" boolean DEFAULT false NOT NULL,

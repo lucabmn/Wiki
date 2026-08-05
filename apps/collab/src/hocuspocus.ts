@@ -29,9 +29,11 @@ const FIELD = "default";
 async function fetchDocument(pageId: string): Promise<Uint8Array | null> {
   const row = await db.query.page.findFirst({
     where: eq(page.id, pageId),
-    columns: { yjsState: true, content: true },
+    columns: { yjsState: true, content: true, deletedAt: true },
   });
-  if (!row) return null;
+  // A page in the trash has no live working copy: handing one out would let an
+  // open tab keep editing (and re-persisting) something already deleted.
+  if (!row || row.deletedAt) return null;
   if (row.yjsState && row.yjsState.byteLength > 0) return row.yjsState;
 
   // First time this page is opened collaboratively: seed the working-copy Yjs

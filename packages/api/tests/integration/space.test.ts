@@ -22,6 +22,7 @@ import {
 
 import { setStorage } from "../../src/lib/storage";
 import { spaceRouter } from "../../src/routers/space";
+import { trashRouter } from "../../src/routers/trash";
 import { createTestDb, type TestDb } from "./db";
 import { testContext } from "./context";
 
@@ -167,8 +168,36 @@ describe("space.get visibility gating", () => {
   });
 });
 
-describe("space.delete", () => {
-  it("keeps the space and attachment metadata when object deletion fails", async () => {
+describe("space.delete (soft delete into the trash)", () => {
+  it("moves the space to the trash instead of destroying it", async () => {
+    const created = await call(
+      spaceRouter.create,
+      { name: "Doomed", visibility: "public" },
+      { context: ctx() },
+    );
+    await call(spaceRouter.delete, { id: created.id }, { context: ctx() });
+
+    // The row survives — this is the whole point of the change: "Delete space"
+    // used to be the one button that could destroy a year of writing.
+    const trashed = await db.query.space.findFirst({ where: eq(space.id, created.id) });
+    expect(trashed?.deletedAt).toBeInstanceOf(Date);
+    expect(trashed?.deletedBy).toBe("u1");
+    // ...and it drops out of the normal listing.
+    const list = await call(spaceRouter.list, { includeArchived: true }, { context: ctx() });
+    expect(list.map((s) => s.id)).not.toContain(created.id);
+
+    // The audit row still carries the identifying metadata, because the purge
+    // that eventually removes the row nulls `activity.spaceId`.
+    const acts = await db.query.activity.findMany();
+    const deleted = acts.find(
+      (a) =>
+        a.action === "space.deleted" &&
+        (a.metadata as { spaceId?: string } | null)?.spaceId === created.id,
+    );
+    expect(deleted?.metadata).toMatchObject({ spaceId: created.id, name: "Doomed" });
+  });
+
+  it("keeps the space and attachment metadata when object deletion fails on purge", async () => {
     const created = await call(
       spaceRouter.create,
       { name: "Retryable", visibility: "public" },
@@ -185,11 +214,12 @@ describe("space.delete", () => {
       storageKey,
       uploadedBy: "u1",
     });
+    await call(spaceRouter.delete, { id: created.id }, { context: ctx() });
     vi.spyOn(storage, "delete").mockRejectedValueOnce(new Error("storage unavailable"));
 
-    await expect(call(spaceRouter.delete, { id: created.id }, { context: ctx() })).rejects.toThrow(
-      "storage unavailable",
-    );
+    await expect(
+      call(trashRouter.purgeSpace, { id: created.id }, { context: ctx() }),
+    ).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
 
     const survivingSpace = await db.query.space.findFirst({ where: eq(space.id, created.id) });
     const survivingAttachment = await db.query.attachment.findFirst({
@@ -199,34 +229,61 @@ describe("space.delete", () => {
     expect(survivingAttachment?.deletionPendingAt).toBeInstanceOf(Date);
     expect(await storage.exists(storageKey)).toBe(true);
 
-    await call(spaceRouter.delete, { id: created.id }, { context: ctx() });
+    // Repeating the purge resumes the cleanup: bytes first, then the rows.
+    await call(trashRouter.purgeSpace, { id: created.id }, { context: ctx() });
     expect(await db.query.space.findFirst({ where: eq(space.id, created.id) })).toBeUndefined();
     expect(
       await db.query.attachment.findFirst({ where: eq(attachment.id, "attachment-to-retry") }),
     ).toBeUndefined();
     expect(await storage.exists(storageKey)).toBe(false);
+
+    const acts = await db.query.activity.findMany();
+    const purged = acts.find(
+      (a) =>
+        a.action === "space.purged" &&
+        (a.metadata as { spaceId?: string } | null)?.spaceId === created.id,
+    );
+    // `activity.spaceId` nulls with the space, so the identity lives in metadata.
+    expect(purged?.spaceId).toBeNull();
+    expect(purged?.metadata).toMatchObject({ spaceId: created.id, name: "Retryable" });
   });
 
-  it("hard-deletes the space and records space.deleted with identifying metadata", async () => {
+  it("restores a trashed space, uploads included", async () => {
     const created = await call(
       spaceRouter.create,
-      { name: "Doomed", visibility: "public" },
+      { name: "Second Thoughts", visibility: "public" },
       { context: ctx() },
     );
     await call(spaceRouter.delete, { id: created.id }, { context: ctx() });
+    await call(trashRouter.restoreSpace, { id: created.id }, { context: ctx() });
 
-    const gone = await db.query.space.findFirst({ where: eq(space.id, created.id) });
-    expect(gone).toBeUndefined();
+    const restored = await db.query.space.findFirst({ where: eq(space.id, created.id) });
+    expect(restored?.deletedAt).toBeNull();
+    expect(restored?.deletionPendingAt).toBeNull();
+    const list = await call(spaceRouter.list, { includeArchived: false }, { context: ctx() });
+    expect(list.map((s) => s.id)).toContain(created.id);
+  });
 
-    // The audit row survives the space, so the id/name live in metadata.
-    const acts = await db.query.activity.findMany();
-    const deleted = acts.find(
-      (a) =>
-        a.action === "space.deleted" &&
-        (a.metadata as { spaceId?: string } | null)?.spaceId === created.id,
+  it("un-archives a space via space.restore", async () => {
+    const created = await call(
+      spaceRouter.create,
+      { name: "Dormant", visibility: "public" },
+      { context: ctx() },
     );
-    expect(deleted?.spaceId).toBeNull();
-    expect(deleted?.metadata).toMatchObject({ spaceId: created.id, name: "Doomed" });
+    await call(spaceRouter.archive, { id: created.id }, { context: ctx() });
+    expect(
+      (await call(spaceRouter.list, { includeArchived: false }, { context: ctx() })).map(
+        (s) => s.id,
+      ),
+    ).not.toContain(created.id);
+
+    const restored = await call(spaceRouter.restore, { id: created.id }, { context: ctx() });
+    expect(restored.archivedAt).toBeNull();
+    expect(
+      (await call(spaceRouter.list, { includeArchived: false }, { context: ctx() })).map(
+        (s) => s.id,
+      ),
+    ).toContain(created.id);
   });
 });
 

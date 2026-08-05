@@ -7,7 +7,7 @@ import {
   space as spaceTable,
   tag,
 } from "@nilovon-wiki/db/schema/index";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 
 import {
   contentFileName,
@@ -27,8 +27,16 @@ export async function loadSpaceSnapshot(db: Database, spaceId: string) {
       const space = await tx.query.space.findFirst({ where: eq(spaceTable.id, spaceId) });
       if (!space) return null;
       const [pages, tags, assignments, attachments, externalLinkRows] = await Promise.all([
+        // Templates stay in. Everywhere a human browses — the tree, search,
+        // backlinks, the dashboard, the digest — they are filtered out, but this
+        // is the "Datenexport": the one artifact that promises the space whole.
+        // Dropping rows from a backup to keep a listing tidy is how archives
+        // quietly lose data, and `manifest.json` flags every page's `isTemplate`
+        // so a consumer that wants only the content can filter it itself.
         tx.query.page.findMany({
-          where: eq(page.spaceId, space.id),
+          // Pages in the trash are omitted: an export is a snapshot of the space
+          // as it stands, not of what is pending deletion.
+          where: and(eq(page.spaceId, space.id), isNull(page.deletedAt)),
           orderBy: [asc(page.position), asc(page.createdAt)],
         }),
         tx.query.tag.findMany({ where: eq(tag.spaceId, space.id), orderBy: [asc(tag.name)] }),
@@ -36,7 +44,7 @@ export async function loadSpaceSnapshot(db: Database, spaceId: string) {
           .select({ pageId: pageTag.pageId, tagId: pageTag.tagId })
           .from(pageTag)
           .innerJoin(page, eq(page.id, pageTag.pageId))
-          .where(eq(page.spaceId, space.id)),
+          .where(and(eq(page.spaceId, space.id), isNull(page.deletedAt))),
         tx.query.attachment.findMany({
           where: eq(attachment.spaceId, space.id),
           orderBy: [asc(attachment.createdAt)],
@@ -45,7 +53,7 @@ export async function loadSpaceSnapshot(db: Database, spaceId: string) {
           .select({ externalLink: pageExternalLink })
           .from(pageExternalLink)
           .innerJoin(page, eq(page.id, pageExternalLink.pageId))
-          .where(eq(page.spaceId, space.id))
+          .where(and(eq(page.spaceId, space.id), isNull(page.deletedAt)))
           .orderBy(asc(pageExternalLink.position)),
       ]);
       return {

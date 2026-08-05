@@ -69,11 +69,22 @@ export const DIGEST_CATEGORY_ACTIONS: Record<DigestCategory, ActivityAction[]> =
   // invisible to a digest until it is published (see `collectDigest`), so for
   // every reader but its author that publish *is* the page appearing.
   pages_created: ["page.created", "page.published"],
-  pages_updated: ["page.updated", "page.moved", "page.restored"],
-  pages_removed: ["page.archived", "page.deleted"],
+  pages_updated: ["page.updated", "page.moved", "page.restored", "page.untrashed"],
+  pages_removed: ["page.archived", "page.deleted", "page.purged"],
   comments: ["comment.created", "comment.resolved", "comment.deleted"],
   attachments: ["attachment.uploaded", "attachment.deleted"],
-  spaces: ["space.created", "space.updated", "space.archived", "space.deleted"],
+  spaces: [
+    "space.created",
+    "space.updated",
+    "space.archived",
+    "space.restored",
+    "space.deleted",
+    "space.untrashed",
+    "space.purged",
+  ],
+  // Deliberately unmapped: `retention.*` and `hold.*`. They are governance
+  // events for admins and the audit log, not newsletter material — a digest
+  // announcing "the retention window changed" to every member is noise.
 };
 
 const ACTION_CATEGORY = new Map<ActivityAction, DigestCategory>(

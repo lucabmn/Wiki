@@ -19,6 +19,10 @@ export const space = wikiSchema.table(
     visibility: spaceVisibility("visibility").notNull().default("private"),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
+    // Same distinction as on `page`: archived is still findable, deleted is in
+    // the trash and disappears from every view until it is restored or expires.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: text("deleted_by").references(() => user.id, { onDelete: "set null" }),
     // A failed object-storage cleanup leaves this marker for a safe retry.
     deletionPendingAt: timestamp("deletion_pending_at", { withTimezone: true }),
     ...timestamps,
@@ -26,6 +30,7 @@ export const space = wikiSchema.table(
   (t) => [
     uniqueIndex("space_org_slug_uq").on(t.organizationId, t.slug),
     index("space_org_idx").on(t.organizationId),
+    index("space_deleted_idx").on(t.deletedAt),
   ],
 );
 
