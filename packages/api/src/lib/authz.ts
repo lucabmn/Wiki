@@ -132,7 +132,12 @@ export async function resolveMyPageAccess(
   context: AuthedContext,
   headers: Headers,
   pageRow: PageRowInput,
-): Promise<{ role: WikiRole | null; canWrite: boolean; canManage: boolean }> {
+): Promise<{
+  role: WikiRole | null;
+  canComment: boolean;
+  canWrite: boolean;
+  canManage: boolean;
+}> {
   const spaceRow = await loadSpace(db, pageRow.spaceId);
   const manager = await isOrgManager(headers, spaceRow.organizationId);
   const spaceRole = await loadSpaceRole(db, context, spaceRow, manager);
@@ -140,7 +145,12 @@ export async function resolveMyPageAccess(
   const canManage =
     roleAllows(spaceRole, "manage") ||
     (pageRow.createdBy === context.session.user.id && roleAllows(spaceRole, "write"));
-  return { role, canWrite: roleAllows(role, "write"), canManage };
+  return {
+    role,
+    canComment: roleAllows(role, "comment"),
+    canWrite: roleAllows(role, "write"),
+    canManage,
+  };
 }
 
 /** Owner-aware page gate: the author may act if they can still read the page. */

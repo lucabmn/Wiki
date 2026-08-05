@@ -82,6 +82,7 @@ vi.mock("@tanstack/react-router", () => ({
   useLocation: () => ({ hash: "" }),
   useRouteContext: () => ({
     auth: {
+      session: { user: { id: "u1" } },
       organization: {
         members: [{ user: { id: "u1", name: "Luca" } }],
       },
