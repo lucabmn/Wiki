@@ -2,7 +2,7 @@ import { createContext } from "@nilovon-wiki/api/context";
 import { appRouter } from "@nilovon-wiki/api/routers/index";
 import { auth } from "@nilovon-wiki/auth";
 import { ensureInitialAdmin } from "@nilovon-wiki/auth/instance-admin";
-import { closeDb, db, pingDb } from "@nilovon-wiki/db";
+import { closeDb, db } from "@nilovon-wiki/db";
 import { env } from "@nilovon-wiki/env/server";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -18,6 +18,7 @@ import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { attachmentRoutes } from "./attachments";
 import { digestRoutes, startDigestScheduler, stopDigestScheduler } from "./digests";
+import { healthRoutes } from "./health";
 import { pageExportRoutes } from "./page-exports";
 import { rateLimit } from "./rate-limit";
 import { retentionRoutes, startRetentionScheduler, stopRetentionScheduler } from "./retention";
@@ -100,6 +101,14 @@ app.use(
 );
 app.use("/v1/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
+// The full dependency report opens a connection to object storage and to the
+// collaboration service on every call, so it is the one health route worth a
+// ceiling — otherwise an unauthenticated client could use it to make the API
+// hammer its own backends. Liveness and the orchestrator's `/health` touch
+// nothing beyond a database ping and stay unlimited: a probe that starts
+// getting 429s during an incident is worse than useless.
+app.use("/health/ready", rateLimit({ max: 60, keyPrefix: "health" }));
+
 app.use("/attachments/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 app.use("/exports/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
@@ -175,18 +184,10 @@ app.get("/", (c) => {
   return c.text("OK");
 });
 
-// Deep health check: verifies the database is reachable, not just that the
-// process accepts TCP. Orchestrators and the compose healthcheck use this so
-// a server with a dead database is reported unhealthy instead of "OK".
-app.get("/health", async (c) => {
-  try {
-    await pingDb();
-    return c.json({ status: "ok" });
-  } catch (error) {
-    log.error({ source: "health", ...parseError(error) });
-    return c.json({ status: "unhealthy" }, 503);
-  }
-});
+// Liveness, orchestrator readiness and the full dependency report. The oRPC
+// middleware above only claims `/rpc` and `/v1`, so these paths fall through to
+// here. See ./health.ts for why one endpoint could not answer all three.
+app.route("/", healthRoutes);
 
 // Drain database connections on orchestrator-initiated restarts so in-flight
 // transactions finish cleanly instead of dying with the socket.

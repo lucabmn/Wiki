@@ -15,8 +15,9 @@ import {
 
 /**
  * Space › Ancestors › Title trail for nested pages. Resolves ancestors from
- * the space's flat page list — the same query key the sidebar tree uses — so
- * the chain comes from cache instead of one request per level.
+ * the space's flat tree — the same query key the sidebar uses — so the chain
+ * comes from cache instead of one request per level, and carries titles rather
+ * than whole page bodies.
  */
 export function PageBreadcrumb({
   page,
@@ -26,7 +27,7 @@ export function PageBreadcrumb({
   space?: { slug: string; name: string };
 }) {
   const { data: allPages } = useQuery(
-    orpc.pages.list.queryOptions({ input: { spaceId: page.spaceId } }),
+    orpc.pages.tree.queryOptions({ input: { spaceId: page.spaceId } }),
   );
 
   const byId = new Map((allPages ?? []).map((p) => [p.id, p]));

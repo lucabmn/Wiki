@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import z from "zod";
 
 import { authClient } from "@/lib/auth-client";
+import { useRegistrationPolicy } from "@/lib/registration-policy";
 
 import AuthLayout from "../layouts/auth-layout";
 import Loader from "../loader";
@@ -23,6 +24,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
     from: "/",
   });
   const { isPending } = authClient.useSession();
+  const registration = useRegistrationPolicy();
 
   const form = useForm({
     defaultValues: {
@@ -36,6 +38,22 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
       });
 
       if (error) {
+        // Where the instance requires a confirmed address, correct credentials
+        // still fail until the mail is opened. "E-Mail oder Passwort ist
+        // falsch" would send the person hunting for a password problem that
+        // does not exist. The other 403 here is a ban, whose message Better
+        // Auth already localizes — so prefer the server's wording and only
+        // supply our own for the verification case.
+        if (error.code === "EMAIL_NOT_VERIFIED") {
+          toast.error(
+            "Diese E-Mail-Adresse ist noch nicht bestätigt. Öffne den Bestätigungslink, den wir dir geschickt haben.",
+          );
+          return;
+        }
+        if (error.status === 403 && error.message) {
+          toast.error(error.message);
+          return;
+        }
         toast.error(
           error.status === 401
             ? "E-Mail oder Passwort ist falsch."
@@ -69,12 +87,17 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
       title="Willkommen zurück"
       subtitle="Melde dich in deinem Wissens-Hub an."
       footer={
-        <>
-          Noch kein Konto?{" "}
-          <Button variant="link" onClick={onSwitchToSignUp} className="h-auto p-0 font-semibold">
-            Registrieren
-          </Button>
-        </>
+        // A closed instance has no self-service registration, so offering the
+        // link only leads somewhere that refuses. Invitation-only keeps it:
+        // that is exactly the route an invited person takes.
+        registration.mode === "closed" ? null : (
+          <>
+            Noch kein Konto?{" "}
+            <Button variant="link" onClick={onSwitchToSignUp} className="h-auto p-0 font-semibold">
+              Registrieren
+            </Button>
+          </>
+        )
       }
     >
       <form

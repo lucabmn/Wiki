@@ -42,6 +42,8 @@ import {
   MovePageInputSchema,
   PageRevisionSchema,
   PageSchema,
+  PageTreeInputSchema,
+  PageTreeNodeSchema,
   PublishPageInputSchema,
   UpdatePageInputSchema,
 } from "../schemas/page";
@@ -299,6 +301,64 @@ function replaceImportAssetUrls(
 }
 
 export const pageRouter = {
+  /**
+   * The space's page tree, as ids and titles.
+   *
+   * Separate from `list` because the sidebar and the breadcrumb were driving
+   * the full page list — which carries every page's document body. On a large
+   * wiki that is tens of megabytes serialized on every navigation, to render a
+   * list of titles. This selects the eight columns the tree actually reads.
+   *
+   * Access is filtered exactly as in `list`: same space role, same per-page
+   * override check. `createdBy` and `visibility` are selected only to feed that
+   * filter and are dropped before the response — a tree node is a label, not a
+   * place to leak who may see what.
+   */
+  tree: protectedProcedure
+    .route({
+      method: "GET",
+      path: "/spaces/{spaceId}/tree",
+      tags: TAGS,
+      summary: "List a space's pages as tree nodes (no page bodies)",
+    })
+    .input(PageTreeInputSchema)
+    .output(z.array(PageTreeNodeSchema))
+    .handler(async ({ input, context }) => {
+      const spaceRow = await loadSpace(context.db, input.spaceId);
+      const manager = await isOrgManager(context.headers, spaceRow.organizationId);
+      const spaceRole = await loadSpaceRole(context.db, context, spaceRow, manager);
+      if (spaceRole === null) throw new ORPCError("FORBIDDEN");
+
+      const rows = await context.db
+        .select({
+          id: page.id,
+          parentId: page.parentId,
+          title: page.title,
+          slug: page.slug,
+          icon: page.icon,
+          status: page.status,
+          position: page.position,
+          archivedAt: page.archivedAt,
+          // For `filterReadablePages` only — see the note above.
+          visibility: page.visibility,
+          createdBy: page.createdBy,
+        })
+        .from(page)
+        .where(
+          and(
+            eq(page.spaceId, input.spaceId),
+            input.includeArchived ? undefined : isNull(page.archivedAt),
+            // Templates belong to the template catalogue, not to the tree.
+            eq(page.isTemplate, false),
+            pageNotTrashed(),
+          ),
+        )
+        .orderBy(asc(page.position));
+
+      const readable = await filterReadablePages(context.db, context, rows, spaceRole);
+      return readable.map(({ visibility: _visibility, createdBy: _createdBy, ...node }) => node);
+    }),
+
   list: protectedProcedure
     .route({ method: "GET", path: "/pages", tags: TAGS, summary: "List pages in a space" })
     .input(ListPagesInputSchema)

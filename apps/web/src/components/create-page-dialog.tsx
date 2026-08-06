@@ -35,7 +35,7 @@ export function CreatePageDialog({
   const [title, setTitle] = useState("");
   const [pickedSpaceId, setPickedSpaceId] = useState("");
   const [templateId, setTemplateId] = useState<TemplateChoice>(null);
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
+  const invalidatePages = useInvalidate(orpc.pages.key());
 
   const needsPicker = spaceId == null;
   const { data: spaces } = useQuery(

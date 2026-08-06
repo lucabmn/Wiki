@@ -93,6 +93,11 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/utils/orpc", () => ({
   orpc: {
     pages: {
+      key: () => ["pages"],
+      tree: {
+        queryOptions: () => ({ queryKey: ["page-tree"], queryFn: async () => [] }),
+        key: () => ["page-tree"],
+      },
       get: {
         queryOptions: ({ input }: { input: { id: string } }) => ({
           queryKey: ["page", input.id],

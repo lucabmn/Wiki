@@ -10,6 +10,11 @@ const { data, selectSpy } = vi.hoisted(() => ({
 vi.mock("@/utils/orpc", () => ({
   orpc: {
     pages: {
+      key: () => ["pages"],
+      tree: {
+        queryOptions: () => ({ queryKey: ["page-tree"], queryFn: async () => data.pages }),
+        key: () => ["page-tree"],
+      },
       list: {
         queryOptions: () => ({ queryKey: ["pages"], queryFn: async () => data.pages }),
         key: () => ["pages"],

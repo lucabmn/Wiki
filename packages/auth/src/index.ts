@@ -13,11 +13,21 @@ import { INSTANCE_ADMIN_ROLES, INSTANCE_ROLE_ADMIN, isInitialAdminEmail } from "
 import { actionMail, sendMail } from "./mail";
 import { ac, roles } from "./permissions";
 import { cachedSessionVersion } from "./session-revocation";
+import { signupPolicyPlugin } from "./signup-policy";
 import { SSO_DOMAIN_TOKEN_PREFIX } from "./sso-domain";
 import { localization } from "better-auth-localization";
 
 export function createAuth() {
   const db = createDb();
+
+  // Fail fast rather than at the first registration: requiring verification
+  // without a mail server means every new account is created and then locked
+  // out, with nothing in the logs pointing at the cause.
+  if (env.REQUIRE_EMAIL_VERIFICATION && !env.SMTP_HOST) {
+    throw new Error(
+      "REQUIRE_EMAIL_VERIFICATION=true needs SMTP_HOST — without mail delivery no account could ever confirm its address.",
+    );
+  }
 
   // Browsers only accept `Secure` cookies over HTTPS (localhost is the sole
   // exception), and `SameSite=None` requires `Secure`. Deriving the attributes
@@ -104,6 +114,14 @@ export function createAuth() {
     },
     emailAndPassword: {
       enabled: true,
+      // Who may register at all is decided by `signupPolicyPlugin` below, which
+      // can also refuse per address. `closed` is mirrored here so the endpoint
+      // is gone rather than merely guarded — one less thing to probe.
+      disableSignUp: env.SIGNUP_MODE === "closed" && !env.INITIAL_ADMIN_EMAIL,
+      // Off by default: enforcing this without SMTP would lock out every new
+      // account. `createAuth` refuses to start in that combination, so by the
+      // time this is true mail delivery is known to be configured.
+      requireEmailVerification: env.REQUIRE_EMAIL_VERIFICATION,
       sendResetPassword: async ({ user, url }) => {
         await sendMail({
           to: user.email,
@@ -117,10 +135,14 @@ export function createAuth() {
         });
       },
     },
-    // Verification is wired but not required: enforcing it on a self-host with
-    // no SMTP configured would lock every new account out. Operators who set
-    // SMTP_HOST can turn on `requireEmailVerification` above.
+    // Verification is always wired; whether it is *required* is
+    // REQUIRE_EMAIL_VERIFICATION above. When it is, the mail has to go out on
+    // registration — otherwise the account is created into a state only an
+    // admin could rescue — and confirming it should sign the person in rather
+    // than dropping them back at a login form they cannot pass yet.
     emailVerification: {
+      sendOnSignUp: env.REQUIRE_EMAIL_VERIFICATION,
+      autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user, url }) => {
         await sendMail({
           to: user.email,
@@ -175,6 +197,9 @@ export function createAuth() {
       // Must follow `admin()`: it hooks that plugin's endpoints to write the
       // instance audit log and to enforce the impersonation kill-switch.
       adminAuditPlugin(db),
+      // Registration policy (SIGNUP_MODE, allowed domains). Guards only
+      // `/sign-up/email`; SSO and SCIM provisioning stay open by design.
+      signupPolicyPlugin(db),
       twoFactor(),
       passkey(),
       organization({

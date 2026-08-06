@@ -38,6 +38,34 @@ export const PageSchema = z.object({
 });
 export type Page = z.infer<typeof PageSchema>;
 
+/**
+ * One node of a space's page tree — everything the sidebar and the breadcrumb
+ * need, and nothing else.
+ *
+ * Deliberately not `PageSchema`. Building the tree from the full page list
+ * means shipping every page's entire document body to the browser on every
+ * sidebar render: a 2 000-page wiki with 20 KB documents is ~40 MB serialized
+ * to draw a list of titles. The tree only ever reads these fields.
+ */
+export const PageTreeNodeSchema = z.object({
+  id: IdSchema,
+  parentId: IdSchema.nullable(),
+  title: z.string(),
+  slug: z.string(),
+  icon: z.string().nullable(),
+  status: PageStatusSchema,
+  /** Fractional index; the tree orders siblings by it. */
+  position: z.string(),
+  /** Present so an archived page can be marked as such without a second query. */
+  archivedAt: z.date().nullable(),
+});
+export type PageTreeNode = z.infer<typeof PageTreeNodeSchema>;
+
+export const PageTreeInputSchema = z.object({
+  spaceId: IdSchema,
+  includeArchived: z.boolean().default(false),
+});
+
 export const ListPagesInputSchema = z.object({
   spaceId: IdSchema,
   // Filter to direct children of a page; omit for the whole space.

@@ -77,6 +77,7 @@ vi.mock("@/utils/orpc", () => ({
       },
     },
     pages: {
+      key: () => ["pages"],
       create: {
         mutationOptions: (opts: Record<string, unknown>) => ({
           mutationFn: async () => ({}),

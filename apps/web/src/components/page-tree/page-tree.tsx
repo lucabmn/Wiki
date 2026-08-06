@@ -1,7 +1,7 @@
 import { QueryError } from "@/components/query-error";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
-import type { Page } from "@nilovon-wiki/api/schemas/page";
+import type { PageTreeNode } from "@nilovon-wiki/api/schemas/page";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import {
@@ -58,18 +58,23 @@ export function PageTree({
     isError,
     error,
     refetch,
-  } = useQuery(orpc.pages.list.queryOptions({ input: { spaceId } }));
+    // `pages.tree`, not `pages.list`: the tree needs titles, and `list` carries
+    // every page's whole document body with them.
+  } = useQuery(orpc.pages.tree.queryOptions({ input: { spaceId } }));
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [offsetLeft, setOffsetLeft] = useState(0);
 
-  const invalidate = useInvalidate(orpc.pages.list.key());
+  // The whole `pages` router rather than just the tree: a move changes both the
+  // tree and any cached page list, and the two drifting apart shows up as a
+  // sidebar that disagrees with the page next to it.
+  const invalidate = useInvalidate(orpc.pages.key());
   const move = useMutation(orpc.pages.move.mutationOptions());
 
   const nodes: PageNode[] = useMemo(
     () =>
-      (pages ?? []).map((p: Page) => ({
+      (pages ?? []).map((p: PageTreeNode) => ({
         id: p.id,
         parentId: p.parentId,
         title: p.title,

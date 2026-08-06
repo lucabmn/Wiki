@@ -41,6 +41,15 @@ vi.mock("@/utils/orpc", () => ({
       },
     },
     pages: {
+      key: () => ["pages"],
+      tree: {
+        queryOptions: ({ enabled }: { enabled?: boolean }) => ({
+          queryKey: ["page-tree"],
+          queryFn: async () => data.pages,
+          enabled,
+        }),
+        key: () => ["page-tree"],
+      },
       list: {
         queryOptions: ({ enabled }: { enabled?: boolean }) => ({
           queryKey: ["pages"],

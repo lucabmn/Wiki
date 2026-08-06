@@ -8,6 +8,7 @@ import { commentRouter } from "./comment";
 import { dashboardRouter } from "./dashboard";
 import { externalLinkRouter } from "./external-link";
 import { inboxRouter } from "./inbox";
+import { instanceRouter } from "./instance";
 import { legalHoldRouter } from "./legal-hold";
 import { linkRouter } from "./link";
 import { notificationRouter } from "./notification";
@@ -37,6 +38,9 @@ export const appRouter = {
       .route({ method: "GET", path: "/health", tags: ["Health"], summary: "Liveness probe" })
       .handler(() => "OK"),
   },
+  // Unauthenticated deployment facts the sign-in screen needs (registration
+  // policy). Nothing here is tenant data.
+  instance: instanceRouter,
   admin: adminRouter,
   spaces: spaceRouter,
   spaceMembers: spaceMemberRouter,

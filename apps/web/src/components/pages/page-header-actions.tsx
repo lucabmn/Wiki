@@ -125,7 +125,7 @@ export function SubscribeButton({ page }: { page: Page }) {
  * its reader wants to do with it.
  */
 export function RestoreButton({ page }: { page: { id: string } }) {
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
+  const invalidatePages = useInvalidate(orpc.pages.key());
   const invalidatePage = useInvalidate(orpc.pages.get.key());
 
   const restore = useMutation(
@@ -168,7 +168,7 @@ export function ArchiveDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const navigate = useNavigate();
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
+  const invalidatePages = useInvalidate(orpc.pages.key());
 
   const archive = useMutation(
     orpc.pages.archive.mutationOptions({
@@ -227,7 +227,7 @@ export function DeleteDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const navigate = useNavigate();
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
+  const invalidatePages = useInvalidate(orpc.pages.key());
   const invalidateTrash = useInvalidate(orpc.trash.key());
 
   const remove = useMutation(

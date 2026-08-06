@@ -22,6 +22,7 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/utils/orpc", () => ({
   orpc: {
     pages: {
+      key: () => ["pages"],
       create: {
         mutationOptions: (opts: Record<string, unknown>) => ({ mutationFn: createSpy, ...opts }),
       },

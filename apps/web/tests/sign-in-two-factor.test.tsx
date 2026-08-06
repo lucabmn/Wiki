@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,10 +30,31 @@ vi.mock("@/lib/auth-client", () => ({
   },
 }));
 
+// The form asks the API how accounts may be created, so it can hide the
+// "Registrieren" link on an instance that takes no registrations. Answered
+// `open` here — the sign-in path this file covers is the same either way.
+vi.mock("@/utils/orpc", () => ({
+  orpc: {
+    instance: {
+      registration: {
+        queryOptions: () => ({
+          queryKey: ["instance-registration"],
+          queryFn: async () => ({ mode: "open", emailVerificationRequired: false }),
+        }),
+      },
+    },
+  },
+}));
+
 import SignInForm from "@/components/auth/sign-in-form";
 
 const submit = () => {
-  render(<SignInForm onSwitchToSignUp={() => {}} />);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <SignInForm onSwitchToSignUp={() => {}} />
+    </QueryClientProvider>,
+  );
   fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: "luca@acme.io" } });
   fireEvent.change(screen.getByLabelText("Passwort"), { target: { value: "supersecret" } });
   fireEvent.submit(screen.getByRole("button", { name: "Anmelden" }).closest("form")!);

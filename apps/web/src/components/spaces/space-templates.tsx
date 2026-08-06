@@ -24,7 +24,7 @@ export function SpaceTemplates({
   onNavigate: () => void;
 }) {
   const invalidateTemplates = useInvalidate(orpc.pages.listTemplates.key());
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
+  const invalidatePages = useInvalidate(orpc.pages.key());
 
   const { data: templates, isPending } = useQuery(
     orpc.pages.listTemplates.queryOptions({ input: { spaceId }, enabled }),
