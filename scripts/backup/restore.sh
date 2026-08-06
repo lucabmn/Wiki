@@ -72,9 +72,29 @@ fi
 
 if [ "${RESTORE_FORCE:-}" = "true" ] && [ "$existing" != "0" ]; then
   log "dropping existing schemas (RESTORE_FORCE=true)"
-  psql -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c \
-    "drop schema if exists wiki cascade; drop schema if exists auth cascade; drop schema if exists admin cascade; drop schema public cascade; create schema public;" ||
-    fail "could not clear the target database"
+  # Every non-system schema, discovered rather than listed. A hand-written list
+  # is wrong the moment a schema is added: the first version named `wiki`,
+  # `auth`, `admin` and `public`, forgot `drizzle` (the migration bookkeeping),
+  # and `pg_restore` then aborted on `schema "drizzle" already exists` — after
+  # it had already dropped everything else.
+  psql -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c "
+    DO \$\$
+    DECLARE target text;
+    BEGIN
+      FOR target IN
+        -- Everything Postgres does not own. The 'pg_' prefix is reserved for
+        -- system schemas, which covers pg_catalog, pg_toast and every
+        -- pg_temp_* / pg_toast_temp_* in one predicate.
+        SELECT nspname FROM pg_namespace
+        WHERE nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+          AND nspname <> 'information_schema'
+      LOOP
+        EXECUTE format('DROP SCHEMA IF EXISTS %I CASCADE', target);
+      END LOOP;
+    END
+    \$\$;
+    CREATE SCHEMA IF NOT EXISTS public;
+  " || fail "could not clear the target database"
 fi
 
 # ── 4. Database ───────────────────────────────────────────────────────────────
