@@ -22,8 +22,19 @@ export const ActivityActionSchema = z.enum([
   "page.untrashed",
   "page.purged",
   "comment.created",
+  "comment.updated",
   "comment.resolved",
   "comment.deleted",
+  // Access control. Who can see what is the question an audit log exists to
+  // answer, and until these were recorded a grant could be added and removed
+  // again between two reads of the members list with nothing left behind.
+  "space.member_added",
+  "space.member_role_changed",
+  "space.member_removed",
+  "page.access_changed",
+  "page.member_added",
+  "page.member_role_changed",
+  "page.member_removed",
   "attachment.uploaded",
   "attachment.deleted",
   "organization.two_factor_enabled",

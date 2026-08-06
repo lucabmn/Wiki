@@ -11,9 +11,14 @@ import type { ActivityAction } from "../activity";
  * loop. The rows are still written to the audit log — they are just not events
  * anyone can subscribe to.
  *
- * Known gap, inherited from the audit log itself: ACL and membership changes and
- * comment *edits* do not call `recordActivity` today, so no webhook can report
- * them. The list below is exhaustive — it is not "everything that happens".
+ * Access-control changes (`space.member_*`, `page.member_*`,
+ * `page.access_changed`) and comment edits are included: they are audited, and
+ * an integration that watches who gains access to what is a legitimate — and
+ * frequently the most important — reason to subscribe.
+ *
+ * The list is derived from the action enum, so a new audited action becomes
+ * deliverable automatically. Anything that must not be is excluded here
+ * explicitly, as `webhook.*` is.
  */
 export const DELIVERABLE_ACTIONS: readonly ActivityAction[] = ActivityActionSchema.options.filter(
   (action) => !action.startsWith("webhook."),

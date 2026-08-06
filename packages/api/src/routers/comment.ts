@@ -110,12 +110,27 @@ export const commentRouter = {
         target,
         { isOwner: existing.authorId === context.session.user.id, capability: "write" },
       );
-      const rows = await context.db
-        .update(comment)
-        .set({ body: input.body })
-        .where(eq(comment.id, existing.id))
-        .returning();
-      const row = firstRow(rows);
+      const row = await context.db.transaction(async (tx) => {
+        const rows = await tx
+          .update(comment)
+          .set({ body: input.body })
+          .where(eq(comment.id, existing.id))
+          .returning();
+        const updated = firstRow(rows);
+        // An edit is a mutation like any other, and one that can change what a
+        // comment says after somebody has replied to it or acted on it. The
+        // body itself is not copied into the audit row — the log records that
+        // an edit happened and by whom, not a second copy of the content.
+        await recordActivity(tx, {
+          organizationId,
+          action: "comment.updated",
+          ...activityActor(context),
+          spaceId: target.spaceId,
+          pageId: target.id,
+          metadata: { commentId: updated.id, authorId: existing.authorId },
+        });
+        return updated;
+      });
       // An edit notifies whoever the new text names for the first time — and
       // nobody who was already named before it.
       await announceComment(context.db, {
