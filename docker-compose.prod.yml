@@ -19,6 +19,17 @@ services:
     image: caddy:2
     init: true
     restart: always
+    # Everything except the one capability a proxy on :80/:443 cannot do
+    # without. Caddy also writes ACME account keys and certificates, so this is
+    # not a read-only filesystem — the volumes below are exactly that state.
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    pids_limit: 512
+    mem_limit: ${CADDY_MEMORY_LIMIT:-256m}
     ports:
       - "80:80"
       - "443:443"
