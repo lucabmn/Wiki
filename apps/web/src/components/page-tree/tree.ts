@@ -164,3 +164,94 @@ export function getMoveArgs(
 
   return { id: activeId, parentId: projection.parentId };
 }
+
+// ── Keyboard reordering ──────────────────────────────────────────────────────
+//
+// Dragging is a pointer gesture: it is unusable with a keyboard, a screen
+// reader, or a switch device, and awkward on a touchscreen. These four moves are
+// the same operations expressed as discrete steps, so the tree can be
+// rearranged from the keyboard or from a menu.
+//
+// Each returns the `pages.move` arguments, or `null` when the move is not
+// possible from where the page currently sits (already first, already at the
+// root, …) — which is also what the UI uses to disable the affordance rather
+// than letting somebody press a key that silently does nothing.
+
+/** Where `id` sits among its siblings, in position order. */
+function siblingContext(
+  pages: PageNode[],
+  id: string,
+): { siblings: PageNode[]; index: number; node: PageNode } | null {
+  const node = pages.find((p) => p.id === id);
+  if (!node) return null;
+  const siblings = childrenOf(pages, node.parentId);
+  const index = siblings.findIndex((p) => p.id === id);
+  return index < 0 ? null : { siblings, index, node };
+}
+
+/** Swap with the previous sibling. Depth is unchanged. */
+export function moveUp(pages: PageNode[], id: string): MoveArgs | null {
+  const context = siblingContext(pages, id);
+  if (!context || context.index === 0) return null;
+  const previous = context.siblings[context.index - 1];
+  if (!previous) return null;
+  return { id, parentId: context.node.parentId, beforeId: previous.id };
+}
+
+/** Swap with the next sibling. Depth is unchanged. */
+export function moveDown(pages: PageNode[], id: string): MoveArgs | null {
+  const context = siblingContext(pages, id);
+  if (!context || context.index >= context.siblings.length - 1) return null;
+  const next = context.siblings[context.index + 1];
+  if (!next) return null;
+  return { id, parentId: context.node.parentId, afterId: next.id };
+}
+
+/**
+ * Nest under the previous sibling, as its last child.
+ *
+ * The previous *sibling* rather than the previous visible row: that is what
+ * keeps the operation reversible with `outdent`, and it is the rule every
+ * outliner uses. Impossible for a first child, which has nothing to nest under.
+ */
+export function indent(pages: PageNode[], id: string): MoveArgs | null {
+  const context = siblingContext(pages, id);
+  if (!context || context.index === 0) return null;
+  const previous = context.siblings[context.index - 1];
+  if (!previous) return null;
+  const lastChild = childrenOf(pages, previous.id).at(-1);
+  // No anchor when the new parent has no children yet — the server appends.
+  return lastChild
+    ? { id, parentId: previous.id, afterId: lastChild.id }
+    : { id, parentId: previous.id };
+}
+
+/**
+ * Lift out to the grandparent, immediately after the old parent.
+ *
+ * "After the old parent" rather than appended: the page keeps its place in the
+ * reading order, which is where the person expects to still find it.
+ */
+export function outdent(pages: PageNode[], id: string): MoveArgs | null {
+  const node = pages.find((p) => p.id === id);
+  if (!node?.parentId) return null;
+  const parent = pages.find((p) => p.id === node.parentId);
+  if (!parent) return null;
+  return { id, parentId: parent.parentId, afterId: parent.id };
+}
+
+export type KeyboardMove = "up" | "down" | "indent" | "outdent";
+
+/** The four moves, so the UI can ask once which are available for a page. */
+export function keyboardMove(pages: PageNode[], id: string, move: KeyboardMove): MoveArgs | null {
+  switch (move) {
+    case "up":
+      return moveUp(pages, id);
+    case "down":
+      return moveDown(pages, id);
+    case "indent":
+      return indent(pages, id);
+    case "outdent":
+      return outdent(pages, id);
+  }
+}
