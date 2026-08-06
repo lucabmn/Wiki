@@ -169,6 +169,11 @@ export const team = authSchema.table(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
+    // Maintained by Better Auth's organization plugin, not by this app: it
+    // increments and decrements this as team membership changes. Required by
+    // the plugin — without the column, creating an organization fails outright,
+    // because creating one also creates its default team.
+    memberCount: integer("member_count").notNull().default(0),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
@@ -188,6 +193,9 @@ export const teamMember = authSchema.table(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    // Also the plugin's own: a unique key it uses to make "add this user to
+    // this team" idempotent. Written by Better Auth, never read here.
+    membershipKey: text("membership_key").unique(),
     createdAt: timestamp("created_at"),
   },
   (table) => [

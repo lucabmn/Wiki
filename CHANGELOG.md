@@ -70,9 +70,24 @@ tag; entries are added as changes land.
 - README no longer claims that _every_ mutation is audited. It now describes what
   is actually covered and points at the action enum.
 
+### Fixed
+
+- **Creating an organization returned a 500.** Better Auth's organization plugin
+  declares `team.memberCount` and `teamMember.membershipKey`; the hand-maintained
+  Drizzle schema had neither, and creating an organization also creates its
+  default team — so it failed outright on every install. Found by the new
+  deployment smoke test, which is the only thing that exercises the real auth
+  adapter (the API integration tests mock it wholesale). A unit test now asserts
+  the Drizzle schema covers every field the plugins declare, so the next
+  dependency bump that drifts fails in CI rather than in production.
+
 ### Migrations
 
 - `0018` adds the new access-control and `comment.updated` values to the
   `wiki.activity_action` enum. Additive only; no existing row changes.
+- `0019` adds `auth.team.member_count` and `auth.team_member.membership_key`,
+  and backfills the member count from the existing membership rows — the column
+  defaults to 0 and Better Auth only increments from there, so without the
+  backfill every existing team would report zero members permanently.
 
 [Unreleased]: https://github.com/lucabmn/Wiki/commits/main
