@@ -31,7 +31,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The review action needs GitHub's dependency graph, which is a repository
+      # setting rather than anything this repo can turn on from a workflow. Left
+      # unguarded, every pull request on an instance without it fails with
+      # "Dependency review is not supported on this repository" — a red check
+      # that no author can fix and that everyone therefore learns to ignore.
+      #
+      # So: probe first. Missing setting → a loud warning and a pass. Enable it
+      # under Settings → Code security → Dependency graph and the gate below
+      # starts biting on the next pull request, with no change here.
+      - name: Is the dependency graph enabled?
+        id: probe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/compare/${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" \
+            --silent 2>/dev/null; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Dependency review skipped::GitHub's dependency graph is not enabled for this repository, so new dependencies are not being screened for advisories. Enable it under Settings → Code security → Dependency graph."
+          fi
+
       - name: Review dependency changes
+        if: steps.probe.outputs.enabled == 'true'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high

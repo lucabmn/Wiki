@@ -43,16 +43,25 @@ function assert(condition, message) {
 }
 
 /**
- * `fetch` that carries the session forward.
+ * `fetch` that behaves like the browser this API is built for.
  *
- * Better Auth's cookie is the thing most likely to be misconfigured in a real
- * deployment (SameSite, Secure, Domain), so the test holds it exactly as a
- * browser would rather than passing a bearer token around.
+ * Two things it has to get right, and both are things a naive `fetch` gets
+ * wrong:
+ *
+ * - **The cookie.** Better Auth's cookie is the single most likely thing to be
+ *   misconfigured in a real deployment (SameSite, Secure, Domain), so the test
+ *   carries it in a jar rather than passing a bearer token around.
+ * - **The `Origin` header.** Better Auth refuses a state-changing request that
+ *   arrives without one (`MISSING_OR_NULL_ORIGIN`) — that is its CSRF defence,
+ *   and it is exactly what a browser always sends and `fetch` from Node never
+ *   does. Sending the web app's origin is what makes this test resemble the
+ *   client the deployment actually serves.
  */
 async function api(path, options = {}) {
   const response = await fetch(`${API}${path}`, {
     ...options,
     headers: {
+      origin: WEB,
       ...(options.body && !(options.body instanceof FormData)
         ? { "Content-Type": "application/json" }
         : {}),
@@ -260,7 +269,7 @@ await step("rate limiting is active", async () => {
     Array.from({ length: 80 }, () =>
       fetch(`${API}/api/auth/sign-in/email`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", origin: WEB },
         body: JSON.stringify({ email: "nobody@example.test", password: "wrong-password-here" }),
       }).then((r) => r.status),
     ),
