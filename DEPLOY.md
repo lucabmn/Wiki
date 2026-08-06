@@ -54,6 +54,43 @@ build the web image locally because `VITE_SERVER_URL` and `VITE_COLLAB_URL` are
 compiled into its bundle; the production overlay enforces that with
 `pull_policy: build`.
 
+### Verifying a release
+
+The documented install path is "download a binary and run it as root", which is
+worth being able to check. Every release carries checksums, an SBOM, and
+[build provenance](https://slsa.dev/) signed by the workflow that produced it.
+
+**Installer binaries** — checksums catch a truncated or swapped download,
+provenance ties the binary to a specific commit, workflow and runner:
+
+```sh
+curl -fsSLO https://github.com/lucabmn/Wiki/releases/latest/download/SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+
+gh attestation verify nilovon-wiki-installer-linux-x64 --repo lucabmn/Wiki
+```
+
+**Container images** carry their provenance and an SPDX SBOM in the manifest
+itself, so they travel with a `docker pull`:
+
+```sh
+gh attestation verify oci://ghcr.io/lucabmn/wiki-server:0.1.0 --repo lucabmn/Wiki
+docker buildx imagetools inspect ghcr.io/lucabmn/wiki-server:0.1.0 --format '{{ json .SBOM }}'
+```
+
+A failed verification is a reason to stop, not to retry — report it through
+[SECURITY.md](SECURITY.md).
+
+For a deployment that must not move underneath you, pin by **digest** rather
+than by tag. A tag is a moving pointer; `latest` and even `0.1` are reassigned
+by the next release:
+
+```sh
+docker buildx imagetools inspect ghcr.io/lucabmn/wiki-server:0.1.0 --format '{{ .Manifest.Digest }}'
+# then in .env:
+#   WIKI_VERSION=0.1.0@sha256:…
+```
+
 ## Production (public domain, HTTPS)
 
 The repo ships a Caddy reverse proxy that provisions Let's Encrypt certificates

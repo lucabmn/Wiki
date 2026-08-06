@@ -1,0 +1,43 @@
+name: Dependency review
+
+# Refuses a pull request that introduces a dependency with a known
+# high-severity advisory, or one under a licence this project cannot ship.
+#
+# This is the gate the existing `pnpm audit` step in ci.yml deliberately is not:
+# that one reports advisories against the *whole* tree and does not fail, so a
+# fresh advisory in a transitive dependency cannot redden every unrelated pull
+# request. This one only ever looks at what the pull request itself adds, which
+# is exactly the thing its author can act on.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # For the inline summary on the pull request.
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          # The project is GPL-3.0. Denying a short list of specific licences is
+          # more honest than an allowlist here: an allowlist silently blocks
+          # every dual-licensed or unrecognised package, which in practice gets
+          # the whole check disabled the first time it is wrong.
+          deny-licenses: AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, SSPL-1.0, BUSL-1.1, Elastic-2.0, CC-BY-NC-4.0

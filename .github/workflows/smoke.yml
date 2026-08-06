@@ -1,0 +1,147 @@
+name: Deployment smoke test
+
+# Boots the real compose stack and drives it over HTTP.
+#
+# The rest of CI proves the code compiles and its units behave. None of it
+# proves the assembled *deployment* works, and the failures that actually take a
+# self-hosted instance down are wiring failures between containers rather than
+# bugs in a function: a migration that never ran, a bucket that was never
+# created, an auth cookie the browser would refuse, a WebSocket the proxy
+# dropped, a backup that restored into nothing.
+#
+# It also runs a real restore. A backup nobody has restored is a hypothesis.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # The stack pulls base images; a weekly run catches the day one of them
+  # changes underneath the deployment rather than the day somebody deploys.
+  schedule:
+    - cron: "20 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write .env
+        run: |
+          set -euo pipefail
+          cat > .env <<'ENV'
+          POSTGRES_PASSWORD=smoke-postgres-password-not-a-secret
+          BETTER_AUTH_SECRET=smoke-better-auth-signing-key-0123456789abcdef
+          S3_ACCESS_KEY_ID=smokeaccesskey
+          S3_SECRET_ACCESS_KEY=smokesecretkey0123456789
+          # Registration has to be open for the test to be able to register.
+          # The `invite` and `closed` paths are covered by unit tests in
+          # packages/auth; what needs a real stack is the happy path.
+          SIGNUP_MODE=open
+          # Every run backs up immediately and the job is short-lived, so the
+          # loop interval only has to be longer than the job.
+          BACKUP_INTERVAL_SECONDS=86400
+          ENV
+
+      - name: Build images
+        # `--profile backup` too: services in an inactive profile are skipped by
+        # a plain `build`, and the backup image is built from source.
+        run: docker compose --profile backup build
+
+      - name: Start the stack
+        run: docker compose up -d --wait --wait-timeout 300
+
+      # `--wait` already gates on the healthchecks, so reaching this point means
+      # migrations ran, the bucket exists, and every service reports healthy.
+      - name: Show service state
+        run: docker compose ps
+
+      - name: Run the smoke test
+        run: node scripts/smoke/smoke.mjs
+
+      # ── Backup and restore ─────────────────────────────────────────────────
+      - name: Take a backup
+        run: docker compose --profile backup run --rm backup run
+
+      - name: Verify the recovery set
+        run: |
+          set -euo pipefail
+          set_dir=$(docker compose --profile backup run --rm -T backup \
+            sh -c 'ls -d /backups/2* | tail -1' | tr -d '\r')
+          echo "recovery set: $set_dir"
+          echo "SET_DIR=$set_dir" >> "$GITHUB_ENV"
+          docker compose --profile backup run --rm backup verify "$set_dir"
+
+      - name: Record what the restore has to bring back
+        run: |
+          set -euo pipefail
+          pages=$(docker compose exec -T postgres \
+            psql -U postgres -d nilovon-wiki -tAc 'select count(*) from wiki.page')
+          echo "pages before restore: $pages"
+          test "$pages" -gt 0
+          echo "PAGES_BEFORE=$pages" >> "$GITHUB_ENV"
+
+      - name: Destroy the database and restore it
+        run: |
+          set -euo pipefail
+          docker compose stop web server collab
+          # RESTORE_FORCE drops the existing schemas first. Without it the
+          # restore refuses, which is the behaviour a later step checks.
+          docker compose --profile backup run --rm -e RESTORE_FORCE=true \
+            backup restore "$SET_DIR"
+          docker compose start server collab web
+
+      - name: The data came back
+        run: |
+          set -euo pipefail
+          pages=$(docker compose exec -T postgres \
+            psql -U postgres -d nilovon-wiki -tAc 'select count(*) from wiki.page')
+          echo "pages after restore: $pages (before: $PAGES_BEFORE)"
+          test "$pages" = "$PAGES_BEFORE"
+          attachments=$(docker compose exec -T postgres \
+            psql -U postgres -d nilovon-wiki -tAc 'select count(*) from wiki.attachment')
+          echo "attachments after restore: $attachments"
+          # The whole reason attachments are part of a recovery set: a
+          # database-only backup restores a wiki whose files all 404.
+          test "$attachments" -gt 0
+
+      - name: The API is healthy again after the restore
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/health >/dev/null; then
+              curl -fsS http://localhost:3000/health/ready | tee /dev/stderr | grep -q '"status":"ok"'
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "API did not come back after the restore" >&2
+          exit 1
+
+      - name: A restore into a populated database is refused
+        run: |
+          set -euo pipefail
+          # The safety rail that keeps a restore from silently merging a dump
+          # into live data. It has to fail — a passing run here is the bug.
+          if docker compose --profile backup run --rm backup restore "$SET_DIR"; then
+            echo "restore into a populated database was allowed" >&2
+            exit 1
+          fi
+          echo "refused, as intended"
+
+      - name: Service logs
+        if: always()
+        run: docker compose logs --no-color --tail=300
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v --remove-orphans
