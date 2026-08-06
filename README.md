@@ -27,6 +27,7 @@ The codebase is a pnpm + Turborepo monorepo with a strict boundary between the H
 - **Tags** — space-scoped labels, created and applied inline from the page header.
 - **External links** — a curated, reorderable list of references outside the wiki per page; URLs are normalized and scheme-allowlisted to `http(s)` on the server, so a stored link can never become a `javascript:` href.
 - **Attachments** — files stored in any S3-compatible object store (a RustFS service ships with the compose stack); uploads and downloads are proxied by the API so the bucket never faces the internet.
+- **Privacy by construction** — no telemetry, no third-party scripts, no analytics; everything stays on the host except mail, webhooks and offsite backups, each of which the operator configures. What is stored and how to answer an access or erasure request is [documented](docs/privacy.md).
 - **Portable exports** — Space admins can download Markdown, HTML, or JSON ZIP archives with attachments, metadata, tags, and hierarchy; the [format is documented](docs/export-format.md).
 - **Email** — invitations, password reset and address verification over SMTP; optional, with delivery disabled when no SMTP host is configured.
 - **Favorites & subscriptions** — personal pins and per-page watch lists.

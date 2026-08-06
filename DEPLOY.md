@@ -404,6 +404,15 @@ purge still contains the purged rows, and a deletion block does not protect
 anything inside an archive either. Aligning backup rotation with these windows is
 a separate decision — see [Backups](#backups).
 
+### Personal data and self-hoster obligations
+
+Which of this is _personal_ data, where it can leave the instance, how to answer
+an access or erasure request, and what the software cannot do for you, are in
+[docs/privacy.md](docs/privacy.md). The short version an operator needs to hold
+on to: there is no telemetry, everything stays on your host except mail, webhooks
+and offsite backups — all three of which you configure — and a retention purge
+deliberately does not reach into backups.
+
 ## Backups
 
 Two things need backing up, and they only mean something together: **Postgres**
