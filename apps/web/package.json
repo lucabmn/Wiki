@@ -10,7 +10,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@better-auth/passkey": "1.7.0-beta.10",
+    "@better-auth/passkey": "1.7.0-rc.3",
     "@better-auth/scim": "1.7.0-beta.10",
     "@better-auth/sso": "1.7.0-beta.10",
     "@dnd-kit/core": "^6.3.1",
