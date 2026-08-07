@@ -29,9 +29,9 @@
   },
   "devDependencies": {
     "@nilovon-wiki/config": "workspace:*",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.1.2",
     "@types/ws": "^8.18.1",
-    "tsdown": "^0.22.3",
+    "tsdown": "^0.22.14",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
