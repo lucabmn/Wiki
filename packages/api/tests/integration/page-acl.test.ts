@@ -123,6 +123,38 @@ describe("per-page overrides restrict within a space", () => {
     expect(ids).toContain("secret");
   });
 
+  it("page.tree applies the same ACL as page.list", async () => {
+    // The tree is the sidebar. A cheaper query that forgot the ACL would leak
+    // every restricted page's *title* to everyone in the space — the whole
+    // point of the override, defeated by a performance change.
+    const excluded = await call(pageRouter.tree, { spaceId: "sp" }, { context: ctx("ed2") });
+    expect(excluded.map((p) => p.id)).toEqual(["open"]);
+
+    const member = await call(pageRouter.tree, { spaceId: "sp" }, { context: ctx("ed") });
+    expect(member.map((p) => p.id).sort()).toEqual(["open", "secret"]);
+  });
+
+  it("page.tree carries no page bodies and no access metadata", async () => {
+    const [node] = await call(pageRouter.tree, { spaceId: "sp" }, { context: ctx("admin") });
+    // The reason this endpoint exists: `list` ships every document body.
+    expect(node).not.toHaveProperty("content");
+    expect(node).not.toHaveProperty("textContent");
+    // Selected only to feed the ACL filter, and dropped before the response —
+    // a tree node is a label, not a place to publish who may see what.
+    expect(node).not.toHaveProperty("visibility");
+    expect(node).not.toHaveProperty("createdBy");
+    expect(Object.keys(node ?? {}).sort()).toEqual([
+      "archivedAt",
+      "icon",
+      "id",
+      "parentId",
+      "position",
+      "slug",
+      "status",
+      "title",
+    ]);
+  });
+
   it("the excluded editor cannot write the restricted page", async () => {
     await expect(
       call(pageRouter.update, { id: "secret", title: "Hacked" }, { context: ctx("ed2") }),

@@ -1,0 +1,103 @@
+# Automated dependency updates.
+#
+# The point is not to be on the newest version of everything — it is that a
+# published advisory turns into a pull request without anybody having to notice
+# it. Grouping keeps that from arriving as forty separate pull requests a week,
+# which is how dependency automation usually ends up being switched off.
+version: 2
+
+updates:
+  # ── The workspace ──────────────────────────────────────────────────────────
+  # One ecosystem entry covers every workspace package: pnpm workspaces share a
+  # single lockfile, and updating one package's dependency in isolation would
+  # produce a lockfile that does not match.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      # Security fixes travel alone and unbatched — a grouped PR that fails CI
+      # for an unrelated reason must not hold up a patched advisory.
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
+      # Everything else, batched by the thing it belongs to. These move as a
+      # set upstream, and splitting them produces PRs that cannot pass CI on
+      # their own.
+      better-auth:
+        patterns: ["better-auth", "@better-auth/*", "better-auth-localization"]
+      tiptap:
+        patterns: ["@tiptap/*", "yjs", "y-*", "@hocuspocus/*"]
+      orpc:
+        patterns: ["@orpc/*"]
+      tanstack:
+        patterns: ["@tanstack/*"]
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      aws-sdk:
+        patterns: ["@aws-sdk/*"]
+      dev-tooling:
+        dependency-type: development
+        patterns: ["*"]
+      production-minor-patch:
+        dependency-type: production
+        update-types: ["minor", "patch"]
+    ignore:
+      # Majors of these three reach every part of the app at once. They are
+      # deliberate, reviewed migrations rather than something to merge on a
+      # Monday morning — the advisory-driven PRs above still cover them.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+
+  # ── CI itself ──────────────────────────────────────────────────────────────
+  # An action is code that runs with the workflow's token. This keeps the
+  # versions moving, and — once the workflows are pinned to commit SHAs — is
+  # what makes that pinning maintainable rather than a slowly rotting snapshot.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Etc/UTC
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # ── Base images ────────────────────────────────────────────────────────────
+  # The three app Dockerfiles plus the backup image. An unpatched base image is
+  # the most common way a fully-updated application still ships a known CVE.
+  - package-ecosystem: docker
+    directories:
+      - /apps/server
+      - /apps/web
+      - /apps/collab
+      - /scripts/backup
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Etc/UTC
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(docker)"

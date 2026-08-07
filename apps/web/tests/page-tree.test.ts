@@ -5,6 +5,11 @@ import {
   descendantIds,
   getMoveArgs,
   getProjection,
+  indent,
+  keyboardMove,
+  moveDown,
+  moveUp,
+  outdent,
   type PageNode,
 } from "@/components/page-tree/tree";
 
@@ -94,5 +99,67 @@ describe("getProjection + getMoveArgs", () => {
     // Anchored to b1 (its new preceding sibling under b).
     const args = getMoveArgs(items, "a2", "b1", projection);
     expect(args.parentId).toBe("b");
+  });
+});
+
+describe("keyboard reordering", () => {
+  // a
+  //   a1
+  //   a2
+  // b
+  const pages: PageNode[] = [
+    { id: "a", parentId: null, title: "A", icon: null },
+    { id: "a1", parentId: "a", title: "A1", icon: null },
+    { id: "a2", parentId: "a", title: "A2", icon: null },
+    { id: "b", parentId: null, title: "B", icon: null },
+  ];
+
+  it("swaps with the sibling above, keeping the depth", () => {
+    expect(moveUp(pages, "a2")).toEqual({ id: "a2", parentId: "a", beforeId: "a1" });
+    expect(moveUp(pages, "b")).toEqual({ id: "b", parentId: null, beforeId: "a" });
+  });
+
+  it("swaps with the sibling below", () => {
+    expect(moveDown(pages, "a1")).toEqual({ id: "a1", parentId: "a", afterId: "a2" });
+  });
+
+  it("refuses a move there is no room for", () => {
+    // Disabled affordances rather than keys that silently do nothing: the UI
+    // asks these the same way, and greys the menu item out.
+    expect(moveUp(pages, "a")).toBeNull();
+    expect(moveUp(pages, "a1")).toBeNull();
+    expect(moveDown(pages, "b")).toBeNull();
+    expect(moveDown(pages, "a2")).toBeNull();
+    expect(moveUp(pages, "nonexistent")).toBeNull();
+  });
+
+  it("nests under the previous sibling, at the end of its children", () => {
+    // `b` follows `a`, which already has two children, so it lands after them.
+    expect(indent(pages, "b")).toEqual({ id: "b", parentId: "a", afterId: "a2" });
+    // With no children yet there is no anchor and the server appends.
+    expect(indent([pages[0]!, pages[3]!], "b")).toEqual({ id: "b", parentId: "a" });
+  });
+
+  it("cannot indent a first child — there is nothing to nest under", () => {
+    expect(indent(pages, "a")).toBeNull();
+    expect(indent(pages, "a1")).toBeNull();
+  });
+
+  it("lifts out to the grandparent, immediately after the old parent", () => {
+    // Not appended at the end: the page keeps its place in the reading order,
+    // which is where the person expects to still find it.
+    expect(outdent(pages, "a1")).toEqual({ id: "a1", parentId: null, afterId: "a" });
+  });
+
+  it("cannot outdent a root page", () => {
+    expect(outdent(pages, "a")).toBeNull();
+    expect(outdent(pages, "b")).toBeNull();
+  });
+
+  it("dispatches all four through one entry point", () => {
+    expect(keyboardMove(pages, "a2", "up")).toEqual(moveUp(pages, "a2"));
+    expect(keyboardMove(pages, "a1", "down")).toEqual(moveDown(pages, "a1"));
+    expect(keyboardMove(pages, "b", "indent")).toEqual(indent(pages, "b"));
+    expect(keyboardMove(pages, "a1", "outdent")).toEqual(outdent(pages, "a1"));
   });
 });

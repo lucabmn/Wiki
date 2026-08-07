@@ -101,6 +101,7 @@ vi.mock("@/components/editor/revision-history", () => ({
 vi.mock("@/utils/orpc", () => ({
   orpc: {
     pages: {
+      key: () => ["pages"],
       get: { key: () => ["page"] },
       list: { key: () => ["pages"] },
       update: {

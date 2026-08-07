@@ -94,6 +94,7 @@ vi.mock("sonner", () => ({
 vi.mock("@/utils/orpc", () => ({
   orpc: {
     pages: {
+      key: () => ["pages"],
       get: { key: () => ["page"] },
       list: { key: () => ["pages"] },
       update: {

@@ -98,7 +98,7 @@ export function HtmlImportDialog({
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [confirmed, setConfirmed] = useState(false);
   const [progress, setProgress] = useState(0);
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
+  const invalidatePages = useInvalidate(orpc.pages.key());
 
   const commit = useMutation({
     mutationFn: async () => {

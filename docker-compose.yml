@@ -12,6 +12,30 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+# Runtime hardening for the three Node/Bun app containers.
+#
+# They already run as the unprivileged `node` user (see the Dockerfiles), bind
+# ports above 1024, and touch no device — so every Linux capability can go. What
+# this buys is narrow but real: a remote-code-execution bug in the app can no
+# longer mount, load a module, change file ownership, or trace another process
+# on its way out of the container.
+#
+# `no-new-privileges` is the other half: without it a setuid binary that ends up
+# in a base image is a path back to root inside the namespace.
+#
+# Not read-only root filesystems: Node writes to `/tmp` and the SSR server
+# unpacks assets under its own working directory, so a read-only root would need
+# a tmpfs per path and a rebuild to verify. Capabilities are the part that is
+# both safe to ship blind and worth the most.
+x-app-hardening: &app-hardening
+  security_opt:
+    - "no-new-privileges:true"
+  cap_drop:
+    - ALL
+  # A fork bomb inside one container should not take the host's process table
+  # with it. Generous — the apps run well under a hundred threads.
+  pids_limit: 512
+
 services:
   web:
     # Tagged multi-arch releases are available from GHCR for localhost installs.
@@ -25,7 +49,9 @@ services:
         # rebuild. Defaults keep plain `docker compose` on localhost.
         VITE_SERVER_URL: ${VITE_SERVER_URL:-http://localhost:3000}
         VITE_COLLAB_URL: ${VITE_COLLAB_URL:-ws://localhost:1234}
+    <<: *app-hardening
     init: true
+    mem_limit: ${WEB_MEMORY_LIMIT:-512m}
     ports:
       - "3001:3001"
     env_file:
@@ -61,6 +87,7 @@ services:
     # installed migration binary directly: pnpm 11 attempts to write workspace
     # metadata under root-owned /app even for `pnpm run`, which fails at runtime.
     working_dir: /app/packages/db
+    <<: *app-hardening
     command: ["./node_modules/.bin/drizzle-kit", "migrate"]
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example, or use the installer)}@postgres:5432/nilovon-wiki
@@ -75,7 +102,12 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
+    <<: *app-hardening
     init: true
+    # The API renders PDF exports in-process, so this is the service most likely
+    # to want more. Raise it if large Space exports get killed; the per-export
+    # ceilings (PDF_EXPORT_*) are what bound the demand in the first place.
+    mem_limit: ${SERVER_MEMORY_LIMIT:-1g}
     ports:
       - "3000:3000"
     env_file:
@@ -95,6 +127,11 @@ services:
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
       IMPERSONATION_ENABLED: ${IMPERSONATION_ENABLED:-true}
       IMPERSONATION_MAX_MINUTES: ${IMPERSONATION_MAX_MINUTES:-30}
+      # Registration policy. `open` keeps the historical behaviour; a private
+      # organization wiki wants `invite`. See .env.example and DEPLOY.md.
+      SIGNUP_MODE: ${SIGNUP_MODE:-open}
+      SIGNUP_ALLOWED_EMAIL_DOMAINS: ${SIGNUP_ALLOWED_EMAIL_DOMAINS:-}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-false}
       # The collab service runs in its own container, so the reachability probe
       # on the instance overview needs its address rather than loopback.
       COLLAB_INTERNAL_URL: http://collab:1234
@@ -137,8 +174,26 @@ services:
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID in .env (or use the installer)}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env (or use the installer)}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      # Per-file upload ceiling. Uploads proxy through the API, so this also
+      # bounds what one request makes the server buffer.
+      ATTACHMENT_MAX_MB: ${ATTACHMENT_MAX_MB:-25}
+      # PDF export ceilings. Rendering happens in-process, so these bound what
+      # one export request may cost the API's CPU and memory.
+      PDF_EXPORT_MAX_PAGES: ${PDF_EXPORT_MAX_PAGES:-500}
+      PDF_EXPORT_PAGE_TIMEOUT_MS: ${PDF_EXPORT_PAGE_TIMEOUT_MS:-15000}
+      PDF_EXPORT_IMAGE_CACHE_MB: ${PDF_EXPORT_IMAGE_CACHE_MB:-64}
+      # Per-IP request ceilings (requests per minute).
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
+      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-60}
+      RATE_LIMIT_SCIM_MAX: ${RATE_LIMIT_SCIM_MAX:-1200}
+      APP_NAME: ${APP_NAME:-Wiki}
     healthcheck:
       # /health verifies database connectivity, not just process liveness.
+      # Deliberately not /health/ready: that one also probes object storage and
+      # the collaboration service, and neither failure is fixed by restarting
+      # this container — compose would cycle a working API and take the web
+      # service down with it. Point monitoring at /health/ready instead
+      # (DEPLOY.md → Health & monitoring).
       test:
         [
           "CMD",
@@ -165,7 +220,11 @@ services:
     build:
       context: .
       dockerfile: apps/collab/Dockerfile
+    <<: *app-hardening
     init: true
+    # Hocuspocus holds every open document in memory. Scale this with how many
+    # pages are edited at once, not with the size of the wiki.
+    mem_limit: ${COLLAB_MEMORY_LIMIT:-512m}
     ports:
       - "1234:1234"
     env_file:
@@ -201,6 +260,19 @@ services:
   postgres:
     image: postgres:18
     container_name: nilovon-wiki-postgres
+    # No `cap_drop: ALL` here, unlike the app containers: the official entrypoint
+    # starts as root to fix ownership of the data directory and then drops to the
+    # `postgres` user, which needs CHOWN/SETUID/SETGID/DAC_OVERRIDE/FOWNER.
+    # `no-new-privileges` still applies — dropping privileges is allowed, gaining
+    # them is not.
+    security_opt:
+      - "no-new-privileges:true"
+    # A hard ceiling on the database is a trade: it stops a runaway query from
+    # taking the host down, and it means the OOM killer, not Postgres, decides
+    # what happens when the ceiling is reached. Sized so normal operation never
+    # comes close — Postgres' own appetite is bounded by its config, not by how
+    # much content the wiki holds. Raise it before you tune shared_buffers.
+    mem_limit: ${POSTGRES_MEMORY_LIMIT:-2g}
     environment:
       POSTGRES_DB: nilovon-wiki
       POSTGRES_USER: postgres
@@ -227,6 +299,8 @@ services:
     container_name: nilovon-wiki-rustfs
     security_opt:
       - "no-new-privileges:true"
+    mem_limit: ${RUSTFS_MEMORY_LIMIT:-1g}
+    pids_limit: 512
     environment:
       RUSTFS_VOLUMES: /data/rustfs
       RUSTFS_ADDRESS: 0.0.0.0:9000
@@ -268,42 +342,69 @@ services:
     restart: "no"
     logging: *default-logging
 
-  # Nightly database dump into a named volume, with retention. Opt-in:
-  #   docker compose --profile backup up -d backup
-  # Postgres holds pages, revisions and Yjs snapshots; attachment *bytes* live
-  # in the object store and are NOT covered here — back up the rustfs volume
-  # separately (see DEPLOY.md).
+  # Backups. Opt-in:
+  #   docker compose --profile backup up -d --build backup
+  #
+  # One run produces one *recovery set*: the database dump and every attachment
+  # byte under a single timestamp, with SHA-256 checksums over both. A database
+  # dump on its own restores a wiki whose attachments all 404, which is why the
+  # two are no longer separate procedures.
+  #
+  # Attachments are mirrored through the S3 API, so nothing has to be stopped
+  # for the backup to be consistent. Optional at-rest encryption and an offsite
+  # copy are configured per .env; restore with
+  #   docker compose --profile backup run --rm backup restore /backups/<stamp>
+  # See DEPLOY.md → Backups, and scripts/backup/.
   backup:
-    image: postgres:18
+    build:
+      context: ./scripts/backup
+    image: nilovon-wiki-backup:local
     container_name: nilovon-wiki-backup
     profiles: ["backup"]
+    init: true
+    security_opt:
+      - "no-new-privileges:true"
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example, or use the installer)}
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: nilovon-wiki
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      # Age at which the container reports itself unhealthy. Default 36 h:
+      # tolerates one late run, flags the second.
+      BACKUP_MAX_AGE_SECONDS: ${BACKUP_MAX_AGE_SECONDS:-129600}
+      # Same object store the API writes attachments to — read here, never written.
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://rustfs:9000}
+      S3_BUCKET: ${S3_BUCKET:-nilovon-wiki}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID in .env (or use the installer)}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env (or use the installer)}
+      # Optional at-rest encryption. Store the passphrase somewhere other than
+      # this host — losing it loses every backup made with it.
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+      # Optional offsite copy (any S3-compatible target). Without it, backups
+      # survive a bad deploy and nothing else.
+      BACKUP_REMOTE_ENDPOINT: ${BACKUP_REMOTE_ENDPOINT:-}
+      BACKUP_REMOTE_BUCKET: ${BACKUP_REMOTE_BUCKET:-}
+      BACKUP_REMOTE_PREFIX: ${BACKUP_REMOTE_PREFIX:-nilovon-wiki}
+      BACKUP_REMOTE_ACCESS_KEY_ID: ${BACKUP_REMOTE_ACCESS_KEY_ID:-}
+      BACKUP_REMOTE_SECRET_ACCESS_KEY: ${BACKUP_REMOTE_SECRET_ACCESS_KEY:-}
     volumes:
       - nilovon-wiki_backups:/backups
     depends_on:
       postgres:
         condition: service_healthy
-    # A sleep loop rather than cron: one process, logs to stdout like every
-    # other service, and no second scheduler to keep alive inside the image.
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        set -eu
-        while true; do
-          file="/backups/wiki-$$(date +%F-%H%M).sql.gz"
-          if pg_dump -h postgres -U postgres nilovon-wiki | gzip > "$$file.part"; then
-            mv "$$file.part" "$$file"
-            echo "backup written: $$file"
-          else
-            rm -f "$$file.part"
-            echo "backup FAILED" >&2
-          fi
-          find /backups -name 'wiki-*.sql.gz' -mtime +$${BACKUP_KEEP_DAYS} -delete
-          sleep 86400
-        done
+    healthcheck:
+      # Backup *age*, not process liveness. The failure worth catching is the
+      # quiet one: the loop keeps running, the container keeps saying "Up", and
+      # the dumps stopped three weeks ago because the volume filled up.
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      # Long enough for the first run to finish on a large install; until then
+      # "no backup yet" is expected rather than a fault.
+      start_period: 30m
     restart: unless-stopped
     logging: *default-logging
 

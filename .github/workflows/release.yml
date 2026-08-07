@@ -12,13 +12,18 @@ on:
     tags:
       - "v*"
 
+# Least privilege at the top, widened per job. Only `publish` writes releases
+# and only the image jobs write packages; a build job that can push a tag is a
+# credential nobody needed to hand out.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: read
     env:
       TURBO_TELEMETRY_DISABLED: 1
       SKIP_ENV_VALIDATION: 1
@@ -70,6 +75,13 @@ jobs:
             suffix: darwin-x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    permissions:
+      contents: read
+      # Signs a provenance statement for the binary this job produced, tying it
+      # to this workflow, this commit and this runner. Without it "download the
+      # installer and run it as root" is an act of faith.
+      id-token: write
+      attestations: write
     env:
       TURBO_TELEMETRY_DISABLED: 1
     steps:
@@ -99,6 +111,14 @@ jobs:
       - name: Rename binary for platform
         run: mv apps/tui/dist/nilovon-wiki-installer nilovon-wiki-installer-${{ matrix.suffix }}
 
+      # Signed here rather than in `publish`: provenance is only worth anything
+      # if it is produced by the job that actually did the build, on the runner
+      # that did it.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: nilovon-wiki-installer-${{ matrix.suffix }}
+
       - name: Stage installer artifact
         uses: actions/upload-artifact@v4
         with:
@@ -115,6 +135,10 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # BuildKit attaches an in-toto provenance statement and an SPDX SBOM to
+      # each image below; pushing those to GHCR needs the OIDC identity.
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -176,6 +200,13 @@ jobs:
           tags: ghcr.io/lucabmn/wiki-${{ matrix.app }}:staging-${{ github.sha }}${{ matrix.suffix }}
           cache-from: type=gha,scope=${{ matrix.app }}${{ matrix.suffix }}
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}${{ matrix.suffix }}
+          # Attached to the image manifest itself, so they survive the retagging
+          # in `publish` and travel with a `docker pull` rather than living in a
+          # release page somebody has to remember to check.
+          #   provenance mode=max — full build definition, not just the digest
+          #   sbom               — SPDX inventory of what ended up in the layers
+          provenance: mode=max
+          sbom: true
           # The web bundle bakes its public URLs at build time, so the published
           # image only fits a deployment that uses these. Self-hosters on custom
           # domains must still build web themselves (see DEPLOY.md).
@@ -190,12 +221,38 @@ jobs:
       contents: write
       packages: write
     steps:
+      # Needed for the source SBOM below — the installers alone do not describe
+      # what went into them.
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download all installer artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: installer-*
           path: installers
           merge-multiple: true
+
+      # Without this there is no way to tell a truncated download from a
+      # tampered one, and "curl | chmod +x | run as root" is the documented
+      # install path.
+      - name: Checksum the installers
+        working-directory: installers
+        run: |
+          set -euo pipefail
+          sha256sum nilovon-wiki-installer-* > SHA256SUMS
+          cat SHA256SUMS
+
+      # An inventory of the dependency tree behind this tag. When the next
+      # advisory lands, this answers "are we affected, and since when" without
+      # rebuilding a six-month-old commit.
+      - name: Generate source SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: nilovon-wiki-sbom.spdx.json
+          output-file: installers/nilovon-wiki-sbom.spdx.json
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -241,4 +298,27 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
+          # Installers, their SHA256SUMS, and the SBOM.
           files: installers/*
+          body: |
+            ## Verifying this release
+
+            Checksums, and provenance signed by the workflow that built each binary:
+
+            ```sh
+            sha256sum -c SHA256SUMS --ignore-missing
+            gh attestation verify nilovon-wiki-installer-linux-x64 --repo ${{ github.repository }}
+            ```
+
+            Container images carry their own provenance and an SPDX SBOM in the
+            manifest:
+
+            ```sh
+            gh attestation verify oci://ghcr.io/lucabmn/wiki-server:${{ github.ref_name }} --repo ${{ github.repository }}
+            docker buildx imagetools inspect ghcr.io/lucabmn/wiki-server:${{ github.ref_name }} --format '{{ json .SBOM }}'
+            ```
+
+            See [DEPLOY.md](https://github.com/${{ github.repository }}/blob/main/DEPLOY.md#verifying-a-release)
+            and the [changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).
+          append_body: true
+          generate_release_notes: true

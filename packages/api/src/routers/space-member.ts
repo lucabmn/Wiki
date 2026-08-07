@@ -7,6 +7,7 @@ import { spaceMember, team, user } from "@nilovon-wiki/db/schema/index";
 
 import { isOrgManager, protectedProcedure } from "../index";
 import { assertSpaceRead, loadSpaceRole } from "../lib/access";
+import { activityActor, recordActivity } from "../lib/activity";
 import { requireSpaceManage } from "../lib/authz";
 import { loadSpace } from "../lib/loaders";
 import { assertPermissionSubjectInOrganization } from "../lib/permission-subject";
@@ -28,6 +29,24 @@ async function loadSpaceMember(db: Database, id: string) {
   const row = rows[0];
   if (!row) throw new ORPCError("NOT_FOUND", { message: "Space member not found" });
   return row;
+}
+
+/**
+ * Names the grantee in a form that outlives the row it describes.
+ *
+ * "A grant was removed" answers nothing; *whose* access changed is the question,
+ * and the `spaceMember` row is gone by the time anybody reads the log. So the
+ * subject is denormalized into the activity metadata, as page titles already are.
+ */
+function grantee(row: Awaited<ReturnType<typeof loadSpaceMember>>): Record<string, unknown> {
+  return {
+    subject: row.subject,
+    subjectId: row.user?.id ?? row.team?.id ?? row.roleName ?? null,
+    subjectName: row.user?.name ?? row.team?.name ?? row.roleName ?? null,
+    // Two people share a display name more often than anyone expects, and an
+    // access audit is precisely where "who exactly" has to be unambiguous.
+    subjectEmail: row.user?.email ?? null,
+  };
 }
 
 /** Joined select shared by list/load so both return the same shape. */
@@ -129,7 +148,15 @@ export const spaceMemberRouter = {
       if (!inserted) {
         throw new ORPCError("CONFLICT", { message: "Already a member of this space" });
       }
-      return loadSpaceMember(context.db, inserted.id);
+      const created = await loadSpaceMember(context.db, inserted.id);
+      await recordActivity(context.db, {
+        organizationId: spaceRow.organizationId,
+        action: "space.member_added",
+        ...activityActor(context),
+        spaceId: spaceRow.id,
+        metadata: { name: spaceRow.name, role: created.role, ...grantee(created) },
+      });
+      return created;
     }),
 
   updateRole: protectedProcedure
@@ -157,6 +184,18 @@ export const spaceMemberRouter = {
           }
         }
         await tx.update(spaceMember).set({ role: input.role }).where(eq(spaceMember.id, input.id));
+        await recordActivity(tx, {
+          organizationId: spaceRow.organizationId,
+          action: "space.member_role_changed",
+          ...activityActor(context),
+          spaceId: spaceRow.id,
+          metadata: {
+            name: spaceRow.name,
+            from: existing.role,
+            to: input.role,
+            ...grantee(existing),
+          },
+        });
       });
       return loadSpaceMember(context.db, input.id);
     }),
@@ -181,6 +220,15 @@ export const spaceMemberRouter = {
           throw new ORPCError("BAD_REQUEST", { message: "A space must keep at least one admin" });
         }
         await tx.delete(spaceMember).where(eq(spaceMember.id, input.id));
+        // Inside the transaction: a revocation that rolled back — because it
+        // would have orphaned space management — must not appear in the log.
+        await recordActivity(tx, {
+          organizationId: spaceRow.organizationId,
+          action: "space.member_removed",
+          ...activityActor(context),
+          spaceId: spaceRow.id,
+          metadata: { name: spaceRow.name, role: existing.role, ...grantee(existing) },
+        });
       });
       return { id: input.id };
     }),

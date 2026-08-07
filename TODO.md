@@ -1,82 +1,71 @@
 P1 – Für echte Production Readiness
 
-### Backup und Recovery
+### ~~Backup und Recovery~~ — erledigt
 
-Der vorhandene Backup-Service sichert nur PostgreSQL:
+Ein Backup-Lauf erzeugt jetzt **ein Recovery-Set**: Datenbank-Dump _und_ alle
+Attachment-Bytes unter einem Zeitstempel, mit SHA-256-Prüfsummen über beides.
 
-- Attachments fehlen.
-- Backups bleiben standardmäßig auf demselben Host.
-- Fehler machen den Container nicht unhealthy.
-- Keine automatischen Restore-Tests.
-- Keine definierten RPO/RTO.
+- Attachments werden über die S3-API gespiegelt — es muss nichts gestoppt werden.
+- Offsite-Kopie (`BACKUP_REMOTE_*`), bewusst `mc cp` statt `mc mirror`, damit
+  lokales Pruning nicht auf die Fernkopie durchschlägt.
+- Optionale Verschlüsselung at rest (`BACKUP_PASSPHRASE`).
+- Backup-Alter treibt den Container-Healthcheck: ein still gescheitertes Backup
+  ist in `docker compose ps` sichtbar, nicht erst beim Restore.
+- Restore ist ein Kommando, prüft Prüfsummen _vor_ dem Schreiben und verweigert
+  eine bereits befüllte Datenbank. CI fährt Backup **und Restore** bei jeder
+  Änderung (`.github/workflows/smoke.yml`).
+- RPO/RTO und eine quartalsweise Restore-Übung stehen in `DEPLOY.md`.
 
-Benötigt werden:
+### ~~Registrierung kontrollierbar machen~~ — erledigt
 
-1.  konsistentes DB- und Object-Store-Backup,
-2.  Offsite-Kopie,
-3.  Checksums/Verschlüsselung,
-4.  Backup-Alter als Health-/Monitoring-Signal,
-5.  dokumentierter und regelmäßig getesteter Restore.
-
-### Registrierung kontrollierbar machen
-
-Öffentliche Registrierung ist aktiv, E-Mail-Verifikation aber nicht erforderlich. Für private Organisations-Wikis braucht es Konfiguration wie:
-
-- SIGNUP_ENABLED=false
-- Invitation-only
-- optional verpflichtende E-Mail-Verifikation
-- optional erlaubte E-Mail-Domains
+`SIGNUP_MODE=open|invite|closed`, optionale Domain-Allowlist
+(`SIGNUP_ALLOWED_EMAIL_DOMAINS`) und optional verpflichtende E-Mail-Verifikation
+(`REQUIRE_EMAIL_VERIFICATION`). Durchgesetzt in der Auth-Schicht auf
+`/sign-up/email` — SSO und SCIM bleiben absichtlich unberührt, `INITIAL_ADMIN_EMAIL`
+ist in jedem Modus ausgenommen. Siehe `DEPLOY.md` → „Who may register“.
 
 ### Observability
 
-Strukturierte Logs und Healthchecks existieren, aber noch keine:
+**Erledigt:** Healthchecks decken jetzt jede Abhängigkeit ab.
+`/health/live` (nichts), `/health` (Datenbank — was der Orchestrator beobachtet)
+und `/health/ready` (Datenbank, Object Storage, Collab, Mail, je Komponente
+gemeldet). Backup-Alter ist ein Container-Health-Signal. `DEPLOY.md` nennt einen
+minimalen Alerting-Regelsatz.
 
-- Metrics,
-- Alerting,
-- SLOs,
-- Backup-Alarme,
-- Disk-/DB-Pool-/Storage-Monitoring,
-- Incident-Runbooks.
+**Offen:** ein echtes Metrics-Backend (Prometheus-Endpunkt o. Ä.), SLOs,
+Disk-/DB-Pool-Monitoring und Incident-Runbooks über die Restore-Übung hinaus.
+Für einen Single-Host-Betrieb ist Container-Health plus `/health/ready` die
+Grundlage; ein `/metrics`-Endpunkt wäre der nächste sinnvolle Schritt.
 
-/health prüft derzeit im Wesentlichen PostgreSQL. Object Storage und Collaboration können ausfallen, während der API-Container gesund erscheint.
+### ~~Security Headers~~ — erledigt
 
-### Security Headers
+HSTS, CSP, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+`Cross-Origin-Opener-Policy` und eine `Permissions-Policy`, die nichts gewährt —
+in einem Snippet, das jeder Host importiert. `'unsafe-inline'` für script/style
+ist bewusst gesetzt und im `Caddyfile` begründet (SSR-Hydration, Editor,
+Mermaid); eine Nonce-basierte Policy bräuchte Umbauten an beiden.
 
-Im Caddyfile fehlen explizite Browser-Sicherheitsheader:
+### ~~Deployment-E2E-Tests~~ — teilweise erledigt
 
-- HSTS
-- CSP bzw. mindestens frame-ancestors
-- Referrer-Policy
-- Permissions-Policy
-- X-Content-Type-Options
+`.github/workflows/smoke.yml` fährt den echten Compose-Stack hoch und testet
+über HTTP: Health (alle drei Routen), Registrierung, Organisation, Space,
+Seitenbearbeitung, Seitenbaum, Attachment-Roundtrip, WebSocket-Collaboration,
+Audit-Log, Rate Limiting — dann Backup, Datenbank zerstören, Restore, und die
+Prüfung, dass Seiten _und Attachments_ zurück sind.
 
-### Deployment-E2E-Tests
-
-CI baut Images, startet aber den tatsächlichen Stack nicht. Sinnvoll wäre ein Smoke-Test mit:
-
-1.  PostgreSQL und RustFS starten,
-2.  Migrationen ausführen,
-3.  Stack starten,
-4.  Registrierung/Login,
-5.  Seite erstellen und bearbeiten,
-6.  WebSocket-Collaboration,
-7.  Attachment Upload/Download,
-8.  Backup und Restore.
-
-Zusätzlich fehlen Playwright-/Cypress- und automatisierte Accessibility-Tests.
+**Offen:** Playwright/Cypress im Browser und automatisierte
+Accessibility-Prüfung (axe). Der Smoke-Test deckt die API-Ebene ab, nicht das
+gerenderte UI.
 
 ────────────────────────────────────────────────────────────────────────────────
 
 P1 – Produktreife eines Wikis
 
-### Skalierbare Seitennavigation
+### ~~Skalierbare Seitennavigation~~ — erledigt
 
-pages.list lädt für den Baum alle Seiten inklusive vollständigem Content:
-
-- packages/api/src/routers/page.ts
-- apps/web/src/components/page-tree/page-tree.tsx
-
-Für große Wikis braucht es einen schlanken Tree-Endpunkt mit nur ID, Titel, Parent, Reihenfolge, Status und Slug.
+`pages.tree` liefert acht Spalten statt jeder Seite samt Dokumentkörper.
+Sidebar und Breadcrumb nutzen ihn; derselbe ACL-Filter wie `pages.list`, mit
+einem Test, der das festhält.
 
 ### ~~Archiv-Wiederherstellung vollständig machen~~ — erledigt
 
@@ -91,16 +80,16 @@ Geschlossen mit dem Datenlebenszyklus (`tickets/T04-data-lifecycle.md`):
   Frist, Wiederherstellen und endgültiges Löschen sind eigene Aktionen. Siehe
   `apps/docs/content/docs/concepts/data-lifecycle.mdx`.
 
-### Audit Log ehrlich vervollständigen
+### ~~Audit Log ehrlich vervollständigen~~ — erledigt
 
-README behauptet, jede Mutation werde auditiert. Tatsächlich fehlen unter anderem:
+ACL-Änderungen (Space- und Seiten-Mitgliedschaften, Rollenwechsel, Entzug),
+Seiten-Sichtbarkeit und Comment-Edits schreiben jetzt Audit-Zeilen — innerhalb
+der Transaktion der Mutation, damit ein zurückgerollter Vorgang nie im Log
+steht. Die Metadaten denormalisieren, _wessen_ Zugriff sich geändert hat, weil
+die Mitgliedszeile beim Lesen des Logs längst weg ist.
 
-- ACL-Änderungen,
-- Membership-Änderungen,
-- Comment-Edits,
-- Teile der Auth-/Org-Mutationen.
-
-Entweder Audit-Abdeckung vervollständigen oder die Produktbeschreibung einschränken.
+Die README-Behauptung ist auf das eingeschränkt, was tatsächlich gilt, und
+verweist auf das Enum statt es zu wiederholen.
 
 ### Subscriptions tatsächlich benachrichtigen
 
@@ -114,85 +103,88 @@ Offen bleibt:
 
 ### Accessibility
 
-Page-Reordering funktioniert nur per Pointer. Es fehlen Keyboard-/Menü-Alternativen. Außerdem sollte mindestens axe-basierte Prüfung plus Tastatur-E2E eingeführt werden.
+**Erledigt:** Page-Reordering geht jetzt auch ohne Zeigegerät — vier diskrete
+Züge (hoch, runter, ein-, ausrücken), sowohl als `Alt`+Pfeil auf der fokussierten
+Zeile als auch als Menü pro Zeile, mit einer `aria-live`-Ansage. Unmögliche Züge
+sind deaktiviert statt still wirkungslos.
+
+**Offen:** axe-basierte Prüfung und Tastatur-E2E über den Seitenbaum hinaus.
 
 ────────────────────────────────────────────────────────────────────────────────
 
 P1 – Open Source Readiness
 
-### Community-Dateien ergänzen
+### ~~Community-Dateien ergänzen~~ — erledigt
 
-Mindestens:
+`CODE_OF_CONDUCT.md`, `SUPPORT.md`, `GOVERNANCE.md`, `MAINTAINERS.md`,
+`.github/CODEOWNERS`, `CHANGELOG.md`. `GOVERNANCE.md` benennt die fünf öffentlichen
+Verträge (REST-Oberfläche, Exportformat, Env-Variablen, Schema, Compose-Service-
+und Volume-Namen) samt Breaking-Change- und SemVer-Politik.
 
-- CODE_OF_CONDUCT.md
-- SUPPORT.md
-- GOVERNANCE.md oder MAINTAINERS.md
-- .github/CODEOWNERS
-- CHANGELOG.md
-- Release-/SemVer- und Breaking-Change-Policy
+### ~~Contributor Setup reparieren~~ — erledigt
 
-### Contributor Setup reparieren
-
-CONTRIBUTING.md vergisst die Konfiguration von apps/collab/.env, obwohl pnpm dev den Collab-Service startet.
+`CONTRIBUTING.md` nennt jetzt `apps/collab/.env` und hebt hervor, dass
+`BETTER_AUTH_SECRET` in Server und Collab identisch sein muss — sonst verbindet
+sich der Editor und scheitert danach still an der Authentifizierung.
 
 ### Release Supply Chain
 
-Für Release-Artefakte fehlen:
+**Erledigt:** SHA-256-Prüfsummen und signierte Build-Provenance für die
+Installer-Binaries (im bauenden Job, nicht nachträglich), BuildKit-Provenance
+(`mode=max`) und SPDX-SBOM am Image-Manifest, plus ein Quell-SBOM am Release.
+`DEPLOY.md` → „Verifying a release“ dokumentiert die Prüfung und das Pinnen per
+Digest. Workflow-Rechte sind least-privilege pro Job.
 
-- SHA-256 Checksums,
-- SBOMs,
-- Artifact Attestations/Provenance,
-- optional Cosign-/Sigstore-Signaturen.
+**Offen:** Actions auf Commit-SHAs pinnen. Bewusst nicht blind gemacht — ein
+nicht verifizierter Digest wäre schlechter als kein Pin. Der
+`github-actions`-Eintrag in `dependabot.yml` hält die Pins danach aktuell.
+Optional zusätzlich Cosign-/Sigstore-Signaturen.
 
-GitHub Actions sollten außerdem auf Commit-SHAs gepinnt und Schreibrechte nur den Publish-Jobs gegeben werden.
+### ~~Dependency Automation~~ — erledigt
 
-### Dependency Automation
+Dependabot über Workspace, Actions und die vier Base-Images, gruppiert (Security
+Updates ungruppiert, damit ein fremder CI-Fehler kein Advisory aufhält). CodeQL
+wöchentlich über TypeScript _und_ die Workflows; Dependency Review als Gate für
+neu eingeführte High-Severity-Advisories auf PRs.
 
-Es fehlen Dependabot/Renovate und Dependency Review/CodeQL. Derzeit bestehen zwei moderate Advisories:
+### ~~Datenschutz und Datenlebenszyklus~~ — erledigt
 
-- esbuild
-- @hono/node-server
-
-Keine davon ist aktuell „high“, aber sie sollten geprüft und automatisiert verfolgt werden.
-
-### Datenschutz und Datenlebenszyklus
-
-Für Betreiber sollte dokumentiert werden:
-
-- welche personenbezogenen Daten gespeichert werden,
-- ~~Log- und Audit-Retention~~ — umgesetzt und dokumentiert (`DEPLOY.md`,
-  „Which data lives how long"; Fristen pro Organisation in der App),
-- Account-/Org-Löschung,
-- Datenexport,
-- Backup-Löschung (Aufbewahrungsfristen greifen bewusst **nicht** in Backups —
-  ein Dump von vor einem Purge enthält die gelöschten Zeilen weiterhin),
-- Telemetrieverhalten,
-- Verantwortlichkeiten des Self-Hosters.
+`docs/privacy.md`: welche personenbezogenen Daten wo liegen, wohin sie die
+Instanz verlassen können (Mail, Webhooks, Offsite-Backups — alle drei vom
+Betreiber konfiguriert), Auskunft/Berichtigung/Löschung, Organisationslöschung,
+Export, Telemetrieverhalten (keines) und die Verantwortlichkeiten des
+Self-Hosters. Inklusive der ehrlichen Aussage, dass Aufbewahrungsfristen
+bewusst **nicht** in Backups greifen.
 
 ────────────────────────────────────────────────────────────────────────────────
 
 P2 – Danach sinnvoll
 
-- Container-Images per Digest pinnen
-- Read-only Filesystems, Capability Drops und Resource Limits
-- ATTACHMENT_MAX_MB tatsächlich durch Compose weiterreichen
+- ~~Read-only Filesystems, Capability Drops und Resource Limits~~ — Capability
+  Drops, `no-new-privileges`, PID- und Memory-Limits sind gesetzt.
+  Read-only-Rootfs bleibt offen: das braucht ein tmpfs je Schreibpfad und einen
+  Rebuild zur Verifikation.
+- ~~ATTACHMENT_MAX_MB tatsächlich durch Compose weiterreichen~~ — erledigt,
+  zusammen mit den PDF-Export-Ceilings, den Rate Limits und `APP_NAME`.
+- Container-Images per Digest pinnen (dokumentiert in `DEPLOY.md`, aber nicht
+  Vorgabe der Compose-Datei)
 - Changelog automatisch aus Releases/PRs generieren
 - Performance-/Lasttests für große Spaces
 - Storage- und DB-Kapazitätsrichtlinien
 - klare Single-Host-Grenzen dokumentieren
 - dokumentierte Upgrade-Kompatibilitätsmatrix
+- `/metrics`-Endpunkt (Prometheus) als nächster Observability-Schritt
 
-Empfohlene Reihenfolge
+────────────────────────────────────────────────────────────────────────────────
 
-1.  Lizenz und Repository-Links
-2.  ACL-Leaks und tenantübergreifende Grants
-3.  Attachment-Lifecycle
-4.  Secret- und Auth-Link-Logging
-5.  vollständige Backups plus Restore-Test
-6.  Signup-/Produktionskonfiguration
-7.  Deployment-E2E und Accessibility
-8.  Export, Restore-UI und Skalierung
-9.  Community-, Release- und Supply-Chain-Dateien
+Verbleibende Reihenfolge
 
-Die normalen Qualitätsprüfungen sind aktuell stark: Typecheck, Tests und Build laufen erfolgreich; die größte verbleibende Arbeit liegt nicht bei allgemeiner Codequalität, sondern bei Security-Randfällen,  
- Betriebssicherheit, Datenlebenszyklus und Open-Source-Governance.
+1.  Actions auf Commit-SHAs pinnen (verifizierte Digests)
+2.  Browser-E2E (Playwright) und axe-Accessibility-Prüfung
+3.  Metrics/SLOs und Incident-Runbooks
+4.  Sofort- und In-App-Benachrichtigungen
+5.  Lasttests und Kapazitätsrichtlinien
+
+Die normalen Qualitätsprüfungen sind weiterhin grün: Typecheck, Tests und Build
+laufen erfolgreich, und der Deployment-Smoke-Test prüft zusätzlich den
+zusammengesetzten Stack inklusive Restore.

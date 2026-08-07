@@ -11,7 +11,7 @@ type TemplatePage = { id: string; spaceId: string; title: string; status: string
 
 /** Invalidates every list a template's flag can move a page in or out of. */
 function useTemplateInvalidation() {
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
+  const invalidatePages = useInvalidate(orpc.pages.key());
   const invalidateTemplates = useInvalidate(orpc.pages.listTemplates.key());
   const invalidatePage = useInvalidate(orpc.pages.get.key());
   return () => {
@@ -57,7 +57,7 @@ export function useTemplateToggle(page: TemplatePage & { isTemplate: boolean }) 
  */
 export function PageTemplateBanner({ page }: { page: TemplatePage }) {
   const navigate = useNavigate();
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
+  const invalidatePages = useInvalidate(orpc.pages.key());
   const unpublished = page.status !== "published";
 
   const use = useMutation(

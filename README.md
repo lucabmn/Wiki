@@ -27,11 +27,12 @@ The codebase is a pnpm + Turborepo monorepo with a strict boundary between the H
 - **Tags** — space-scoped labels, created and applied inline from the page header.
 - **External links** — a curated, reorderable list of references outside the wiki per page; URLs are normalized and scheme-allowlisted to `http(s)` on the server, so a stored link can never become a `javascript:` href.
 - **Attachments** — files stored in any S3-compatible object store (a RustFS service ships with the compose stack); uploads and downloads are proxied by the API so the bucket never faces the internet.
+- **Privacy by construction** — no telemetry, no third-party scripts, no analytics; everything stays on the host except mail, webhooks and offsite backups, each of which the operator configures. What is stored and how to answer an access or erasure request is [documented](docs/privacy.md).
 - **Portable exports** — Space admins can download Markdown, HTML, or JSON ZIP archives with attachments, metadata, tags, and hierarchy; the [format is documented](docs/export-format.md).
 - **Email** — invitations, password reset and address verification over SMTP; optional, with delivery disabled when no SMTP host is configured.
 - **Favorites & subscriptions** — personal pins and per-page watch lists.
 - **Full-text search** — PostgreSQL `tsvector` generated columns with GIN indexes.
-- **Activity feed / audit log** — every mutation records an audit row, including destructive deletes.
+- **Activity feed / audit log** — content mutations, access-control changes and destructive deletes all record an audit row, naming the actor (and the instance admin behind them during an impersonated session). Grants record _whose_ access changed, denormalized so the entry still reads after the grant is gone. The full list of audited actions is the `ActivityActionSchema` enum in `packages/api/src/schemas/misc.ts`.
 - **Role-based access control** — static and dynamic roles via Better Auth; see [docs/permissions.md](docs/permissions.md).
 - **Guided onboarding** — create an organization and optionally seed sample content.
 - **Type-safe API** — one oRPC definition powers both `/rpc` and a generated, versioned OpenAPI spec at `/v1`.
@@ -75,7 +76,7 @@ The codebase is a pnpm + Turborepo monorepo with a strict boundary between the H
       └──────────────┘     └──────────────┘      └──────────────┘
 ```
 
-Reads are gated on **space visibility** (`packages/api/src/lib/access.ts`); mutations are gated on **organization role** (`assertOrgPermission`). Every write runs in a transaction and appends an audit row.
+Reads are gated on **space visibility** (`packages/api/src/lib/access.ts`); mutations are gated on **organization role** (`assertOrgPermission`). Writes run in a transaction, and the ones the audit log covers append their row inside it — so a mutation that rolled back is never in the log, and one that succeeded always is.
 
 ## Self-hosting
 

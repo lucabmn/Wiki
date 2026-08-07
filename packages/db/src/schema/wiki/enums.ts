@@ -30,10 +30,31 @@ export const activityAction = wikiSchema.enum("activity_action", [
   "page.untrashed",
   "page.purged",
   "comment.created",
+  // An edit can change what a comment says after somebody replied to it or
+  // acted on it. The row records that it happened and by whom, never the body.
+  "comment.updated",
   "comment.resolved",
   "comment.deleted",
   "attachment.uploaded",
   "attachment.deleted",
+  // ── Access control ────────────────────────────────────────────────────────
+  // Who could see what, and since when, is the question an audit log exists to
+  // answer. Without these a grant could be added and removed again between two
+  // reads of the members list and leave nothing behind at all.
+  //
+  // The metadata denormalizes the grantee (id, display name, and the address
+  // for a user grant), because the membership row is gone by the time anybody
+  // reads the log — the same reason `page.deleted` carries the page title.
+  "space.member_added",
+  "space.member_role_changed",
+  "space.member_removed",
+  // The page's own visibility override, which is what decides whether the page
+  // ACL applies at all. Records both sides: "restricted" alone does not say
+  // whether access was tightened or loosened.
+  "page.access_changed",
+  "page.member_added",
+  "page.member_role_changed",
+  "page.member_removed",
   // Org-wide security policy. Auditable because turning the requirement off is
   // the interesting event: it silently restores access for every member who
   // never set up a second factor.

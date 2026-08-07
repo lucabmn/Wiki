@@ -57,7 +57,7 @@ export function SpaceTrashSheet({
   nameOf: (userId: string | null) => string;
 }) {
   const invalidateTrash = useInvalidate(orpc.trash.key());
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
+  const invalidatePages = useInvalidate(orpc.pages.key());
   const [confirmPurge, setConfirmPurge] = useState<{ id: string; title: string } | null>(null);
 
   const trashQuery = useQuery(

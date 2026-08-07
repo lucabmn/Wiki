@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# Nothing here publishes anything. `GITHUB_TOKEN` defaults to whatever the
+# repository setting says, which on an older repository is read *and* write for
+# every scope — and this workflow runs code from pull requests.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

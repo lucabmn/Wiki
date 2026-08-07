@@ -1,0 +1,66 @@
+name: CodeQL
+
+# Static analysis for the TypeScript sources and for the workflows themselves.
+#
+# The scheduled run is the point of this, not the pull-request one: most of what
+# CodeQL eventually flags here is a *newly published* query matching code that
+# has been sitting in `main` for months. A PR-only setup never sees those.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Monday 05:40 UTC. Offset from Dependabot's 05:00 so the two do not
+    # compete for the same runners.
+    - cron: "40 5 * * 1"
+
+# Read-only by default; the analyze job grants itself the one write scope it
+# needs. A workflow with broad write permissions is a credential, and this one
+# runs on pull_request.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # Uploading the SARIF result is the only write this needs.
+      security-events: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          # The workflows are part of the attack surface: an injection into a
+          # `run:` block through an untrusted PR title is a real class of bug
+          # and this is what catches it.
+          - language: actions
+            build-mode: none
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # `security-extended` over the default suite: this stores an
+          # organization's knowledge base behind an authentication layer, so the
+          # extra precision costs less than a missed finding.
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}

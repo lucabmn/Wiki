@@ -17,6 +17,7 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/utils/orpc", () => ({
   orpc: {
     pages: {
+      key: () => ["pages"],
       listTemplates: {
         queryOptions: ({ enabled }: { enabled?: boolean }) => ({
           queryKey: ["templates"],

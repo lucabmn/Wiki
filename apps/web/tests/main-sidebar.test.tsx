@@ -68,6 +68,11 @@ vi.mock("@/utils/orpc", () => ({
       list: { queryOptions: () => ({ queryKey: ["spaces"], queryFn: async () => data.spaces }) },
     },
     pages: {
+      key: () => ["pages"],
+      tree: {
+        queryOptions: () => ({ queryKey: ["page-tree"], queryFn: async () => data.pages }),
+        key: () => ["page-tree"],
+      },
       list: {
         queryOptions: () => ({ queryKey: ["pages"], queryFn: async () => data.pages }),
         key: () => ["pages"],

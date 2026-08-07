@@ -64,6 +64,37 @@ export const env = createEnv({
     // forgotten tab must not stay signed in as someone else for a working day.
     IMPERSONATION_MAX_MINUTES: z.coerce.number().int().min(1).max(480).default(30),
 
+    // ── Registration policy ─────────────────────────────────────────────────
+    // Who may create an account with email and password.
+    //
+    //   open    anyone who reaches the sign-up form (the default, and the right
+    //           setting for a public community wiki)
+    //   invite  only addresses with a pending organization invitation — the
+    //           recommended setting for a private, organization-internal wiki
+    //   closed  nobody; accounts are created by an instance admin or pushed by
+    //           an identity provider (SSO/SCIM)
+    //
+    // `INITIAL_ADMIN_EMAIL` is exempt in every mode, otherwise a fresh instance
+    // set to `closed` could never be bootstrapped. Identity-provider sign-in
+    // (SSO) and directory sync (SCIM) are also unaffected: both are configured
+    // by an admin, which is itself the invitation.
+    SIGNUP_MODE: z.enum(["open", "invite", "closed"]).default("open"),
+    // Optional allowlist of email domains that may register, e.g.
+    // `example.com,example.org`. Applies on top of SIGNUP_MODE and is matched
+    // case-insensitively; subdomains are not implied. Empty means no
+    // restriction. Note this bounds *self-service registration* only — an
+    // invitation to another domain is still honoured by design, because
+    // somebody with the authority to invite deliberately sent it.
+    SIGNUP_ALLOWED_EMAIL_DOMAINS: z.string().optional(),
+    // Require a confirmed email address before the account can sign in. Off by
+    // default because an install without SMTP would otherwise lock every new
+    // account out; the server refuses to start if this is on and SMTP_HOST is
+    // unset, rather than failing silently at the first registration.
+    REQUIRE_EMAIL_VERIFICATION: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+
     // ── SMTP ────────────────────────────────────────────────────────────────
     // Optional as a whole: with SMTP_HOST unset the app still boots but mail is
     // not sent, so a single-user install needs no mail server. Message bodies

@@ -52,6 +52,7 @@ const ACTION_PHRASES: Record<ActivityAction, { verb: string; noun: string }> = {
   "page.untrashed": { verb: "hat die Seite aus dem Papierkorb geholt", noun: "Seite" },
   "page.purged": { verb: "hat die Seite endgültig gelöscht", noun: "Seite" },
   "comment.created": { verb: "hat kommentiert:", noun: "Seite" },
+  "comment.updated": { verb: "hat einen Kommentar bearbeitet:", noun: "Seite" },
   "comment.resolved": { verb: "hat einen Kommentar aufgelöst:", noun: "Seite" },
   "comment.deleted": { verb: "hat einen Kommentar gelöscht:", noun: "Seite" },
   "attachment.uploaded": { verb: "hat einen Anhang hochgeladen:", noun: "Seite" },
@@ -88,6 +89,17 @@ const ACTION_PHRASES: Record<ActivityAction, { verb: string; noun: string }> = {
   "retention.purged": { verb: "hat abgelaufene Daten gelöscht", noun: "Organisation" },
   "hold.created": { verb: "hat eine Löschsperre gesetzt", noun: "Objekt" },
   "hold.released": { verb: "hat eine Löschsperre aufgehoben", noun: "Objekt" },
+  // Access control. Also unmapped to a digest category, and deliberately so: a
+  // summary mail announcing "X was granted access to Y" to every member of the
+  // organization would publish the membership list by instalments. These belong
+  // in the audit log and in a webhook an admin subscribed to on purpose.
+  "space.member_added": { verb: "hat Zugriff auf den Bereich erteilt", noun: "Bereich" },
+  "space.member_role_changed": { verb: "hat eine Bereichsrolle geändert", noun: "Bereich" },
+  "space.member_removed": { verb: "hat den Zugriff auf den Bereich entzogen", noun: "Bereich" },
+  "page.access_changed": { verb: "hat die Sichtbarkeit der Seite geändert", noun: "Seite" },
+  "page.member_added": { verb: "hat Zugriff auf die Seite erteilt", noun: "Seite" },
+  "page.member_role_changed": { verb: "hat eine Seitenrolle geändert", noun: "Seite" },
+  "page.member_removed": { verb: "hat den Zugriff auf die Seite entzogen", noun: "Seite" },
 };
 
 const UNKNOWN_ACTOR = "Jemand";

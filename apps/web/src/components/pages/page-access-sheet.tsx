@@ -33,7 +33,7 @@ export function PageAccessSheet({
 }) {
   const invalidateAccess = useInvalidate(orpc.pageAccess.get.key());
   const invalidateMyRole = useInvalidate(orpc.pageAccess.myRole.key());
-  const invalidatePages = useInvalidate(orpc.pages.list.key());
+  const invalidatePages = useInvalidate(orpc.pages.key());
 
   const accessQuery = useQuery(
     orpc.pageAccess.get.queryOptions({ input: { pageId }, enabled: open }),

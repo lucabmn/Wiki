@@ -1,0 +1,27 @@
+# Review is requested from these owners automatically on every pull request.
+#
+# The list itself lives in MAINTAINERS.md; this file is what GitHub reads.
+# Later rules win, so the catch-all comes first and the sensitive paths below
+# only exist to make an unreviewed change to them impossible to merge under a
+# branch protection rule that requires code-owner review.
+
+*                                 @lucabmn
+
+# Anything that decides who gets in, what they may do, or what leaves the
+# instance. A regression here is not a bug report, it is an incident.
+/packages/auth/                   @lucabmn
+/packages/api/src/lib/access.ts   @lucabmn
+/packages/api/src/lib/authz.ts    @lucabmn
+/packages/api/src/routers/admin/  @lucabmn
+/SECURITY.md                      @lucabmn
+
+# Deployment surface: a mistake here reaches every self-hosted instance on the
+# next `docker compose up`, including ones nobody is watching.
+/docker-compose.yml               @lucabmn
+/docker-compose.prod.yml          @lucabmn
+/Caddyfile                        @lucabmn
+/scripts/backup/                  @lucabmn
+
+# Supply chain. A workflow with write permissions is a credential.
+/.github/workflows/               @lucabmn
+/.github/dependabot.yml           @lucabmn

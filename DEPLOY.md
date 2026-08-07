@@ -54,6 +54,43 @@ build the web image locally because `VITE_SERVER_URL` and `VITE_COLLAB_URL` are
 compiled into its bundle; the production overlay enforces that with
 `pull_policy: build`.
 
+### Verifying a release
+
+The documented install path is "download a binary and run it as root", which is
+worth being able to check. Every release carries checksums, an SBOM, and
+[build provenance](https://slsa.dev/) signed by the workflow that produced it.
+
+**Installer binaries** — checksums catch a truncated or swapped download,
+provenance ties the binary to a specific commit, workflow and runner:
+
+```sh
+curl -fsSLO https://github.com/lucabmn/Wiki/releases/latest/download/SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+
+gh attestation verify nilovon-wiki-installer-linux-x64 --repo lucabmn/Wiki
+```
+
+**Container images** carry their provenance and an SPDX SBOM in the manifest
+itself, so they travel with a `docker pull`:
+
+```sh
+gh attestation verify oci://ghcr.io/lucabmn/wiki-server:0.1.0 --repo lucabmn/Wiki
+docker buildx imagetools inspect ghcr.io/lucabmn/wiki-server:0.1.0 --format '{{ json .SBOM }}'
+```
+
+A failed verification is a reason to stop, not to retry — report it through
+[SECURITY.md](SECURITY.md).
+
+For a deployment that must not move underneath you, pin by **digest** rather
+than by tag. A tag is a moving pointer; `latest` and even `0.1` are reassigned
+by the next release:
+
+```sh
+docker buildx imagetools inspect ghcr.io/lucabmn/wiki-server:0.1.0 --format '{{ .Manifest.Digest }}'
+# then in .env:
+#   WIKI_VERSION=0.1.0@sha256:…
+```
+
 ## Production (public domain, HTTPS)
 
 The repo ships a Caddy reverse proxy that provisions Let's Encrypt certificates
@@ -105,6 +142,48 @@ Postgres is bound to `127.0.0.1:5432` in the base file already — it is never
 reachable from the network.
 
 Open `https://wiki.example.com` and register.
+
+> Registration is **open** by default. Before the instance is reachable from the
+> internet, decide who may create an account — see
+> [Who may register](#who-may-register) directly below.
+
+## Who may register
+
+`SIGNUP_MODE` in `.env` governs self-service registration with email and
+password:
+
+| Value    | Who gets in                                                      | Fits                       |
+| -------- | ---------------------------------------------------------------- | -------------------------- |
+| `open`   | anyone who reaches the sign-up form (**default**)                | a public community wiki    |
+| `invite` | only addresses with a pending, unexpired organization invitation | a private company wiki     |
+| `closed` | nobody; an admin creates accounts, or an IdP pushes them         | a wiki fed entirely by SSO |
+
+```sh
+SIGNUP_MODE=invite
+# Optional: restrict to your own mail domains. Matched exactly and
+# case-insensitively — example.com does NOT cover sub.example.com.
+SIGNUP_ALLOWED_EMAIL_DOMAINS=example.com,example.org
+# Optional: no sign-in until the address is confirmed. Needs SMTP.
+REQUIRE_EMAIL_VERIFICATION=true
+```
+
+What this does and does not cover:
+
+- Enforcement is in the auth layer, on `/sign-up/email` — a request straight at
+  the endpoint is refused, not merely hidden in the UI. The sign-in page also
+  stops offering a "Registrieren" link once the mode is `closed`.
+- `INITIAL_ADMIN_EMAIL` is exempt in every mode. Without that exemption a fresh
+  instance set to `closed` could never be bootstrapped: no account, and
+  therefore no admin who could reopen registration.
+- **SSO sign-in and SCIM directory sync are unaffected.** Both are configured by
+  an administrator, and that configuration is itself the invitation. Closing
+  registration must not break enterprise sign-in.
+- The domain allowlist bounds _self-service registration only_. An invitation to
+  an address outside the list is still honoured, because somebody with the
+  authority to invite deliberately sent it.
+- `REQUIRE_EMAIL_VERIFICATION=true` without `SMTP_HOST` **refuses to start**.
+  The alternative is worse: every new account is created and then locked out,
+  with nothing in the logs pointing at the cause.
 
 ## The first instance admin
 
@@ -325,78 +404,169 @@ purge still contains the purged rows, and a deletion block does not protect
 anything inside an archive either. Aligning backup rotation with these windows is
 a separate decision — see [Backups](#backups).
 
+### Personal data and self-hoster obligations
+
+Which of this is _personal_ data, where it can leave the instance, how to answer
+an access or erasure request, and what the software cannot do for you, are in
+[docs/privacy.md](docs/privacy.md). The short version an operator needs to hold
+on to: there is no telemetry, everything stays on your host except mail, webhooks
+and offsite backups — all three of which you configure — and a retention purge
+deliberately does not reach into backups.
+
 ## Backups
 
-Two things need backing up: **Postgres** (pages, revisions, Yjs snapshots,
-users, and all attachment _metadata_) and the **object store** (the attachment
-bytes themselves). A database dump alone restores a wiki whose attachments all 404.
+Two things need backing up, and they only mean something together: **Postgres**
+(pages, revisions, Yjs snapshots, users, and all attachment _metadata_) and the
+**object store** (the attachment bytes). A database dump alone restores a wiki
+whose attachments all 404.
 
-### Automatic
+The backup service therefore produces one **recovery set** per run — both
+halves, one timestamp, checksums over everything:
 
-```sh
-docker compose --profile backup up -d backup
+```
+/backups/2026-08-06T030000Z/database.dump        pg_dump -Fc
+/backups/2026-08-06T030000Z/attachments.tar.gz   every object in the bucket
+/backups/2026-08-06T030000Z/SHA256SUMS
+/backups/2026-08-06T030000Z/MANIFEST.json
+/backups/last-success                            epoch seconds — the health signal
 ```
 
-Dumps the database nightly into the `nilovon-wiki_nilovon-wiki_backups` volume and prunes
-anything older than `BACKUP_KEEP_DAYS` (default 14). This does not snapshot the
-object store. Copy database dumps off-host and use the quiesced object-store
-procedure below; never archive a live RustFS data volume.
+Attachments are mirrored **through the S3 API**, so nothing has to be stopped
+for a backup to be consistent — the old "stop RustFS and tar its volume"
+procedure is no longer needed.
 
-### Manual
-
-Postgres holds everything except attachment bytes. For a consistent recovery
-set, first stop application writers, then dump Postgres:
+### Turning it on
 
 ```sh
+docker compose --profile backup up -d --build backup
+```
+
+`--build` because the image needs both `pg_dump` and `mc`, which no single
+published image carries; it is built from `scripts/backup/Dockerfile`.
+
+Defaults: daily, 14 days of local retention, no encryption, no offsite copy.
+All four are `.env` settings — see the **Backups** block in `.env.example`.
+
+### Recommended production settings
+
+```sh
+BACKUP_PASSPHRASE=…                  # store this OFF this host
+BACKUP_REMOTE_ENDPOINT=https://s3.eu-central-1.amazonaws.com
+BACKUP_REMOTE_BUCKET=my-wiki-backups
+BACKUP_REMOTE_ACCESS_KEY_ID=…
+BACKUP_REMOTE_SECRET_ACCESS_KEY=…
+```
+
+Two things about the offsite copy are deliberate:
+
+- It is `mc cp`, not `mc mirror`. Mirroring would propagate local pruning to the
+  remote, so a host that deletes its backups — or an attacker on it — would
+  delete the only remaining copies too. **Retention on the remote belongs to the
+  remote's own lifecycle policy**, where this host cannot reach it.
+- Give the offsite credentials write-but-not-delete rights for the same reason.
+
+A passphrase nobody wrote down turns a backup into a very thorough deletion.
+Store it with your password manager, not on the server it protects.
+
+### Knowing the backups still happen
+
+The failure that costs you the wiki is the quiet one: the loop keeps running,
+`docker compose ps` keeps saying **Up**, and the dumps stopped three weeks ago
+because the volume filled up or a credential rotated.
+
+`last-success` is written only after a _complete_ run — checksums, offsite copy
+and all — and the container's healthcheck turns its age into container health:
+
+```sh
+docker compose ps backup     # "(healthy)" / "(unhealthy)"
+```
+
+Alert on that container state. Anything already watching Docker health (Uptime
+Kuma, Prometheus + cAdvisor, a five-line cron) is enough; the point is that the
+signal exists at all.
+
+### RPO and RTO
+
+The defaults give you:
+
+|                              | Default                                                | Set by                    |
+| ---------------------------- | ------------------------------------------------------ | ------------------------- |
+| **RPO** (data you can lose)  | up to 24 h                                             | `BACKUP_INTERVAL_SECONDS` |
+| **RTO** (time to be back up) | minutes to an hour, dominated by restoring attachments | size of your object store |
+
+Tighten the RPO by lowering `BACKUP_INTERVAL_SECONDS` (e.g. `21600` for every
+six hours). Each run is a full dump, not an incremental one, so the cost of a
+tighter RPO is disk and CPU, not complexity.
+
+**Write down which you are promising your users**, because these numbers are
+what "we have backups" actually means to them.
+
+### Restoring
+
+```sh
+# What is available?
+docker compose --profile backup run --rm backup ls /backups
+
+# Check a set is intact without writing anything
+docker compose --profile backup run --rm backup verify /backups/2026-08-06T030000Z
+
+# Restore it
 docker compose stop web server collab
-docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki | gzip > backup-$(date +%F).sql.gz
-```
-
-Restore into a fresh stack (empty database) only after restoring the matching
-attachment backup below:
-
-```sh
-gunzip -c backup-2026-07-09.sql.gz | docker exec -i nilovon-wiki-postgres psql -U postgres nilovon-wiki
-```
-
-Automate it with cron, e.g. daily at 03:00 with 14 days retention:
-
-```cron
-0 3 * * * cd /path/to/Wiki && docker exec nilovon-wiki-postgres pg_dump -U postgres nilovon-wiki | gzip > /var/backups/wiki-$(date +\%F).sql.gz && find /var/backups -name 'wiki-*.sql.gz' -mtime +14 -delete
-```
-
-Attachment bytes live in the object store, not in Postgres. With the bundled
-RustFS service that is the `nilovon-wiki_nilovon-wiki_rustfs_data` volume. Stop RustFS before
-reading its raw volume, then restart the stack after the archive completes:
-
-```sh
-docker compose stop rustfs
-docker run --rm -v nilovon-wiki_nilovon-wiki_rustfs_data:/data -v "$PWD":/out alpine \
-  tar czf /out/attachments-$(date +%F).tar.gz -C /data .
+docker compose --profile backup run --rm backup restore /backups/2026-08-06T030000Z
 docker compose up -d
 ```
 
-Restore the bundled object store only into a stopped, empty RustFS volume. Put
-the original `.env` in place first, then:
+The restore verifies checksums **before** writing anything, and refuses to
+restore into a database that already has tables — a restore is not an import,
+and silently merging a dump into live data produces a wiki that is neither the
+backup nor what was there before. To deliberately replace an existing database,
+add `-e RESTORE_FORCE=true`, which drops and recreates its schemas first.
 
-```sh
-docker compose down
-docker volume rm nilovon-wiki_nilovon-wiki_postgres_data nilovon-wiki_nilovon-wiki_rustfs_data
-docker volume create nilovon-wiki_nilovon-wiki_rustfs_data
-docker run --rm \
-  -v nilovon-wiki_nilovon-wiki_rustfs_data:/data \
-  -v "$PWD":/out \
-  alpine sh -c 'cd /data && tar xzf /out/attachments-2026-07-09.tar.gz'
-docker compose up -d postgres rustfs rustfs-init
-```
+Restoring from an encrypted set needs `BACKUP_PASSPHRASE` set in `.env`.
 
-Then restore the matching database dump and start the remaining services. Do
-not extract over a live or non-empty volume. Treat the database dump and object
-archive as one recovery set and verify attachment downloads after restoring.
+### Test the restore. On a schedule.
+
+A backup nobody has restored is a hypothesis.
+
+CI runs a full backup-and-restore against a real stack on every change
+(`.github/workflows/smoke.yml`), which proves the _mechanism_ works. It does not
+prove **your** backups are restorable — only your data and your credentials can
+do that. Once a quarter:
+
+1. Copy the newest recovery set to a scratch host.
+2. `docker compose up -d postgres rustfs rustfs-init` on an empty volume set.
+3. Run the restore above.
+4. Start the stack, sign in, open a page **and download an attachment** — that
+   last step is what catches a database-only backup.
+5. Note how long it took. That is your real RTO.
 
 Keep the `.env` file (especially `BETTER_AUTH_SECRET`, `POSTGRES_PASSWORD`,
-`S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`) with your backups — sessions and
-collab tokens are signed with it, and RustFS needs the original credentials.
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `BACKUP_PASSPHRASE`) with your
+backups — sessions and collab tokens are signed with it, and RustFS needs the
+original credentials.
+
+### Manual dumps
+
+For a one-off, outside the backup service:
+
+```sh
+docker compose stop web server collab
+docker exec nilovon-wiki-postgres pg_dump -U postgres -Fc nilovon-wiki > backup-$(date +%F).dump
+docker compose up -d
+```
+
+This covers the database only. If you take a manual dump, take the matching
+attachments too — `docker compose --profile backup run --rm backup run` does
+both and is almost always the better answer.
+
+### Retention interacts with backups
+
+Per-organization retention windows (audit log, trash) deliberately do **not**
+reach into backups: a dump taken before a purge still contains the rows that
+purge removed. That is the point of a backup, and it is also a data-protection
+fact you have to state — see
+[Which data lives how long](#which-data-lives-how-long) and
+[docs/privacy.md](docs/privacy.md).
 
 ## Collab on Vercel
 
@@ -466,7 +636,54 @@ See `docs/export-format.md`.
 
 ## Health & monitoring
 
-- `GET http://<api>/health` — deep health check (verifies database
-  connectivity), used by the compose healthchecks. Returns `503` when the
-  database is unreachable.
-- Container logs are JSON-file capped at 10 MB × 3 files per service.
+Three endpoints, because an orchestrator and a monitoring system are asking
+different questions. None of them needs authentication, and none returns tenant
+data or a version number.
+
+| Endpoint            | Answers                      | Fails (503) when                           |
+| ------------------- | ---------------------------- | ------------------------------------------ |
+| `GET /health/live`  | is the process alive?        | never — it touches nothing                 |
+| `GET /health`       | can the process serve?       | the database is unreachable                |
+| `GET /health/ready` | is every dependency healthy? | any _configured_ dependency is unreachable |
+
+`/health` is what the compose healthcheck and any orchestrator watch, and it is
+narrow on purpose: object storage or the collaboration service failing does not
+make restarting the API the right answer, and a restart loop is worse than
+degraded attachments.
+
+**Point your monitoring at `/health/ready`.** It probes the database, object
+storage and the collaboration service concurrently and reports each one:
+
+```jsonc
+{
+  "status": "degraded",
+  "checks": {
+    "database": { "status": "ok" },
+    "storage": { "status": "unreachable", "detail": "no such bucket" },
+    "collab": { "status": "ok" },
+    "mail": { "status": "disabled" },
+  },
+}
+```
+
+`disabled` means the dependency is not configured on this install (attachments
+or mail turned off), which is a supported configuration and not an outage.
+`ok` for mail means SMTP is configured — there is no cheap probe short of an
+actual SMTP dialogue, and the report says "configured" rather than pretending to
+have tested it.
+
+`/health/ready` is rate-limited (60/min per IP) because each call opens a
+connection to storage and to collab. `/health` and `/health/live` are not: a
+probe that starts getting 429s during an incident is worse than useless.
+
+A minimal alerting rule set:
+
+- `/health` non-200 for 2 minutes → the API cannot serve. Page.
+- `/health/ready` reporting `storage: unreachable` → attachments and exports are
+  broken; page during working hours.
+- `/health/ready` reporting `collab: unreachable` → collaborative editing is
+  down; pages still load and save. Page during working hours.
+- Backup age above your RPO → see [Backups](#backups); the backup container's
+  own healthcheck already turns this into a container state.
+
+Container logs are JSON-file capped at 10 MB × 3 files per service.

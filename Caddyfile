@@ -7,17 +7,73 @@
 	email {$ACME_EMAIL}
 }
 
+# Browser security headers every host gets. Kept in a snippet so a host added
+# later cannot quietly ship without them.
+#
+# HSTS deliberately omits `preload`: submission to the preload list is
+# effectively irreversible for months and is the operator's call, not a
+# default. Add it once the deployment is known to be HTTPS-only for good.
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Cross-Origin-Opener-Policy "same-origin"
+		# The wiki uses none of these. Granting nothing is also what stops an
+		# embedded third party from prompting on this origin's behalf.
+		Permissions-Policy "accelerometer=(), autoplay=(), browsing-topics=(), camera=(), display-capture=(), encrypted-media=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=(), xr-spatial-tracking=()"
+		# Not a security control on its own, but it costs nothing and narrows
+		# trivial version fingerprinting of the proxy.
+		-Server
+	}
+}
+
 # Web app
 {$WEB_DOMAIN} {
+	import security_headers
+
+	# Content Security Policy.
+	#
+	# `'unsafe-inline'` on script-src and style-src is not an oversight: the SSR
+	# framework inlines its hydration payload as a <script>, and both the editor
+	# and Mermaid set element styles at runtime. A nonce-based policy would mean
+	# reworking both, so this one buys what it can without that — no third-party
+	# script origin, no plugin content, no framing, and an exfiltration surface
+	# bounded by connect-src.
+	#
+	# `blob:` covers Mermaid's worker and the client-side download of exported
+	# archives. Attachment bytes are streamed from the API host, which is why it
+	# appears in img-src and media-src.
+	header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://{$API_DOMAIN}; media-src 'self' blob: https://{$API_DOMAIN}; font-src 'self' data:; connect-src 'self' https://{$API_DOMAIN} wss://{$COLLAB_DOMAIN}; worker-src 'self' blob:; manifest-src 'self'"
+
 	reverse_proxy web:3001
 }
 
 # API server (Better Auth issues cookies for this origin)
 {$API_DOMAIN} {
+	import security_headers
+
+	# `?` means "only if the response does not already carry one". The
+	# attachment routes send their own, far stricter policy (`default-src
+	# 'none'; sandbox`) with the file bytes, and that one must win.
+	#
+	# No `default-src` here on purpose: this host also serves the generated
+	# OpenAPI reference, an HTML page that loads its viewer from a CDN. The
+	# directives below are the ones that matter for an API origin and break
+	# nothing — user-uploaded bytes are already covered by the route's own
+	# policy plus `nosniff` and a `Content-Disposition` of `attachment`.
+	header ?Content-Security-Policy "frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+
 	reverse_proxy server:3000
 }
 
 # Real-time collaboration (WebSocket — Caddy proxies WS transparently)
 {$COLLAB_DOMAIN} {
+	import security_headers
+
+	# WebSocket upgrades only — nothing here is ever a document.
+	header ?Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+
 	reverse_proxy collab:1234
 }

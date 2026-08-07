@@ -148,7 +148,7 @@ function PageEditorForm({
   );
 
   const invalidatePage = useInvalidate(orpc.pages.get.key());
-  const invalidateList = useInvalidate(orpc.pages.list.key());
+  const invalidateList = useInvalidate(orpc.pages.key());
 
   const update = useMutation(orpc.pages.update.mutationOptions({ onError: toastError }));
   const publish = useMutation(orpc.pages.publish.mutationOptions({ onError: toastError }));
