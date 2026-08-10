@@ -10,13 +10,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@opentui/core": "^0.4.3",
-    "@opentui/react": "^0.4.3",
-    "react": "^19.2.6"
+    "@opentui/core": "^0.5.1",
+    "@opentui/react": "^0.5.1",
+    "react": "^19.2.8"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/react": "^19.2.17",
+    "@types/react": "^19.2.18",
     "vitest": "catalog:"
   },
   "peerDependencies": {
