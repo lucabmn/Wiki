@@ -37,6 +37,32 @@ provider are yours to account for.
 | Favourites, subscriptions, notification preferences           | `wiki.favorite`, `wiki.page_subscription`, digest settings | personal preferences                           |
 | Uploader of an attachment                                     | `wiki.attachment`                                          | attribution and quota accounting               |
 
+### Learning records
+
+Course participation produces a distinct and more sensitive class of record: it
+says what somebody was taught, how far they got, and how they were assessed.
+
+| Data                                                           | Where                                       | Why it exists                                     |
+| -------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------- |
+| Enrolment, status, progress percent, last activity             | `learn.enrollment`                          | resuming a course, and the instructor's roster    |
+| Per-lesson progress, resume position, time spent               | `learn.lesson_progress`                     | continuing where the learner left off; analytics  |
+| Submitted work, uploaded files, per-task answers               | `learn.submission`, `learn.submission_task` | the hand-in itself                                |
+| Grades, feedback, and the full grading history with the grader | `learn.submission_grade`                    | a grade can be appealed, so the record is kept    |
+| Quiz attempts and every individual answer                      | `learn.quiz_attempt`, `learn.quiz_response` | scoring, and showing the learner what they missed |
+| Certificates, with a frozen snapshot of the holder's name      | `learn.certificate`                         | verification by a third party after the fact      |
+| Course reviews and ratings, attributed                         | `learn.course_review`                       | the catalog                                       |
+| Purchases and entitlements                                     | `learn.purchase`, `learn.entitlement`       | paid access, and answering a billing dispute      |
+
+Two of these are deliberately durable and worth knowing about before you promise
+a deletion deadline:
+
+- **A certificate snapshots the holder's name** into `learn.certificate.subject`
+  so it stays verifiable after the course was renamed or the account removed.
+  Deleting the account does not erase that snapshot; revoke the certificate if
+  the assertion must stop being made.
+- **`learn.submission_grade` is append-only.** A regrade adds a row rather than
+  overwriting one, because the previous decision is what an appeal is about.
+
 ### Content
 
 Page bodies, comments and uploaded files are whatever your users put in them.
@@ -123,6 +149,11 @@ does not do:
 - **Content stays.** Pages, comments and revisions the person wrote remain, with
   the author reference nulled — the wiki does not collapse because somebody
   left, and the remaining team keeps the knowledge they depend on.
+- **Learning records mostly go.** Enrolments, lesson progress, submissions, quiz
+  attempts and entitlements cascade from the account and are removed with it.
+  Certificates do not: they keep the frozen name snapshot and null their user
+  reference, because a certificate is an assertion made to third parties who may
+  still be checking it. Revoke it first if that assertion must end.
 - If the _content_ must go too, delete it explicitly before the account. Content
   under a deletion block cannot be removed until the block is released — by
   design, and something to check before promising a deadline.
@@ -136,7 +167,8 @@ a loop over the spaces; there is no single "export the tenant" button today.
 
 Removing an organization removes its spaces, pages, comments, attachments,
 memberships, invitations, webhooks, SSO providers and audit rows by database
-cascade. Attachment **bytes** in object storage follow the attachment rows.
+cascade — and, on the learning side, its courses with every lesson, enrolment,
+submission, quiz attempt, certificate and entitlement in them. Attachment **bytes** in object storage follow the attachment rows.
 Verify against your own install before relying on it — and note that the same
 backup caveat applies.
 
