@@ -62,8 +62,13 @@ fi
 [ -f "$DB_DUMP" ] || fail "no database dump in $SET_DIR"
 
 # ── 3. Refuse to overwrite a populated database ───────────────────────────────
+# Counted over every non-system schema rather than a hand-written list, for the
+# same reason the drop below is discovered: a list is wrong the moment a schema
+# is added, and here being wrong means reading a populated database as empty and
+# overwriting it without the guard ever firing.
 existing=$(psql -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" -tAc \
-  "select count(*) from information_schema.tables where table_schema in ('public','auth','wiki')" \
+  "select count(*) from information_schema.tables
+   where table_schema not like 'pg\\_%' and table_schema <> 'information_schema'" \
   2>/dev/null || echo "unreachable")
 [ "$existing" != "unreachable" ] || fail "cannot reach postgres at $PGHOST"
 if [ "$existing" != "0" ] && [ "${RESTORE_FORCE:-}" != "true" ]; then
