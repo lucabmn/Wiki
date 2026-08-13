@@ -1,10 +1,15 @@
 {
   "extends": "@nilovon-wiki/config/tsconfig.base.json",
   "compilerOptions": {
-    "declaration": true,
-    "declarationMap": true,
+    // Declaration emit is deliberately off. Nothing consumes a built artefact
+    // of this package — the exports map points at `./src/*.ts`, there are no
+    // project references, and there is no build script — but declaration emit
+    // is still *checked* under `--noEmit`, and writing out `typeof appRouter`
+    // exceeds the length TypeScript will serialize once the learning platform's
+    // routers are in it (TS7056). The alternative would be hand-writing the
+    // type of every procedure in the API, which is not a type anybody can
+    // maintain. Type checking of the sources themselves is unaffected.
     "sourceMap": true,
-    "outDir": "dist",
-    "composite": true
+    "outDir": "dist"
   }
 }

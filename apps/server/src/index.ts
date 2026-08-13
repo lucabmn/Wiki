@@ -17,6 +17,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { attachmentRoutes } from "./attachments";
+import { courseAssetRoutes } from "./course-assets";
 import { digestRoutes, startDigestScheduler, stopDigestScheduler } from "./digests";
 import { healthRoutes } from "./health";
 import { pageExportRoutes } from "./page-exports";
@@ -110,6 +111,7 @@ app.use("/v1/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 app.use("/health/ready", rateLimit({ max: 60, keyPrefix: "health" }));
 
 app.use("/attachments/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
+app.use("/course-assets/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 app.use("/exports/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 
 // PUT/PATCH/DELETE are not optional here: SCIM 2.0 replaces (`PUT`), patches
@@ -120,6 +122,7 @@ app.on(["POST", "GET", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.han
 // Binary transfer for attachments and streamed Space export archives live
 // outside oRPC because their response bodies are files rather than JSON.
 app.route("/attachments", attachmentRoutes);
+app.route("/course-assets", courseAssetRoutes);
 app.route("/exports", spaceExportRoutes);
 app.route("/exports", pageExportRoutes);
 
