@@ -284,6 +284,7 @@ export const courseRouter = {
                   ...(rest.description !== undefined
                     ? { description: rest.description ?? null }
                     : {}),
+                  ...(rest.textContent !== undefined ? { textContent: rest.textContent } : {}),
                   ...(rest.thumbnailAssetId !== undefined
                     ? { thumbnailAssetId: rest.thumbnailAssetId ?? null }
                     : {}),

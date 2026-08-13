@@ -1,14 +1,21 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { page } from "@nilovon-wiki/db/schema/index";
+import { course, page } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg } from "../index";
 import { assertSpaceRead, readableSpaceIds } from "../lib/access";
 import { pageNotTrashed } from "../lib/lifecycle";
 import { filterReadablePagesAcrossSpaces } from "../lib/authz";
+import { courseAssetUrl } from "../lib/course-cards";
+import { courseViewFilter } from "../lib/learn-authz";
 import { loadSpace } from "../lib/loaders";
-import { SearchHitSchema, SearchInputSchema } from "../schemas/misc";
+import {
+  CourseSearchHitSchema,
+  CourseSearchInputSchema,
+  SearchHitSchema,
+  SearchInputSchema,
+} from "../schemas/misc";
 
 const TAGS = ["Search"];
 
@@ -76,5 +83,56 @@ export const searchRouter = {
       // restrictive per-page `visibility` override, and a hit leaks its title
       // and a content snippet.
       return filterReadablePagesAcrossSpaces(context.db, context, context.headers, hits);
+    }),
+
+  courses: protectedProcedure
+    .route({
+      method: "GET",
+      path: "/search/courses",
+      tags: TAGS,
+      summary: "Full-text search across courses",
+    })
+    .input(CourseSearchInputSchema)
+    .output(z.array(CourseSearchHitSchema))
+    .handler(async ({ input, context }) => {
+      const organizationId = requireActiveOrg(context);
+      // Same discipline as the page search above: narrow the corpus to what the
+      // caller may see *before* running the query, so a snippet can never come
+      // from a course they would be refused on open.
+      const canView = await courseViewFilter(context.db, context, context.headers, organizationId);
+      // Must match the generated search vector in the course schema.
+      const tsquery = sql`websearch_to_tsquery('german', ${input.query})`;
+
+      const hits = await context.db
+        .select({
+          courseId: course.id,
+          title: course.title,
+          slug: course.slug,
+          tagline: course.tagline,
+          thumbnailAssetId: course.thumbnailAssetId,
+          snippet: sql<string>`ts_headline('german', ${course.textContent}, ${tsquery}, 'MaxFragments=1, MaxWords=30, MinWords=10')`,
+          rank: sql<number>`ts_rank(${course.searchVector}, ${tsquery})`,
+          // Needed only to resolve access below; stripped by the output schema.
+          id: course.id,
+          organizationId: course.organizationId,
+          status: course.status,
+          visibility: course.visibility,
+          createdBy: course.createdBy,
+        })
+        .from(course)
+        .where(
+          and(
+            eq(course.organizationId, organizationId),
+            isNull(course.deletedAt),
+            isNull(course.archivedAt),
+            sql`${course.searchVector} @@ ${tsquery}`,
+          ),
+        )
+        .orderBy(sql`ts_rank(${course.searchVector}, ${tsquery}) DESC`)
+        .limit(input.limit);
+
+      return hits
+        .filter((hit) => canView(hit))
+        .map((hit) => ({ ...hit, thumbnailUrl: courseAssetUrl(hit.thumbnailAssetId) }));
     }),
 };

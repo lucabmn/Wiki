@@ -155,6 +155,12 @@ export const UpdateCourseInputSchema = z.object({
   slug: SlugSchema.optional(),
   tagline: z.string().max(300).nullish(),
   description: z.unknown().nullish(),
+  /**
+   * Plaintext projection of `description`, supplied by the editor so the search
+   * vector stays in step with the rich body. Same contract as a page: only sent
+   * when the body changed, so a title-only save cannot blank it.
+   */
+  textContent: z.string().max(2_000_000).optional(),
   thumbnailAssetId: IdSchema.nullish(),
   visibility: CourseVisibilitySchema.optional(),
   enrollmentPolicy: EnrollmentPolicySchema.optional(),

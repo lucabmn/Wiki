@@ -150,6 +150,27 @@ export const SearchInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
+export const CourseSearchInputSchema = z.object({
+  query: z.string().min(1).max(200),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+/**
+ * A course hit. Deliberately its own shape rather than a variant of the page
+ * hit: they carry different identifiers and route to different places, and a
+ * union with half the fields nulled would push that distinction into every
+ * consumer.
+ */
+export const CourseSearchHitSchema = z.object({
+  courseId: IdSchema,
+  title: z.string(),
+  slug: z.string(),
+  tagline: z.string().nullable(),
+  thumbnailUrl: z.string().nullable(),
+  snippet: z.string(),
+  rank: z.number(),
+});
+
 export const SearchHitSchema = z.object({
   pageId: IdSchema,
   spaceId: IdSchema,
