@@ -8,6 +8,7 @@ import type { AuthedContext } from "../context";
 import { protectedProcedure, requireActiveOrg } from "../index";
 import { assertSpaceRead, readableSpaceIds } from "../lib/access";
 import { filterReadablePagesAcrossSpaces, requirePageCapability } from "../lib/authz";
+import { viewableCourses as viewableCourseIdsFor } from "../lib/learn-authz";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { ActivitySchema, ListActivityInputSchema } from "../schemas/misc";
 
@@ -19,6 +20,7 @@ const activityFeedColumns = {
   organizationId: activity.organizationId,
   spaceId: activity.spaceId,
   pageId: activity.pageId,
+  courseId: activity.courseId,
   actorId: activity.actorId,
   impersonatedBy: activity.impersonatedBy,
   action: activity.action,
@@ -38,11 +40,20 @@ const activityFeedColumns = {
  * `visibility` override — activity metadata carries page titles. Space-level
  * read access is already established for every row's space by the callers.
  */
-async function dropRestrictedPageRows<T extends { pageId: string | null; action: string }>(
+async function dropRestrictedPageRows<
+  T extends { pageId: string | null; courseId: string | null; action: string },
+>(
   db: Database,
   context: AuthedContext,
   headers: Headers,
   rows: T[],
+  /**
+   * Courses the caller may see. Course rows carry no `spaceId`, so without this
+   * they would fall into the "ambiguous" bucket below and be dropped wholesale;
+   * with it, a course event is visible exactly to the people who can open the
+   * course it belongs to.
+   */
+  viewableCourseIds: Set<string> = new Set(),
 ): Promise<T[]> {
   const pageIds = [...new Set(rows.flatMap((r) => (r.pageId ? [r.pageId] : [])))];
   const pages = pageIds.length
@@ -63,7 +74,11 @@ async function dropRestrictedPageRows<T extends { pageId: string | null; action:
   // longer be checked. Keep only definitely space-scoped events in that case;
   // suppressing ambiguous comment/attachment events is safer than exposing
   // metadata that used to belong to a restricted page.
-  return rows.filter((r) => (r.pageId ? readable.has(r.pageId) : r.action.startsWith("space.")));
+  return rows.filter((r) => {
+    if (r.pageId) return readable.has(r.pageId);
+    if (r.courseId) return viewableCourseIds.has(r.courseId);
+    return r.action.startsWith("space.");
+  });
 }
 
 export const activityRouter = {
@@ -111,7 +126,10 @@ export const activityRouter = {
       // Org-wide feed: only org-level events (no space) plus events in spaces the
       // caller may read — never leak activity from private spaces.
       const organizationId = requireActiveOrg(context);
-      const readable = await readableSpaceIds(context.db, context, organizationId);
+      const [readable, viewableCourses] = await Promise.all([
+        readableSpaceIds(context.db, context, organizationId),
+        viewableCourseIdsFor(context.db, context, context.headers, organizationId),
+      ]);
       const data = await context.db
         .select(activityFeedColumns)
         .from(activity)
@@ -130,6 +148,12 @@ export const activityRouter = {
         .orderBy(desc(activity.createdAt))
         .limit(input.limit);
 
-      return dropRestrictedPageRows(context.db, context, context.headers, data);
+      return dropRestrictedPageRows(
+        context.db,
+        context,
+        context.headers,
+        data,
+        new Set(viewableCourses),
+      );
     }),
 };

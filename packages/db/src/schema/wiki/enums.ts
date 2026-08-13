@@ -80,6 +80,52 @@ export const activityAction = wikiSchema.enum("activity_action", [
   "retention.purged",
   "hold.created",
   "hold.released",
+  // ── Learning platform ─────────────────────────────────────────────────────
+  // Courses are a separate product in their own Postgres schema, but they share
+  // this audit log: "what happened in this organization" has one answer, not
+  // one per product, and webhook subscribers filter by action either way.
+  "course.created",
+  "course.updated",
+  "course.published",
+  "course.archived",
+  "course.restored",
+  "course.deleted",
+  "course.untrashed",
+  "course.purged",
+  "course.member_added",
+  "course.member_role_changed",
+  "course.member_removed",
+  "chapter.created",
+  "chapter.updated",
+  "chapter.moved",
+  "chapter.deleted",
+  "lesson.created",
+  "lesson.updated",
+  "lesson.published",
+  "lesson.moved",
+  "lesson.deleted",
+  "collection.created",
+  "collection.updated",
+  "collection.deleted",
+  // Enrolment is the learner-facing counterpart of a membership change, and
+  // the same reason applies: who could take a course, and since when.
+  "enrollment.created",
+  "enrollment.approved",
+  "enrollment.completed",
+  "enrollment.dropped",
+  "assignment.created",
+  "assignment.updated",
+  "assignment.deleted",
+  "submission.submitted",
+  "submission.graded",
+  "submission.returned",
+  "quiz.created",
+  "quiz.updated",
+  "quiz.deleted",
+  // A certificate is an assertion about a person that third parties rely on;
+  // issuing and withdrawing it both have to leave a trace.
+  "certificate.issued",
+  "certificate.revoked",
 ]);
 
 /**

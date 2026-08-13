@@ -22,7 +22,7 @@ export type Principal = {
   organizationId: string | null;
 };
 
-function principalOf(context: AuthedContext): Principal {
+export function principalOf(context: AuthedContext): Principal {
   return {
     userId: context.session.user.id,
     organizationId: context.session.session.activeOrganizationId ?? null,
@@ -65,7 +65,7 @@ export function resolveSpaceAccess(
  * row's comma-separated role list. Used to resolve `subject="role"` grants that
  * grant a space/page to everyone in a group.
  */
-async function orgRoleNames(
+export async function orgRoleNames(
   db: Database,
   userId: string,
   organizationId: string,
@@ -81,7 +81,7 @@ async function orgRoleNames(
 }
 
 /** Team ids the user belongs to (across orgs; scoped by the space row later). */
-async function userTeamIds(db: Database, userId: string): Promise<string[]> {
+export async function userTeamIds(db: Database, userId: string): Promise<string[]> {
   const rows = await db
     .select({ teamId: teamMember.teamId })
     .from(teamMember)
