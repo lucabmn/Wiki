@@ -42,7 +42,7 @@ vi.mock("@/utils/orpc", () => ({
 
 import { Route } from "@/routes/_auth/learn/index";
 
-const Catalog = Route.component as () => ReactNode;
+const Catalog = (Route as unknown as { component: () => ReactNode }).component;
 
 function renderCatalog() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
