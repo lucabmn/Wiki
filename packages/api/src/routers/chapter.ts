@@ -41,8 +41,13 @@ async function positionAfter(
     })
   ).filter((row) => row.id !== excludeId);
 
-  if (!afterId) {
-    // To the front: between nothing and the current first.
+  // Omitted means "append", an explicit null means "move to the front". The
+  // two are different intents and collapsing them makes every new chapter land
+  // at the top of the course, which is never what an author meant.
+  if (afterId === undefined) {
+    return generateKeyBetween(siblings[siblings.length - 1]?.position ?? null, null);
+  }
+  if (afterId === null) {
     return generateKeyBetween(null, siblings[0]?.position ?? null);
   }
   const index = siblings.findIndex((row) => row.id === afterId);

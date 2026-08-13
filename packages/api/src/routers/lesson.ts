@@ -77,7 +77,12 @@ async function positionAfter(
     })
   ).filter((row) => row.id !== excludeId);
 
-  if (!afterId) return generateKeyBetween(null, siblings[0]?.position ?? null);
+  // Omitted means "append", an explicit null means "move to the front" — see
+  // the same rule in `chapter.ts`.
+  if (afterId === undefined) {
+    return generateKeyBetween(siblings[siblings.length - 1]?.position ?? null, null);
+  }
+  if (afterId === null) return generateKeyBetween(null, siblings[0]?.position ?? null);
   const index = siblings.findIndex((row) => row.id === afterId);
   if (index === -1) {
     throw new ORPCError("BAD_REQUEST", {
