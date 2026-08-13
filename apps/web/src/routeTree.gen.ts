@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteRouteImport } from './routes/_auth/route'
 import { Route as AuthIndexRouteImport } from './routes/_auth/index'
+import { Route as CertificatesSerialRouteImport } from './routes/certificates/$serial'
 import { Route as AuthTwoFactorRouteImport } from './routes/auth/two-factor'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
 import { Route as AuthRegisterRouteImport } from './routes/auth/register'
@@ -26,6 +27,7 @@ import { Route as AuthAdminRouteRouteImport } from './routes/_auth/admin/route'
 import { Route as AuthUsersIndexRouteImport } from './routes/_auth/users/index'
 import { Route as AuthSpacesIndexRouteImport } from './routes/_auth/spaces/index'
 import { Route as AuthSettingsIndexRouteImport } from './routes/_auth/settings/index'
+import { Route as AuthLearnIndexRouteImport } from './routes/_auth/learn/index'
 import { Route as AuthAdminIndexRouteImport } from './routes/_auth/admin/index'
 import { Route as AuthUsersIdRouteImport } from './routes/_auth/users/$id'
 import { Route as AuthSpacesSlugRouteImport } from './routes/_auth/spaces/$slug'
@@ -43,11 +45,16 @@ import { Route as AuthSettingsGroupsRouteImport } from './routes/_auth/settings/
 import { Route as AuthSettingsDataLifecycleRouteImport } from './routes/_auth/settings/data-lifecycle'
 import { Route as AuthSettingsAppearanceRouteImport } from './routes/_auth/settings/appearance'
 import { Route as AuthPagesIdRouteImport } from './routes/_auth/pages/$id'
+import { Route as AuthLearnCertificatesRouteImport } from './routes/_auth/learn/certificates'
 import { Route as AuthAdminAuditRouteImport } from './routes/_auth/admin/audit'
 import { Route as AuthAdminUsersIndexRouteImport } from './routes/_auth/admin/users/index'
 import { Route as AuthAdminOrganizationsIndexRouteImport } from './routes/_auth/admin/organizations/index'
 import { Route as AuthAdminUsersUserIdRouteImport } from './routes/_auth/admin/users/$userId'
 import { Route as AuthAdminOrganizationsOrganizationIdRouteImport } from './routes/_auth/admin/organizations/$organizationId'
+import { Route as AuthLearnCoursesSlugIndexRouteImport } from './routes/_auth/learn/courses/$slug/index'
+import { Route as AuthLearnCoursesSlugManageRouteImport } from './routes/_auth/learn/courses/$slug/manage'
+import { Route as AuthLearnCoursesSlugEditRouteImport } from './routes/_auth/learn/courses/$slug/edit'
+import { Route as AuthLearnCoursesSlugLessonsLessonIdRouteImport } from './routes/_auth/learn/courses/$slug/lessons/$lessonId'
 
 const AuthRouteRoute = AuthRouteRouteImport.update({
   id: '/_auth',
@@ -57,6 +64,11 @@ const AuthIndexRoute = AuthIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthRouteRoute,
+} as any)
+const CertificatesSerialRoute = CertificatesSerialRouteImport.update({
+  id: '/certificates/$serial',
+  path: '/certificates/$serial',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthTwoFactorRoute = AuthTwoFactorRouteImport.update({
   id: '/auth/two-factor',
@@ -132,6 +144,11 @@ const AuthSettingsIndexRoute = AuthSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthSettingsRouteRoute,
+} as any)
+const AuthLearnIndexRoute = AuthLearnIndexRouteImport.update({
+  id: '/learn/',
+  path: '/learn/',
+  getParentRoute: () => AuthRouteRoute,
 } as any)
 const AuthAdminIndexRoute = AuthAdminIndexRouteImport.update({
   id: '/',
@@ -223,6 +240,11 @@ const AuthPagesIdRoute = AuthPagesIdRouteImport.update({
   path: '/pages/$id',
   getParentRoute: () => AuthRouteRoute,
 } as any)
+const AuthLearnCertificatesRoute = AuthLearnCertificatesRouteImport.update({
+  id: '/learn/certificates',
+  path: '/learn/certificates',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
 const AuthAdminAuditRoute = AuthAdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -250,6 +272,30 @@ const AuthAdminOrganizationsOrganizationIdRoute =
     path: '/organizations/$organizationId',
     getParentRoute: () => AuthAdminRouteRoute,
   } as any)
+const AuthLearnCoursesSlugIndexRoute =
+  AuthLearnCoursesSlugIndexRouteImport.update({
+    id: '/learn/courses/$slug/',
+    path: '/learn/courses/$slug/',
+    getParentRoute: () => AuthRouteRoute,
+  } as any)
+const AuthLearnCoursesSlugManageRoute =
+  AuthLearnCoursesSlugManageRouteImport.update({
+    id: '/learn/courses/$slug/manage',
+    path: '/learn/courses/$slug/manage',
+    getParentRoute: () => AuthRouteRoute,
+  } as any)
+const AuthLearnCoursesSlugEditRoute =
+  AuthLearnCoursesSlugEditRouteImport.update({
+    id: '/learn/courses/$slug/edit',
+    path: '/learn/courses/$slug/edit',
+    getParentRoute: () => AuthRouteRoute,
+  } as any)
+const AuthLearnCoursesSlugLessonsLessonIdRoute =
+  AuthLearnCoursesSlugLessonsLessonIdRouteImport.update({
+    id: '/learn/courses/$slug/lessons/$lessonId',
+    path: '/learn/courses/$slug/lessons/$lessonId',
+    getParentRoute: () => AuthRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthIndexRoute
@@ -265,7 +311,9 @@ export interface FileRoutesByFullPath {
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/two-factor': typeof AuthTwoFactorRoute
+  '/certificates/$serial': typeof CertificatesSerialRoute
   '/admin/audit': typeof AuthAdminAuditRoute
+  '/learn/certificates': typeof AuthLearnCertificatesRoute
   '/pages/$id': typeof AuthPagesIdRoute
   '/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/settings/data-lifecycle': typeof AuthSettingsDataLifecycleRoute
@@ -283,6 +331,7 @@ export interface FileRoutesByFullPath {
   '/spaces/$slug': typeof AuthSpacesSlugRoute
   '/users/$id': typeof AuthUsersIdRoute
   '/admin/': typeof AuthAdminIndexRoute
+  '/learn/': typeof AuthLearnIndexRoute
   '/settings/': typeof AuthSettingsIndexRoute
   '/spaces/': typeof AuthSpacesIndexRoute
   '/users/': typeof AuthUsersIndexRoute
@@ -290,6 +339,10 @@ export interface FileRoutesByFullPath {
   '/admin/users/$userId': typeof AuthAdminUsersUserIdRoute
   '/admin/organizations/': typeof AuthAdminOrganizationsIndexRoute
   '/admin/users/': typeof AuthAdminUsersIndexRoute
+  '/learn/courses/$slug/edit': typeof AuthLearnCoursesSlugEditRoute
+  '/learn/courses/$slug/manage': typeof AuthLearnCoursesSlugManageRoute
+  '/learn/courses/$slug/': typeof AuthLearnCoursesSlugIndexRoute
+  '/learn/courses/$slug/lessons/$lessonId': typeof AuthLearnCoursesSlugLessonsLessonIdRoute
 }
 export interface FileRoutesByTo {
   '/inbox': typeof AuthInboxRoute
@@ -302,8 +355,10 @@ export interface FileRoutesByTo {
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/two-factor': typeof AuthTwoFactorRoute
+  '/certificates/$serial': typeof CertificatesSerialRoute
   '/': typeof AuthIndexRoute
   '/admin/audit': typeof AuthAdminAuditRoute
+  '/learn/certificates': typeof AuthLearnCertificatesRoute
   '/pages/$id': typeof AuthPagesIdRoute
   '/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/settings/data-lifecycle': typeof AuthSettingsDataLifecycleRoute
@@ -321,6 +376,7 @@ export interface FileRoutesByTo {
   '/spaces/$slug': typeof AuthSpacesSlugRoute
   '/users/$id': typeof AuthUsersIdRoute
   '/admin': typeof AuthAdminIndexRoute
+  '/learn': typeof AuthLearnIndexRoute
   '/settings': typeof AuthSettingsIndexRoute
   '/spaces': typeof AuthSpacesIndexRoute
   '/users': typeof AuthUsersIndexRoute
@@ -328,6 +384,10 @@ export interface FileRoutesByTo {
   '/admin/users/$userId': typeof AuthAdminUsersUserIdRoute
   '/admin/organizations': typeof AuthAdminOrganizationsIndexRoute
   '/admin/users': typeof AuthAdminUsersIndexRoute
+  '/learn/courses/$slug/edit': typeof AuthLearnCoursesSlugEditRoute
+  '/learn/courses/$slug/manage': typeof AuthLearnCoursesSlugManageRoute
+  '/learn/courses/$slug': typeof AuthLearnCoursesSlugIndexRoute
+  '/learn/courses/$slug/lessons/$lessonId': typeof AuthLearnCoursesSlugLessonsLessonIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -344,8 +404,10 @@ export interface FileRoutesById {
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/two-factor': typeof AuthTwoFactorRoute
+  '/certificates/$serial': typeof CertificatesSerialRoute
   '/_auth/': typeof AuthIndexRoute
   '/_auth/admin/audit': typeof AuthAdminAuditRoute
+  '/_auth/learn/certificates': typeof AuthLearnCertificatesRoute
   '/_auth/pages/$id': typeof AuthPagesIdRoute
   '/_auth/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/_auth/settings/data-lifecycle': typeof AuthSettingsDataLifecycleRoute
@@ -363,6 +425,7 @@ export interface FileRoutesById {
   '/_auth/spaces/$slug': typeof AuthSpacesSlugRoute
   '/_auth/users/$id': typeof AuthUsersIdRoute
   '/_auth/admin/': typeof AuthAdminIndexRoute
+  '/_auth/learn/': typeof AuthLearnIndexRoute
   '/_auth/settings/': typeof AuthSettingsIndexRoute
   '/_auth/spaces/': typeof AuthSpacesIndexRoute
   '/_auth/users/': typeof AuthUsersIndexRoute
@@ -370,6 +433,10 @@ export interface FileRoutesById {
   '/_auth/admin/users/$userId': typeof AuthAdminUsersUserIdRoute
   '/_auth/admin/organizations/': typeof AuthAdminOrganizationsIndexRoute
   '/_auth/admin/users/': typeof AuthAdminUsersIndexRoute
+  '/_auth/learn/courses/$slug/edit': typeof AuthLearnCoursesSlugEditRoute
+  '/_auth/learn/courses/$slug/manage': typeof AuthLearnCoursesSlugManageRoute
+  '/_auth/learn/courses/$slug/': typeof AuthLearnCoursesSlugIndexRoute
+  '/_auth/learn/courses/$slug/lessons/$lessonId': typeof AuthLearnCoursesSlugLessonsLessonIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -387,7 +454,9 @@ export interface FileRouteTypes {
     | '/auth/register'
     | '/auth/reset-password'
     | '/auth/two-factor'
+    | '/certificates/$serial'
     | '/admin/audit'
+    | '/learn/certificates'
     | '/pages/$id'
     | '/settings/appearance'
     | '/settings/data-lifecycle'
@@ -405,6 +474,7 @@ export interface FileRouteTypes {
     | '/spaces/$slug'
     | '/users/$id'
     | '/admin/'
+    | '/learn/'
     | '/settings/'
     | '/spaces/'
     | '/users/'
@@ -412,6 +482,10 @@ export interface FileRouteTypes {
     | '/admin/users/$userId'
     | '/admin/organizations/'
     | '/admin/users/'
+    | '/learn/courses/$slug/edit'
+    | '/learn/courses/$slug/manage'
+    | '/learn/courses/$slug/'
+    | '/learn/courses/$slug/lessons/$lessonId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/inbox'
@@ -424,8 +498,10 @@ export interface FileRouteTypes {
     | '/auth/register'
     | '/auth/reset-password'
     | '/auth/two-factor'
+    | '/certificates/$serial'
     | '/'
     | '/admin/audit'
+    | '/learn/certificates'
     | '/pages/$id'
     | '/settings/appearance'
     | '/settings/data-lifecycle'
@@ -443,6 +519,7 @@ export interface FileRouteTypes {
     | '/spaces/$slug'
     | '/users/$id'
     | '/admin'
+    | '/learn'
     | '/settings'
     | '/spaces'
     | '/users'
@@ -450,6 +527,10 @@ export interface FileRouteTypes {
     | '/admin/users/$userId'
     | '/admin/organizations'
     | '/admin/users'
+    | '/learn/courses/$slug/edit'
+    | '/learn/courses/$slug/manage'
+    | '/learn/courses/$slug'
+    | '/learn/courses/$slug/lessons/$lessonId'
   id:
     | '__root__'
     | '/_auth'
@@ -465,8 +546,10 @@ export interface FileRouteTypes {
     | '/auth/register'
     | '/auth/reset-password'
     | '/auth/two-factor'
+    | '/certificates/$serial'
     | '/_auth/'
     | '/_auth/admin/audit'
+    | '/_auth/learn/certificates'
     | '/_auth/pages/$id'
     | '/_auth/settings/appearance'
     | '/_auth/settings/data-lifecycle'
@@ -484,6 +567,7 @@ export interface FileRouteTypes {
     | '/_auth/spaces/$slug'
     | '/_auth/users/$id'
     | '/_auth/admin/'
+    | '/_auth/learn/'
     | '/_auth/settings/'
     | '/_auth/spaces/'
     | '/_auth/users/'
@@ -491,6 +575,10 @@ export interface FileRouteTypes {
     | '/_auth/admin/users/$userId'
     | '/_auth/admin/organizations/'
     | '/_auth/admin/users/'
+    | '/_auth/learn/courses/$slug/edit'
+    | '/_auth/learn/courses/$slug/manage'
+    | '/_auth/learn/courses/$slug/'
+    | '/_auth/learn/courses/$slug/lessons/$lessonId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -502,6 +590,7 @@ export interface RootRouteChildren {
   AuthRegisterRoute: typeof AuthRegisterRoute
   AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   AuthTwoFactorRoute: typeof AuthTwoFactorRoute
+  CertificatesSerialRoute: typeof CertificatesSerialRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -519,6 +608,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthIndexRouteImport
       parentRoute: typeof AuthRouteRoute
+    }
+    '/certificates/$serial': {
+      id: '/certificates/$serial'
+      path: '/certificates/$serial'
+      fullPath: '/certificates/$serial'
+      preLoaderRoute: typeof CertificatesSerialRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/auth/two-factor': {
       id: '/auth/two-factor'
@@ -624,6 +720,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/'
       preLoaderRoute: typeof AuthSettingsIndexRouteImport
       parentRoute: typeof AuthSettingsRouteRoute
+    }
+    '/_auth/learn/': {
+      id: '/_auth/learn/'
+      path: '/learn'
+      fullPath: '/learn/'
+      preLoaderRoute: typeof AuthLearnIndexRouteImport
+      parentRoute: typeof AuthRouteRoute
     }
     '/_auth/admin/': {
       id: '/_auth/admin/'
@@ -744,6 +847,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthPagesIdRouteImport
       parentRoute: typeof AuthRouteRoute
     }
+    '/_auth/learn/certificates': {
+      id: '/_auth/learn/certificates'
+      path: '/learn/certificates'
+      fullPath: '/learn/certificates'
+      preLoaderRoute: typeof AuthLearnCertificatesRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
     '/_auth/admin/audit': {
       id: '/_auth/admin/audit'
       path: '/audit'
@@ -778,6 +888,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/organizations/$organizationId'
       preLoaderRoute: typeof AuthAdminOrganizationsOrganizationIdRouteImport
       parentRoute: typeof AuthAdminRouteRoute
+    }
+    '/_auth/learn/courses/$slug/': {
+      id: '/_auth/learn/courses/$slug/'
+      path: '/learn/courses/$slug'
+      fullPath: '/learn/courses/$slug/'
+      preLoaderRoute: typeof AuthLearnCoursesSlugIndexRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/_auth/learn/courses/$slug/manage': {
+      id: '/_auth/learn/courses/$slug/manage'
+      path: '/learn/courses/$slug/manage'
+      fullPath: '/learn/courses/$slug/manage'
+      preLoaderRoute: typeof AuthLearnCoursesSlugManageRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/_auth/learn/courses/$slug/edit': {
+      id: '/_auth/learn/courses/$slug/edit'
+      path: '/learn/courses/$slug/edit'
+      fullPath: '/learn/courses/$slug/edit'
+      preLoaderRoute: typeof AuthLearnCoursesSlugEditRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/_auth/learn/courses/$slug/lessons/$lessonId': {
+      id: '/_auth/learn/courses/$slug/lessons/$lessonId'
+      path: '/learn/courses/$slug/lessons/$lessonId'
+      fullPath: '/learn/courses/$slug/lessons/$lessonId'
+      preLoaderRoute: typeof AuthLearnCoursesSlugLessonsLessonIdRouteImport
+      parentRoute: typeof AuthRouteRoute
     }
   }
 }
@@ -849,11 +987,17 @@ interface AuthRouteRouteChildren {
   AuthSearchRoute: typeof AuthSearchRoute
   AuthTagsRoute: typeof AuthTagsRoute
   AuthIndexRoute: typeof AuthIndexRoute
+  AuthLearnCertificatesRoute: typeof AuthLearnCertificatesRoute
   AuthPagesIdRoute: typeof AuthPagesIdRoute
   AuthSpacesSlugRoute: typeof AuthSpacesSlugRoute
   AuthUsersIdRoute: typeof AuthUsersIdRoute
+  AuthLearnIndexRoute: typeof AuthLearnIndexRoute
   AuthSpacesIndexRoute: typeof AuthSpacesIndexRoute
   AuthUsersIndexRoute: typeof AuthUsersIndexRoute
+  AuthLearnCoursesSlugEditRoute: typeof AuthLearnCoursesSlugEditRoute
+  AuthLearnCoursesSlugManageRoute: typeof AuthLearnCoursesSlugManageRoute
+  AuthLearnCoursesSlugIndexRoute: typeof AuthLearnCoursesSlugIndexRoute
+  AuthLearnCoursesSlugLessonsLessonIdRoute: typeof AuthLearnCoursesSlugLessonsLessonIdRoute
 }
 
 const AuthRouteRouteChildren: AuthRouteRouteChildren = {
@@ -863,11 +1007,18 @@ const AuthRouteRouteChildren: AuthRouteRouteChildren = {
   AuthSearchRoute: AuthSearchRoute,
   AuthTagsRoute: AuthTagsRoute,
   AuthIndexRoute: AuthIndexRoute,
+  AuthLearnCertificatesRoute: AuthLearnCertificatesRoute,
   AuthPagesIdRoute: AuthPagesIdRoute,
   AuthSpacesSlugRoute: AuthSpacesSlugRoute,
   AuthUsersIdRoute: AuthUsersIdRoute,
+  AuthLearnIndexRoute: AuthLearnIndexRoute,
   AuthSpacesIndexRoute: AuthSpacesIndexRoute,
   AuthUsersIndexRoute: AuthUsersIndexRoute,
+  AuthLearnCoursesSlugEditRoute: AuthLearnCoursesSlugEditRoute,
+  AuthLearnCoursesSlugManageRoute: AuthLearnCoursesSlugManageRoute,
+  AuthLearnCoursesSlugIndexRoute: AuthLearnCoursesSlugIndexRoute,
+  AuthLearnCoursesSlugLessonsLessonIdRoute:
+    AuthLearnCoursesSlugLessonsLessonIdRoute,
 }
 
 const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
@@ -883,6 +1034,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRegisterRoute: AuthRegisterRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
   AuthTwoFactorRoute: AuthTwoFactorRoute,
+  CertificatesSerialRoute: CertificatesSerialRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
