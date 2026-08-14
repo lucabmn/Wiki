@@ -95,7 +95,7 @@ courseAssetRoutes.get("/:id/inline", async (c) => {
   if (!context.session?.user) return c.json({ message: "Unauthorized" }, 401);
 
   try {
-    const row = await call(appRouter.courseAssets.get, { id: c.req.param("id") }, { context });
+    const row = await call(appRouter.learn.assets.get, { id: c.req.param("id") }, { context });
     if (!INLINE_TYPES.has(row.mimeType.toLowerCase())) {
       return c.json({ message: "Dieser Dateityp kann nicht inline angezeigt werden" }, 415);
     }
@@ -147,7 +147,7 @@ courseAssetRoutes.get("/:id/download", async (c) => {
   if (!context.session?.user) return c.json({ message: "Unauthorized" }, 401);
 
   try {
-    const row = await call(appRouter.courseAssets.get, { id: c.req.param("id") }, { context });
+    const row = await call(appRouter.learn.assets.get, { id: c.req.param("id") }, { context });
     const storage = getStorage();
     if (!storage) return c.json({ message: "Uploads are disabled" }, 501);
 
