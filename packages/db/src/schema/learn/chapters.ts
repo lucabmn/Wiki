@@ -66,9 +66,14 @@ export const lesson = learnSchema.table(
     /** Plaintext projection of `content`; feeds search and previews. */
     textContent: text("text_content").notNull().default(""),
     /**
-     * Yjs CRDT snapshot for collaborative authoring of a dynamic lesson. Same
-     * contract as `wiki.page.yjs_state`: once set, the in-memory shared doc
-     * wins and `content` must not be written out of band.
+     * Reserved for collaborative authoring of a dynamic lesson.
+     *
+     * Nothing writes it yet: `apps/collab` serves page documents only, and the
+     * course builder saves `content` directly. When lessons do join the collab
+     * server, the `wiki.page.yjs_state` contract applies — once a snapshot
+     * exists the in-memory shared doc wins and `content` must not be written out
+     * of band — but until then that invariant is a plan, not a rule any code
+     * enforces.
      */
     yjsState: bytea("yjs_state"),
     /** kind=video|document: the uploaded file. */

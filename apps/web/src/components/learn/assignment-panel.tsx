@@ -26,13 +26,11 @@ type SubmissionTask = SubmissionDetail["tasks"][number];
  * The hand-in surface of an assignment lesson: the brief, one editor per task,
  * and whatever came back from the grader.
  *
- * Two API shapes decide the structure here. `mySubmission` on the brief is a
- * summary — it carries the status and the grade but neither the overall
- * feedback nor the per-task answers — so `submissions.listMine` is fetched
- * alongside it for the feedback text and the attempt history. And the per-task
- * scores live only on the result of `start` / `saveTask` / `submit`, which is
- * why the detail from those mutations is held in state instead of re-read: once
- * the page is reloaded, the task-level feedback is no longer reachable.
+ * `mySubmission` on the brief is a summary — it carries the status and the
+ * grade but neither the overall feedback nor the per-task answers — so two more
+ * reads sit alongside it: `submissions.listMine` for the feedback text and the
+ * attempt history, and `submissions.get` for the answers themselves, so a
+ * reload does not lose what the learner already wrote.
  */
 export function AssignmentPanel({ lessonId, courseId }: { lessonId: string; courseId: string }) {
   const assignment = useQuery(
@@ -48,7 +46,17 @@ export function AssignmentPanel({ lessonId, courseId }: { lessonId: string; cour
 
   const invalidateAssignments = useInvalidate(orpc.learn.assignments.key());
   const invalidateSubmissions = useInvalidate(orpc.learn.submissions.key());
-  const [detail, setDetail] = useState<SubmissionDetail | null>(null);
+
+  // The current attempt with its answers. Held as a query rather than as the
+  // leftovers of whichever mutation ran last, so reopening the lesson shows the
+  // draft the learner left behind.
+  const [openedId, setOpenedId] = useState<string | null>(null);
+  const submissionId = openedId ?? assignment.data?.mySubmission?.id ?? null;
+  const detailQuery = useQuery({
+    ...orpc.learn.submissions.get.queryOptions({ input: { id: submissionId ?? "" } }),
+    enabled: Boolean(submissionId),
+  });
+  const detail = detailQuery.data ?? null;
 
   const refresh = () => {
     invalidateAssignments();
@@ -58,7 +66,10 @@ export function AssignmentPanel({ lessonId, courseId }: { lessonId: string; cour
   const start = useMutation(
     orpc.learn.submissions.start.mutationOptions({
       onSuccess: (opened) => {
-        setDetail(opened);
+        // The brief's `mySubmission` only catches up after the refetch below;
+        // remembering the id keeps the answers query pointed at the new attempt
+        // in the meantime.
+        setOpenedId(opened.id);
         refresh();
       },
       onError: toastError,
@@ -67,18 +78,8 @@ export function AssignmentPanel({ lessonId, courseId }: { lessonId: string; cour
 
   const saveTask = useMutation(
     orpc.learn.submissions.saveTask.mutationOptions({
-      onSuccess: (saved) => {
-        // The endpoint answers with the one task it wrote, so the held detail is
-        // patched rather than refetched — there is no learner-visible read that
-        // would return the other tasks again.
-        setDetail((previous) =>
-          previous
-            ? {
-                ...previous,
-                tasks: [...previous.tasks.filter((row) => row.taskId !== saved.taskId), saved],
-              }
-            : previous,
-        );
+      onSuccess: () => {
+        void detailQuery.refetch();
         toast.success("Gespeichert.");
       },
       onError: toastError,
@@ -88,7 +89,8 @@ export function AssignmentPanel({ lessonId, courseId }: { lessonId: string; cour
   const submit = useMutation(
     orpc.learn.submissions.submit.mutationOptions({
       onSuccess: (handedIn) => {
-        setDetail(handedIn);
+        setOpenedId(handedIn.id);
+        void detailQuery.refetch();
         refresh();
         toast.success(
           handedIn.status === "graded" ? "Abgegeben und bewertet." : "Abgabe eingegangen.",

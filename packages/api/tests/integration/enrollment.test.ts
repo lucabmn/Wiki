@@ -5,7 +5,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const { hasPermission } = vi.hoisted(() => ({ hasPermission: vi.fn() }));
 vi.mock("@nilovon-wiki/auth", () => ({ auth: { api: { hasPermission } } }));
 
-import { course, member, organization, user } from "@nilovon-wiki/db/schema/index";
+import {
+  course,
+  entitlement,
+  member,
+  organization,
+  product,
+  user,
+} from "@nilovon-wiki/db/schema/index";
 
 import { certificateRouter } from "../../src/routers/certificate";
 import { chapterRouter } from "../../src/routers/chapter";
@@ -135,6 +142,70 @@ describe("enrolling", () => {
       { context: ctx("uAuthor") },
     );
     expect(decided.status).toBe("active");
+  });
+
+  it("refuses a paid course without a live entitlement, and admits one with", async () => {
+    const { courseId } = await publishedCourse(1, { enrollmentPolicy: "paid" });
+    await expect(
+      call(enrollmentRouter.enroll, { courseId }, { context: ctx("uLearner") }),
+    ).rejects.toThrow(/payment_required/);
+
+    await db.insert(product).values({
+      id: "prod1",
+      organizationId: "oA",
+      kind: "course",
+      courseId,
+      name: "Kurs",
+    });
+    await db.insert(entitlement).values({
+      id: "ent1",
+      organizationId: "oA",
+      productId: "prod1",
+      userId: "uLearner",
+      source: "grant",
+    });
+
+    const enrolled = await call(
+      enrollmentRouter.enroll,
+      { courseId },
+      { context: ctx("uLearner") },
+    );
+    expect(enrolled.status).toBe("active");
+    // The enrolment records how it was obtained, which is what a billing
+    // dispute asks about later.
+    expect(enrolled.source).toBe("purchase");
+  });
+
+  it("ignores an entitlement that was revoked or has run out", async () => {
+    const { courseId } = await publishedCourse(1, { enrollmentPolicy: "paid" });
+    await db.insert(product).values({
+      id: "prod2",
+      organizationId: "oA",
+      kind: "course",
+      courseId,
+      name: "Kurs",
+    });
+    await db.insert(entitlement).values([
+      {
+        id: "ent2",
+        organizationId: "oA",
+        productId: "prod2",
+        userId: "uOther",
+        source: "grant",
+        revokedAt: new Date(),
+      },
+    ]);
+    await expect(
+      call(enrollmentRouter.enroll, { courseId }, { context: ctx("uOther") }),
+    ).rejects.toThrow(/payment_required/);
+
+    await db
+      .update(entitlement)
+      .set({ revokedAt: null, endsAt: new Date(Date.now() - 60_000) })
+      .where(eq(entitlement.id, "ent2"));
+    await expect(
+      call(enrollmentRouter.enroll, { courseId }, { context: ctx("uOther") }),
+    ).rejects.toThrow(/payment_required/);
   });
 
   it("refuses when every seat is taken", async () => {

@@ -44,7 +44,6 @@ import { Textarea } from "@nilovon-wiki/ui/components/textarea";
  */
 type Assignment = Awaited<ReturnType<typeof client.learn.assignments.getForLesson>>;
 type SubmissionRow = Awaited<ReturnType<typeof client.learn.submissions.listForAssignment>>[number];
-type SubmissionDetail = Awaited<ReturnType<typeof client.learn.submissions.grade>>;
 
 type QueueEntry = { submission: SubmissionRow; assignment: Assignment };
 
@@ -291,17 +290,11 @@ function QueueRow({ entry, onOpen }: { entry: QueueEntry; onOpen: () => void }) 
 /**
  * Scores one hand-in task by task, then grades it or hands it back.
  *
- * The answers are not on screen before the decision, and that is an API fact
- * rather than an omission: `listForAssignment` carries only submission-level
- * fields, and the shape that holds the learner's answers — `SubmissionDetail` —
- * is the *output* of `start`/`submit`/`grade`/`returnToLearner`, never of a read
- * a grader may perform. So the form is built from the brief's tasks, and the
- * answers appear underneath once a decision has been written and the server has
- * answered with the detail. The alternative — calling `grade` with an empty body
- * just to read it back — would mark the hand-in graded, so it is not one.
- *
- * That is also why the dialog stays open after a decision: closing it would
- * throw away the only view of the answers the grader ever gets.
+ * The queue listing carries submission-level fields only, so the answers are
+ * fetched per hand-in when it is opened. Every decision refetches rather than
+ * writing the mutation's own result into state: a regrade recomputes per-task
+ * scores server-side, and reading them back from one source keeps the form from
+ * drifting from what was stored.
  */
 function GradingForm({
   entry,
@@ -316,15 +309,21 @@ function GradingForm({
   const [scores, setScores] = useState<Record<string, string>>({});
   const [taskFeedback, setTaskFeedback] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState(submission.feedbackText);
-  const [detail, setDetail] = useState<SubmissionDetail | null>(null);
+
+  // The learner's actual answers. Its own read, gated on the same `grade`
+  // capability as the queue, and applying blind grading the same way.
+  const detailQuery = useQuery(
+    orpc.learn.submissions.get.queryOptions({ input: { id: submission.id } }),
+  );
+  const detail = detailQuery.data ?? null;
 
   const grade = useMutation(
     orpc.learn.submissions.grade.mutationOptions({
       onSuccess: (result) => {
-        setDetail(result);
         // The server owns the stored feedback from here on; leaving the box on
         // the pre-decision text would re-send stale copy on a regrade.
         setFeedback(result.feedbackText);
+        void detailQuery.refetch();
         toast.success("Bewertung gespeichert");
         onDecided();
       },
@@ -335,10 +334,10 @@ function GradingForm({
   const returnToLearner = useMutation(
     orpc.learn.submissions.returnToLearner.mutationOptions({
       onSuccess: (result) => {
-        setDetail(result);
         // The server owns the stored feedback from here on; leaving the box on
         // the pre-decision text would re-send stale copy on a regrade.
         setFeedback(result.feedbackText);
+        void detailQuery.refetch();
         toast.success("Zur Überarbeitung zurückgegeben");
         onDecided();
       },
@@ -406,12 +405,14 @@ function GradingForm({
         <section className="space-y-4">
           <h3 className="text-sm font-semibold">Teilaufgaben</h3>
 
-          {detail === null ? (
-            <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-              Die eingereichten Antworten stehen in dieser Ansicht noch nicht zur Verfügung: die API
-              liefert sie erst als Antwort auf die Bewertung. Sie erscheinen unten, sobald die
-              Bewertung gespeichert oder die Abgabe zurückgegeben wurde.
-            </p>
+          {detailQuery.isPending ? (
+            <Skeleton className="h-20 w-full" />
+          ) : detailQuery.isError ? (
+            <QueryError
+              compact
+              error={detailQuery.error}
+              onRetry={() => void detailQuery.refetch()}
+            />
           ) : null}
 
           {assignment.tasks.length === 0 ? (

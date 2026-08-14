@@ -5,7 +5,7 @@ import { QueryError } from "@/components/query-error";
 import { usePermission } from "@/lib/permissions";
 import { orpc } from "@/utils/orpc";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
-import { Button } from "@nilovon-wiki/ui/components/button";
+import { Button, buttonVariants } from "@nilovon-wiki/ui/components/button";
 import {
   Empty,
   EmptyContent,
@@ -19,8 +19,8 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@nilovon-wiki/ui/components/tabs";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { GraduationCap, Plus, Search, X } from "lucide-react";
+import { Link, createFileRoute } from "@tanstack/react-router";
+import { Award, GraduationCap, Plus, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/_auth/learn/")({
@@ -83,12 +83,20 @@ function RouteComponent() {
               Kurse deiner Organisation — belegen, fortsetzen und unterrichten.
             </p>
           </div>
-          {canCreate && (
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="size-4" aria-hidden />
-              Kurs erstellen
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* The only way into the certificate list — it has no place in the
+                main navigation, but an orphan route is a feature nobody finds. */}
+            <Link to="/learn/certificates" className={buttonVariants({ variant: "outline" })}>
+              <Award className="size-4" aria-hidden />
+              Zertifikate
+            </Link>
+            {canCreate && (
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="size-4" aria-hidden />
+                Kurs erstellen
+              </Button>
+            )}
+          </div>
         </header>
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
