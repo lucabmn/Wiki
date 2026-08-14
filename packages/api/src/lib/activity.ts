@@ -41,6 +41,8 @@ type RecordActivityInput = {
   impersonatedBy?: string | null;
   spaceId?: string | null;
   pageId?: string | null;
+  /** Set instead of `spaceId` for entries from the learning product. */
+  courseId?: string | null;
   // Denormalized context that must survive the referenced row being deleted
   // (e.g. a page's title/id for `page.deleted`, since `activity.pageId` nulls).
   metadata?: unknown;
@@ -69,6 +71,7 @@ export async function recordActivity(
       impersonatedBy: input.impersonatedBy ?? null,
       spaceId,
       pageId: input.pageId ?? null,
+      courseId: input.courseId ?? null,
       metadata: input.metadata ?? null,
     })
     .returning({ id: activity.id });

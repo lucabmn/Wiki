@@ -20,6 +20,16 @@ export const statement = {
   page: ["create", "read", "update", "delete", "publish", "move"],
   comment: ["create", "update", "delete", "moderate"],
   attachment: ["create", "delete"],
+  // ── Learning platform ──────────────────────────────────────────────────────
+  // Org-level grants answer "may this member start a course at all" and
+  // "may they administer courses they are not staff on". What a member may do
+  // *inside* one course is decided by their `course_member` role and their
+  // enrolment — see `packages/api/src/lib/course-access.ts`. Both layers apply:
+  // an org grant never reaches a course the caller cannot already see.
+  course: ["create", "read", "update", "delete", "publish", "manage"],
+  lesson: ["create", "update", "delete"],
+  enrollment: ["create", "manage"],
+  submission: ["grade"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -33,6 +43,10 @@ export const owner = ac.newRole({
   page: ["create", "read", "update", "delete", "publish", "move"],
   comment: ["create", "update", "delete", "moderate"],
   attachment: ["create", "delete"],
+  course: ["create", "read", "update", "delete", "publish", "manage"],
+  lesson: ["create", "update", "delete"],
+  enrollment: ["create", "manage"],
+  submission: ["grade"],
 });
 
 export const admin = ac.newRole({
@@ -41,6 +55,10 @@ export const admin = ac.newRole({
   page: ["create", "read", "update", "delete", "publish", "move"],
   comment: ["create", "update", "delete", "moderate"],
   attachment: ["create", "delete"],
+  course: ["create", "read", "update", "delete", "publish", "manage"],
+  lesson: ["create", "update", "delete"],
+  enrollment: ["create", "manage"],
+  submission: ["grade"],
 });
 
 export const member = ac.newRole({
@@ -48,6 +66,11 @@ export const member = ac.newRole({
   page: ["create", "read", "update"],
   comment: ["create", "update", "delete"],
   attachment: ["create"],
+  // A plain member may browse the catalog and enrol themselves. Authoring is
+  // not an org-level grant: it comes from being staff on a specific course, so
+  // `course:create` is what distinguishes someone who may start one at all.
+  course: ["read"],
+  enrollment: ["create"],
 });
 
 export const roles = { owner, admin, member };

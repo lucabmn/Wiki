@@ -19,6 +19,10 @@ vi.mock("@/components/layouts/dashboard-layout", () => ({
   default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
+// The learning widget runs its own two queries and has its own coverage; this
+// file is about the dashboard's own content.
+vi.mock("@/components/learn/learning-summary", () => ({ LearningSummary: () => null }));
+
 vi.mock("@/lib/auth-client", () => ({
   authClient: { useSession: () => ({ data: { session: { activeOrganizationId: "o1" } } }) },
 }));

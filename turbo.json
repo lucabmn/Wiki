@@ -9,7 +9,12 @@
       // reach the task (turbo runs in strict env mode) and be part of the cache
       // key — otherwise a changed URL replays a stale bundle.
       "env": ["VITE_*", "NODE_ENV"],
-      "outputs": ["dist/**", ".output/**"]
+      // `.vercel/output` belongs here even though nothing in the repo reads it:
+      // Vercel builds through turbo, and on a cache hit an output that was not
+      // captured is never restored. The docs deployment failed with "No Output
+      // Directory named public found" for exactly that reason — the build was
+      // replayed from cache, correctly, into a directory that no longer existed.
+      "outputs": ["dist/**", ".output/**", ".vercel/output/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]

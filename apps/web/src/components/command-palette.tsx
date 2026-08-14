@@ -13,7 +13,7 @@ import {
 } from "@nilovon-wiki/ui/components/command";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { FileText, Search } from "lucide-react";
+import { FileText, GraduationCap, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 /** Renders a `ts_headline` snippet with matched terms bolded. */
@@ -30,9 +30,15 @@ function renderSnippet(snippet: string) {
 }
 
 /**
- * ⌘K search palette. Runs the server-side full-text search (already scoped to
- * readable spaces by the API) and navigates to the chosen page. cmdk's own
- * client-side filtering is disabled — the ranking comes from the backend.
+ * ⌘K search palette. Runs the server-side full-text search (already scoped by
+ * the API to readable spaces and viewable courses) and navigates to the chosen
+ * result. cmdk's own client-side filtering is disabled — the ranking comes from
+ * the backend.
+ *
+ * Pages and courses are two queries and two groups rather than one merged,
+ * re-ranked list: their relevance scores come from different corpora and are not
+ * comparable, and interleaving them by a number that means different things in
+ * each would put the wrong result first.
  */
 export function CommandPalette({
   open,
@@ -76,10 +82,23 @@ export function CommandPalette({
     }),
   );
 
+  const { data: courseHits } = useQuery(
+    orpc.search.courses.queryOptions({
+      input: { query: debounced, limit: 5 },
+      enabled: open && debounced.length >= 2,
+    }),
+  );
+
   const select = (pageId: string) => {
     onOpenChange(false);
     setQuery("");
     navigate({ to: "/pages/$id", params: { id: pageId } });
+  };
+
+  const selectCourse = (slug: string) => {
+    onOpenChange(false);
+    setQuery("");
+    navigate({ to: "/learn/courses/$slug", params: { slug } });
   };
 
   const seeAll = () => {
@@ -110,9 +129,9 @@ export function CommandPalette({
               onRetry={() => refetch()}
               className="justify-center py-4"
             />
-          ) : !hits?.length ? (
+          ) : !hits?.length && !courseHits?.length ? (
             <CommandEmpty>Keine Treffer.</CommandEmpty>
-          ) : (
+          ) : !hits?.length ? null : (
             <CommandGroup heading="Seiten">
               {hits.map((hit) => (
                 <CommandItem
@@ -137,6 +156,27 @@ export function CommandPalette({
               ))}
             </CommandGroup>
           )}
+          {courseHits?.length ? (
+            <CommandGroup heading="Kurse">
+              {courseHits.map((hit) => (
+                <CommandItem
+                  key={hit.courseId}
+                  value={hit.courseId}
+                  onSelect={() => selectCourse(hit.slug)}
+                >
+                  <GraduationCap className="text-muted-foreground size-4" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate">{hit.title}</div>
+                    {hit.snippet || hit.tagline ? (
+                      <div className="text-muted-foreground truncate text-xs">
+                        {hit.snippet ? renderSnippet(hit.snippet) : hit.tagline}
+                      </div>
+                    ) : null}
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
           {hits?.length ? (
             <>
               <CommandSeparator />

@@ -46,6 +46,7 @@ import {
   ChevronRight,
   ChevronsUpDown,
   Folder,
+  GraduationCap,
   Home,
   LayoutGrid,
   LogOut,
@@ -66,6 +67,9 @@ import { Link, useMatchRoute, useNavigate, useRouteContext } from "@tanstack/rea
 const baseNav = [
   { to: "/", label: "Übersicht", icon: Home },
   { to: "/spaces", label: "Alle Spaces", icon: LayoutGrid },
+  // The learning platform is a peer product, not a section of the wiki, so it
+  // sits in the top-level navigation rather than under a space.
+  { to: "/learn", label: "Lernen", icon: GraduationCap },
   { to: "/tags", label: "Tags", icon: Tags },
   { to: "/users", label: "Personen", icon: UsersRound },
 ] as const;

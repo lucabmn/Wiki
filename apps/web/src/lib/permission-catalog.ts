@@ -44,6 +44,17 @@ const ACTION_LABELS: Record<string, Record<string, string>> = {
   invitation: { create: "Einladen", cancel: "Zurückziehen" },
   team: { create: "Erstellen", update: "Bearbeiten", delete: "Löschen" },
   ac: { create: "Erstellen", read: "Ansehen", update: "Bearbeiten", delete: "Löschen" },
+  course: {
+    create: "Erstellen",
+    read: "Ansehen",
+    update: "Bearbeiten",
+    delete: "Löschen",
+    publish: "Veröffentlichen",
+    manage: "Verwalten",
+  },
+  lesson: { create: "Erstellen", update: "Bearbeiten", delete: "Löschen" },
+  enrollment: { create: "Einschreiben", manage: "Teilnehmende verwalten" },
+  submission: { grade: "Bewerten" },
 };
 
 const RESOURCE_META: Record<Resource, { label: string; description: string }> = {
@@ -68,13 +79,21 @@ const RESOURCE_META: Record<Resource, { label: string; description: string }> = 
     label: "Rollenverwaltung",
     description: "Gruppen (Rollen) erstellen und deren Rechte vergeben.",
   },
+  course: { label: "Kurse", description: "Kurse der Lernplattform." },
+  // The three below are listed for completeness of the permission surface, but
+  // they are deliberately absent from the group editor: what somebody may do
+  // *inside* a course comes from their Kursrolle and their enrolment, not from
+  // an org-wide grant.
+  lesson: { label: "Lektionen", description: "Inhalte innerhalb eines Kurses." },
+  enrollment: { label: "Einschreibungen", description: "Teilnahme an Kursen." },
+  submission: { label: "Abgaben", description: "Eingereichte Aufgaben und deren Bewertung." },
 };
 
 // Content permissions (page/comment/attachment) are no longer granted here —
 // they are governed per-space and per-page via space/page roles. Org groups only
 // grant org-level capabilities. `space` stays: it controls who may create and
 // org-wide-manage spaces.
-const CONTENT_RESOURCES: Resource[] = ["space"];
+const CONTENT_RESOURCES: Resource[] = ["space", "course"];
 const ORGANIZATION_RESOURCES: Resource[] = ["organization", "member", "invitation", "team", "ac"];
 
 function buildResource(resource: Resource, dangerous: boolean): PermissionResource {

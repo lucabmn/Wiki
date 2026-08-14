@@ -9,6 +9,7 @@ import { dashboardRouter } from "./dashboard";
 import { externalLinkRouter } from "./external-link";
 import { inboxRouter } from "./inbox";
 import { instanceRouter } from "./instance";
+import { learnRouter } from "./learn";
 import { legalHoldRouter } from "./legal-hold";
 import { linkRouter } from "./link";
 import { notificationRouter } from "./notification";
@@ -53,6 +54,9 @@ export const appRouter = {
   attachments: attachmentRouter,
   links: linkRouter,
   externalLinks: externalLinkRouter,
+  // ── Learning platform ─────────────────────────────────────────────────────
+  // A peer product to the wiki: same organization, its own access model.
+  learn: learnRouter,
   activity: activityRouter,
   notifications: notificationRouter,
   inbox: inboxRouter,

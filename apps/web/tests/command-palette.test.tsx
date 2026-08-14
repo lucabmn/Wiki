@@ -5,9 +5,10 @@ import { describe, expect, it, vi } from "vitest";
 
 // --- mocks ---------------------------------------------------------------
 
-const { navigateSpy, searchHits } = vi.hoisted(() => ({
+const { navigateSpy, searchHits, courseHits } = vi.hoisted(() => ({
   navigateSpy: vi.fn(),
   searchHits: vi.fn<() => Array<Record<string, unknown>>>(() => []),
+  courseHits: vi.fn<() => Array<Record<string, unknown>>>(() => []),
 }));
 
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigateSpy }));
@@ -21,6 +22,13 @@ vi.mock("@/utils/orpc", () => ({
         queryOptions: ({ input, enabled }: { input: { query: string }; enabled?: boolean }) => ({
           queryKey: ["search", input.query],
           queryFn: async () => searchHits(),
+          enabled,
+        }),
+      },
+      courses: {
+        queryOptions: ({ input, enabled }: { input: { query: string }; enabled?: boolean }) => ({
+          queryKey: ["search-courses", input.query],
+          queryFn: async () => courseHits(),
           enabled,
         }),
       },
@@ -69,8 +77,51 @@ describe("CommandPalette", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("lists courses in their own group and navigates by slug", async () => {
+    // Pages and courses come back from different corpora, so they are two
+    // groups rather than one re-ranked list — assert both can appear at once.
+    searchHits.mockReturnValue([
+      {
+        pageId: "p1",
+        spaceId: "s1",
+        title: "Onboarding Guide",
+        slug: "onboarding",
+        icon: null,
+        snippet: "",
+        rank: 1,
+      },
+    ]);
+    courseHits.mockReturnValue([
+      {
+        courseId: "c1",
+        title: "Onboarding für neue Kolleg:innen",
+        slug: "onboarding-kurs",
+        tagline: "Die ersten zwei Wochen",
+        thumbnailUrl: null,
+        snippet: "",
+        rank: 1,
+      },
+    ]);
+    const onOpenChange = vi.fn();
+    render(<CommandPalette open onOpenChange={onOpenChange} />, { wrapper });
+
+    fireEvent.change(screen.getByPlaceholderText("Seiten suchen …"), {
+      target: { value: "onboarding" },
+    });
+
+    const course = await screen.findByText("Onboarding für neue Kolleg:innen");
+    expect(screen.getByText("Onboarding Guide")).toBeDefined();
+    fireEvent.click(course);
+
+    expect(navigateSpy).toHaveBeenCalledWith({
+      to: "/learn/courses/$slug",
+      params: { slug: "onboarding-kurs" },
+    });
+  });
+
   it("reports no matches when the search is empty", async () => {
     searchHits.mockReturnValue([]);
+    courseHits.mockReturnValue([]);
     render(<CommandPalette open onOpenChange={vi.fn()} />, { wrapper });
 
     fireEvent.change(screen.getByPlaceholderText("Seiten suchen …"), {

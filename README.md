@@ -23,6 +23,7 @@ The codebase is a pnpm + Turborepo monorepo with a strict boundary between the H
 - **Organizations & members** — multi-tenant by default; every query is org-scoped.
 - **Spaces** — group related pages with `public` / `private` / `restricted` visibility.
 - **Pages** — draft → published → archived lifecycle, hierarchical nesting with fractional (LexoRank) ordering, per-space auto-deduplicated slugs, and backlink tracking surfaced in the page rail.
+- **Learning platform** — courses, chapters and lessons (rich text, video, documents, embeds, assignments, quizzes) with enrolment, progress tracking, drip release, sequential unlocking, grading with an append-only grade history, certificates with public verification, instructor analytics, and an entitlement model for paid courses. Courses are a peer product to the wiki with their own access rules; see [docs/learning.md](docs/learning.md).
 - **Comments** — create, resolve, and moderate; author-or-permission authorization.
 - **Tags** — space-scoped labels, created and applied inline from the page header.
 - **External links** — a curated, reorderable list of references outside the wiki per page; URLs are normalized and scheme-allowlisted to `http(s)` on the server, so a stored link can never become a `javascript:` href.
@@ -252,6 +253,7 @@ See the `.env.example` files for annotated placeholders.
 ## Documentation
 
 - [Permissions (RBAC)](docs/permissions.md) — how authorization works, and how to use it on the backend and frontend.
+- [Learning platform](docs/learning.md) — the course access model, content model, progress and locking rules, grading, certificates and paid access.
 
 ## Contributing
 
