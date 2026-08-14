@@ -1,10 +1,10 @@
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 
 import { auth } from "@nilovon-wiki/auth";
 import { session } from "@nilovon-wiki/db/schema/index";
 
-import { instanceAdminProcedure } from "../../lib/instance-admin";
+import { instanceAdminProcedure, nowUtc } from "../../lib/instance-admin";
 import {
   AdminActionResultSchema,
   AdminSessionSchema,
@@ -45,7 +45,7 @@ export const adminSessionRouter = {
           impersonatedBy: session.impersonatedBy,
         })
         .from(session)
-        .where(and(eq(session.userId, input.userId), gt(session.expiresAt, sql`now()`)))
+        .where(and(eq(session.userId, input.userId), gt(session.expiresAt, nowUtc)))
         .orderBy(desc(session.createdAt));
 
       const own = context.session.session.token;

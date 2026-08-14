@@ -26,7 +26,7 @@ import {
 } from "@nilovon-wiki/db/schema/index";
 import { splitInstanceRoles } from "@nilovon-wiki/auth/instance-admin";
 
-import { instanceAdminProcedure } from "../../lib/instance-admin";
+import { instanceAdminProcedure, nowUtc } from "../../lib/instance-admin";
 import { firstRow } from "../../lib/rows";
 import {
   AdminUserDetailSchema,
@@ -81,7 +81,7 @@ function selectUsers(db: Database) {
       .leftJoin(session, eq(session.userId, user.id))
       .leftJoin(
         liveSession,
-        and(eq(liveSession.userId, user.id), gt(liveSession.expiresAt, sql`now()`)),
+        and(eq(liveSession.userId, user.id), gt(liveSession.expiresAt, nowUtc)),
       )
       // Grouping by the primary key covers every other selected user column.
       .groupBy(user.id)

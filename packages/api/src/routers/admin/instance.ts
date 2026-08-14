@@ -1,4 +1,4 @@
-import { count, eq, gt, sql, sum } from "drizzle-orm";
+import { count, eq, gt, sum } from "drizzle-orm";
 import { z } from "zod";
 
 import { isMailConfigured } from "@nilovon-wiki/auth/mail";
@@ -12,7 +12,7 @@ import {
 } from "@nilovon-wiki/db/schema/index";
 import { env } from "@nilovon-wiki/env/server";
 
-import { instanceAdminProcedure } from "../../lib/instance-admin";
+import { instanceAdminProcedure, nowUtc } from "../../lib/instance-admin";
 import { firstRow } from "../../lib/rows";
 import { isStorageConfigured } from "../../lib/storage";
 import { InstanceOverviewSchema } from "../../schemas/admin";
@@ -67,10 +67,7 @@ export const adminInstanceRouter = {
           db.select({ n: count() }).from(organization),
           db.select({ n: count() }).from(space),
           db.select({ n: count() }).from(page),
-          db
-            .select({ n: count() })
-            .from(session)
-            .where(gt(session.expiresAt, sql`now()`)),
+          db.select({ n: count() }).from(session).where(gt(session.expiresAt, nowUtc)),
           db.select({ bytes: sum(attachment.size) }).from(attachment),
           probeCollab(),
         ]);

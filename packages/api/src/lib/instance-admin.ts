@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 
 import { hasInstanceAdminRole } from "@nilovon-wiki/auth/instance-admin";
@@ -37,3 +38,16 @@ export const instanceAdminProcedure = protectedProcedure.use(async ({ context, n
   }
   return next();
 });
+
+/**
+ * "Now", as a naive timestamp in UTC.
+ *
+ * `session.expires_at` is `timestamp` *without* time zone and is written as a
+ * UTC wall clock, so comparing it against `now()` — which is `timestamptz` —
+ * makes Postgres reinterpret the stored value in the server's own TimeZone.
+ * On any instance not running in UTC that shifts every expiry by the offset:
+ * live sessions read as expired to the east of UTC, and revoked ones read as
+ * live to the west. Comparing against a naive UTC clock keeps both sides in the
+ * same frame.
+ */
+export const nowUtc = sql`(now() at time zone 'utc')`;
