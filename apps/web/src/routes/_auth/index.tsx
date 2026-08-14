@@ -1,5 +1,6 @@
 import { CreatePageDialog } from "@/components/create-page-dialog";
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { LearningSummary } from "@/components/learn/learning-summary";
 import { QueryError } from "@/components/query-error";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { timeAgo } from "@/lib/format";
@@ -396,6 +397,11 @@ function RouteComponent() {
     <DashboardLayout className="gap-6 p-7">
       <Header />
       <ContinueWorking />
+      {/* Learning sits above the activity feed rather than beside it: a course
+          with a deadline is something to act on, and the feed is something to
+          read. Somebody who takes no courses gets the counters and one line
+          pointing at the catalog. */}
+      <LearningSummary />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <ActivityFeed />
