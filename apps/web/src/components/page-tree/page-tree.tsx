@@ -34,6 +34,7 @@ import { Button } from "@nilovon-wiki/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
@@ -392,20 +393,22 @@ function PageTreeRow({
             }
           />
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel>Verschieben</DropdownMenuLabel>
-            {MOVES.map((entry) => (
-              <DropdownMenuItem
-                key={entry.move}
-                // Disabled rather than hidden: a menu whose items move around
-                // is harder to learn than one where they grey out.
-                disabled={!availableMoves.includes(entry.move)}
-                onClick={() => onMove(entry.move)}
-              >
-                <entry.icon className="size-4" />
-                {entry.label}
-                <span className="ml-auto text-xs text-muted-foreground">{entry.hint}</span>
-              </DropdownMenuItem>
-            ))}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Verschieben</DropdownMenuLabel>
+              {MOVES.map((entry) => (
+                <DropdownMenuItem
+                  key={entry.move}
+                  // Disabled rather than hidden: a menu whose items move around
+                  // is harder to learn than one where they grey out.
+                  disabled={!availableMoves.includes(entry.move)}
+                  onClick={() => onMove(entry.move)}
+                >
+                  <entry.icon className="size-4" />
+                  {entry.label}
+                  <span className="ml-auto text-xs text-muted-foreground">{entry.hint}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       )}

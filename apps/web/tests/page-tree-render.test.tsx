@@ -97,6 +97,15 @@ describe("PageTree reordering without a pointer", () => {
     expect(screen.getByLabelText('Seite „Notes" verschieben')).toBeDefined();
   });
 
+  // Base UI throws "MenuGroupContext is missing" when a GroupLabel mounts
+  // outside a Menu.Group, and only once the menu content actually mounts.
+  it("mounts the move menu content", async () => {
+    renderTree(true);
+    await screen.findByText("Guide");
+    fireEvent.click(screen.getByLabelText('Seite „Notes" verschieben'));
+    expect(await screen.findByText("Verschieben")).toBeDefined();
+  });
+
   it("offers no move affordance when the caller may not reorder", async () => {
     renderTree(false);
     await screen.findByText("Guide");

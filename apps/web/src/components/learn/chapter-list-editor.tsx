@@ -9,6 +9,7 @@ import { Card } from "@nilovon-wiki/ui/components/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
@@ -477,12 +478,14 @@ function ChapterCard({
             }
           />
           <DropdownMenuContent align="start">
-            <DropdownMenuLabel>Art der Lektion</DropdownMenuLabel>
-            {LESSON_KINDS.map((kind) => (
-              <DropdownMenuItem key={kind} onClick={() => onAddLesson(kind)}>
-                {LESSON_KIND_LABEL[kind]}
-              </DropdownMenuItem>
-            ))}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Art der Lektion</DropdownMenuLabel>
+              {LESSON_KINDS.map((kind) => (
+                <DropdownMenuItem key={kind} onClick={() => onAddLesson(kind)}>
+                  {LESSON_KIND_LABEL[kind]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
