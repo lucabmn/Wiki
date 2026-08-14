@@ -9,6 +9,7 @@ import {
   submission,
   submissionGrade,
   submissionTask,
+  user,
 } from "@nilovon-wiki/db/schema/index";
 
 import type { AuthedContext } from "../context";
@@ -25,6 +26,7 @@ import {
 } from "../lib/learn-loaders";
 import { firstRow } from "../lib/rows";
 import {
+  GradableSubmissionSchema,
   GradeSubmissionInputSchema,
   ListMySubmissionsInputSchema,
   ListSubmissionsInputSchema,
@@ -107,6 +109,52 @@ export const submissionRouter = {
           user: hidden ? null : (row.user ?? null),
         };
       });
+    }),
+
+  /**
+   * One hand-in with its answers.
+   *
+   * Without this a grader could list the queue but never read what was actually
+   * submitted: every other procedure returning the answers is a mutation, and
+   * the read paths were owner-only. Ownership and the grading grant are both
+   * accepted here, and blind grading is applied exactly as it is in the queue.
+   */
+  get: protectedProcedure
+    .route({
+      method: "GET",
+      path: "/submissions/{id}",
+      tags: TAGS,
+      summary: "Read one submission with the answers given to it",
+    })
+    .input(z.object({ id: IdSchema }))
+    .output(GradableSubmissionSchema)
+    .handler(async ({ input, context }) => {
+      const row = await loadSubmission(context.db, input.id);
+      const assignment = await loadAssignment(context.db, row.assignmentId);
+      const course = await loadCourse(context.db, assignment.courseId);
+
+      const isOwner = row.userId === context.session.user.id;
+      if (!isOwner) {
+        // NOT_FOUND, not FORBIDDEN: for a classmate, confirming the row exists
+        // is already more than they should learn here.
+        try {
+          await requireCourseCapability(context.db, context, context.headers, course, "grade");
+        } catch {
+          throw new ORPCError("NOT_FOUND", { message: "Submission not found" });
+        }
+      }
+
+      const detail = await withTasks(context.db, row);
+      const author = await context.db.query.user.findFirst({
+        where: eq(user.id, row.userId),
+        columns: { id: true, name: true, image: true },
+      });
+      const hidden = !isOwner && assignment.blindGrading && row.gradedAt === null;
+      return {
+        ...detail,
+        userId: hidden ? null : detail.userId,
+        user: hidden ? null : (author ?? null),
+      };
     }),
 
   start: protectedProcedure

@@ -98,6 +98,16 @@ export const SubmissionDetailSchema = SubmissionSchema.extend({
   tasks: z.array(SubmissionTaskSchema),
 });
 
+/**
+ * A hand-in as its grader sees it: the answers, plus who wrote them — unless
+ * blind grading is on and no grade exists yet, in which case `user` is null for
+ * the same reason it is null in the queue listing.
+ */
+export const GradableSubmissionSchema = SubmissionDetailSchema.extend({
+  userId: IdSchema.nullable(),
+  user: z.object({ id: IdSchema, name: z.string(), image: z.string().nullable() }).nullable(),
+});
+
 /** What the assignment page shows about the caller's own latest attempt. */
 export const SubmissionSummarySchema = SubmissionSchema.pick({
   id: true,
