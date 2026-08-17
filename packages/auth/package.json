@@ -24,7 +24,7 @@
     "better-auth": "catalog:",
     "better-auth-localization": "^3.0.0",
     "dotenv": "catalog:",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^9.0.5",
     "zod": "catalog:"
   },
   "devDependencies": {
