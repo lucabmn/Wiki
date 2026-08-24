@@ -10,22 +10,22 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hocuspocus/extension-database": "^4.4.0",
-    "@hocuspocus/extension-redis": "^4.4.0",
-    "@hocuspocus/server": "^4.4.0",
-    "@hocuspocus/transformer": "^4.4.0",
+    "@hocuspocus/extension-database": "^4.6.0",
+    "@hocuspocus/extension-redis": "^4.6.0",
+    "@hocuspocus/server": "^4.6.0",
+    "@hocuspocus/transformer": "^4.6.0",
     "@nilovon-wiki/api": "workspace:*",
     "@nilovon-wiki/db": "workspace:*",
     "@nilovon-wiki/editor": "workspace:*",
     "@nilovon-wiki/env": "workspace:*",
-    "@tiptap/core": "^3.0.7",
-    "@vercel/functions": "^3.7.6",
+    "@tiptap/core": "^3.30.2",
+    "@vercel/functions": "^3.9.5",
     "drizzle-orm": "^0.45.2",
     "evlog": "catalog:",
     "ioredis": "~5.6.1",
-    "tsx": "^4.20.3",
-    "ws": "^8.18.3",
-    "yjs": "^13.6.27"
+    "tsx": "^4.23.12",
+    "ws": "^8.21.3",
+    "yjs": "^13.6.32"
   },
   "devDependencies": {
     "@nilovon-wiki/config": "workspace:*",

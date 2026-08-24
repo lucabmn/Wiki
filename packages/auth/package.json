@@ -15,16 +15,16 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@better-auth/passkey": "1.7.0-beta.10",
-    "@better-auth/scim": "1.7.0-beta.10",
-    "@better-auth/sso": "1.7.0-beta.10",
+    "@better-auth/passkey": "1.7.1",
+    "@better-auth/scim": "1.7.1",
+    "@better-auth/sso": "1.7.1",
     "@nilovon-wiki/db": "workspace:*",
     "@nilovon-wiki/env": "workspace:*",
     "@simplewebauthn/server": "13.3.2",
     "better-auth": "catalog:",
     "better-auth-localization": "^3.0.0",
     "dotenv": "catalog:",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^9.0.5",
     "zod": "catalog:"
   },
   "devDependencies": {
