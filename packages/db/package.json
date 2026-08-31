@@ -21,13 +21,13 @@
     "@paralleldrive/cuid2": "^3.3.0",
     "dotenv": "catalog:",
     "drizzle-orm": "^0.45.2",
-    "pg": "^8.22.0",
+    "pg": "^8.23.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",
     "@nilovon-wiki/config": "workspace:*",
-    "@types/pg": "^8.20.0",
+    "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.10",
     "typescript": "catalog:"
   }

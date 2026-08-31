@@ -26,7 +26,7 @@
     "drizzle-orm": "^0.45.2",
     "evlog": "catalog:",
     "hono": "catalog:",
-    "pdfkit": "^0.17.2",
+    "pdfkit": "^0.19.1",
     "zod": "catalog:"
   },
   "devDependencies": {
