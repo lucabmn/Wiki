@@ -6,6 +6,11 @@ allowBuilds:
   sharp: true
   lefthook: true
 overrides:
+  # Better Auth moves as one set. From 1.7.0-rc the plugins need new columns
+  # (sso: account.issuer, scim: scimProvider.providerKey) and scim ships a
+  # rewritten API this app is not migrated to — an upgrade is a migration, not
+  # a bump. Pinning core keeps a plugin from dragging it forward on its own.
+  "@better-auth/core": 1.7.0-beta.10
   brace-expansion: 5.0.8
   fast-uri: 3.1.4
   "@hocuspocus/extension-redis>ioredis": 6.0.0
@@ -20,11 +25,11 @@ catalog:
   "@orpc/server": ^1.15.0
   "@orpc/openapi": ^1.15.0
   "@orpc/zod": ^1.15.0
-  better-auth: 1.7.1
+  better-auth: 1.7.0-beta.10
   evlog: ^2.26.0
   lucide-react: ^1.33.0
   next-themes: ^0.4.6
-  react: ^19.2.7
+  react: ^19.2.8
   react-dom: ^19.2.8
   sonner: ^2.0.8
   tailwindcss: ^4.3.3
