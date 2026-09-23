@@ -14,6 +14,7 @@ import {
 } from "../lib/authz";
 import { pageNotTrashed } from "../lib/lifecycle";
 import { loadPage, loadSpace, loadTag } from "../lib/loaders";
+import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
 import { IdSchema } from "../schemas/shared";
 import {
@@ -149,10 +150,15 @@ export const tagRouter = {
         input.spaceId,
         "write",
       );
-      const rows = await context.db
-        .insert(tag)
-        .values({ spaceId: input.spaceId, name: input.name, color: input.color ?? null })
-        .returning();
+      // `tag_space_name_uq`: a duplicate name is the caller's mistake, not a 500.
+      const rows = await mapUniqueViolation(
+        () =>
+          context.db
+            .insert(tag)
+            .values({ spaceId: input.spaceId, name: input.name, color: input.color ?? null })
+            .returning(),
+        "A tag with this name already exists in the space",
+      );
       return firstRow(rows);
     }),
 
@@ -170,7 +176,10 @@ export const tagRouter = {
         "write",
       );
       const { id, ...patch } = input;
-      const rows = await context.db.update(tag).set(patch).where(eq(tag.id, id)).returning();
+      const rows = await mapUniqueViolation(
+        () => context.db.update(tag).set(patch).where(eq(tag.id, id)).returning(),
+        "A tag with this name already exists in the space",
+      );
       return firstRow(rows);
     }),
 

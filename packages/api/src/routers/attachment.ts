@@ -1,14 +1,20 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
-import { attachment } from "@nilovon-wiki/db/schema/index";
+import { attachment, page } from "@nilovon-wiki/db/schema/index";
 import { env } from "@nilovon-wiki/env/server";
 
 import { protectedProcedure } from "../index";
 import { assertSpaceRead } from "../lib/access";
-import { requireOwnerOrSpaceCapability, requirePageCapability } from "../lib/authz";
+import {
+  filterReadablePagesAcrossSpaces,
+  requireOwnerOrPageCapability,
+  requireOwnerOrSpaceCapability,
+  requirePageCapability,
+} from "../lib/authz";
 import { activityActor, recordActivity } from "../lib/activity";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { loadAttachment, loadPage, loadSpace } from "../lib/loaders";
 import { assertPageContentDeletable } from "../lib/retention/holds";
 import { getStorage } from "../lib/storage";
@@ -65,7 +71,30 @@ export const attachmentRouter = {
         ),
         orderBy: [desc(attachment.createdAt)],
       });
-      return canReadDrafts ? rows : rows.filter((row) => !row.isDraft);
+      const visible = canReadDrafts ? rows : rows.filter((row) => !row.isDraft);
+      if (input.pageId) return visible;
+      // Space-wide listing: space read access does not extend to files on pages
+      // the caller can't open (per-page overrides) or that sit in the trash —
+      // `get` refuses those one by one, so the list must not name them either.
+      const pageIds = [
+        ...new Set(visible.map((row) => row.pageId).filter((id): id is string => id !== null)),
+      ];
+      if (pageIds.length === 0) return visible;
+      const pages = await context.db
+        .select({
+          id: page.id,
+          spaceId: page.spaceId,
+          visibility: page.visibility,
+          createdBy: page.createdBy,
+        })
+        .from(page)
+        .where(and(inArray(page.id, pageIds), pageNotTrashed()));
+      const readable = new Set(
+        (await filterReadablePagesAcrossSpaces(context.db, context, context.headers, pages)).map(
+          (row) => row.id,
+        ),
+      );
+      return visible.filter((row) => row.pageId === null || readable.has(row.pageId));
     }),
 
   // Metadata for one attachment, gated on read access to its page (or space for
@@ -109,11 +138,22 @@ export const attachmentRouter = {
     .handler(async ({ input, context }) => {
       const existing = await loadAttachment(context.db, input.id);
       const space = await loadSpace(context.db, existing.spaceId);
-      // Uploaders may remove their own; otherwise space editor+ is required.
-      await requireOwnerOrSpaceCapability(context.db, context, context.headers, space, {
-        isOwner: existing.uploadedBy === context.session.user.id,
-        capability: "write",
-      });
+      // Uploaders may remove their own; otherwise editor+ is required — on the
+      // page when the file hangs off one, so a per-page override that makes a
+      // space editor a reader there also stops them deleting its files.
+      const isOwner = existing.uploadedBy === context.session.user.id;
+      if (existing.pageId) {
+        const target = await loadPage(context.db, existing.pageId);
+        await requireOwnerOrPageCapability(context.db, context, context.headers, target, {
+          isOwner,
+          capability: "write",
+        });
+      } else {
+        await requireOwnerOrSpaceCapability(context.db, context, context.headers, space, {
+          isOwner,
+          capability: "write",
+        });
+      }
       const organizationId = space.organizationId;
       // Attachments are evidence as much as the page text is, so they inherit
       // the same deletion block — via the page when there is one, otherwise via
@@ -123,18 +163,20 @@ export const attachmentRouter = {
         spaceId: existing.spaceId,
         organizationId,
       });
-      // Persist intent before touching object storage. If storage or the final
-      // DB transaction fails, repeating this request safely resumes deletion.
-      await context.db
-        .update(attachment)
-        .set({ deletionPendingAt: existing.deletionPendingAt ?? new Date() })
-        .where(eq(attachment.id, input.id));
+      // Checked before anything is written: without storage the delete can
+      // never complete, so it must not leave the row marked as pending.
       const storage = getStorage();
       if (!storage) {
         throw new ORPCError("NOT_IMPLEMENTED", {
           message: "Cannot delete attachment: no object storage is configured.",
         });
       }
+      // Persist intent before touching object storage. If storage or the final
+      // DB transaction fails, repeating this request safely resumes deletion.
+      await context.db
+        .update(attachment)
+        .set({ deletionPendingAt: existing.deletionPendingAt ?? new Date() })
+        .where(eq(attachment.id, input.id));
       // S3 DeleteObject is idempotent, so retrying after an uncertain response
       // or a later DB failure is safe.
       await storage.delete(existing.storageKey);

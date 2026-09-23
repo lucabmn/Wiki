@@ -100,28 +100,9 @@ export const notificationRouter = {
     })
     .input(z.object({}))
     .output(MyDigestSettingsSchema)
-    .handler(async ({ context }) => {
-      const organizationId = requireActiveOrg(context);
-      const userId = context.session.user.id;
-      const [settings, delivery] = await Promise.all([
-        loadEffectiveDigestSettings(context.db, userId, organizationId),
-        context.db.query.digestDelivery.findFirst({
-          where: and(
-            eq(digestDelivery.userId, userId),
-            eq(digestDelivery.organizationId, organizationId),
-          ),
-        }),
-      ]);
-      return {
-        organization: settings.organization,
-        override: settings.override,
-        effective: settings.effective,
-        nextRunAt: delivery?.nextRunAt ?? null,
-        lastSentAt: delivery?.lastSentAt ?? null,
-        canOverride: settings.organization.allowUserOverride,
-        mailConfigured: isMailConfigured(),
-      };
-    }),
+    .handler(async ({ context }) =>
+      readMySettings(context.db, context.session.user.id, requireActiveOrg(context)),
+    ),
 
   updateMySettings: protectedProcedure
     .route({

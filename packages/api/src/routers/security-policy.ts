@@ -5,7 +5,7 @@ import { isMailConfigured } from "@nilovon-wiki/auth/mail";
 import { organization } from "@nilovon-wiki/db/schema/index";
 
 import { requireActiveOrg, requireOrgPermission, sessionProcedure } from "../index";
-import { recordActivity, type ActivityAction } from "../lib/activity";
+import { activityActor, recordActivity, type ActivityAction } from "../lib/activity";
 import {
   loadOrganizationSettings,
   saveOrganizationSettings,
@@ -84,7 +84,7 @@ export const securityPolicyRouter = {
           await recordActivity(tx, {
             organizationId,
             action,
-            actorId: context.session.user.id,
+            ...activityActor(context),
             metadata: {
               before: serialize(before),
               after: serialize(after),

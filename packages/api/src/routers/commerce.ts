@@ -2,11 +2,12 @@ import { ORPCError } from "@orpc/server";
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
+import type { Database } from "@nilovon-wiki/db";
 import { entitlement, product, productPrice, purchase } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure, requireActiveOrg, requireOrgPermission } from "../index";
 import { requireCourseCapabilityById } from "../lib/learn-authz";
-import { loadCourse } from "../lib/learn-loaders";
+import { assertPermissionSubjectInOrganization } from "../lib/permission-subject";
 import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
 import { IdSchema } from "../schemas/shared";
@@ -114,8 +115,13 @@ export const commerceRouter = {
     )
     .output(ProductSchema)
     .handler(async ({ input, context }) => {
-      const course = await loadCourse(context.db, input.courseId);
-      await requireCourseCapabilityById(context.db, context, context.headers, course.id, "manage");
+      const course = await requireCourseCapabilityById(
+        context.db,
+        context,
+        context.headers,
+        input.courseId,
+        "manage",
+      );
 
       return mapUniqueViolation(
         () =>
@@ -279,6 +285,12 @@ export const commerceRouter = {
     .handler(async ({ input, context }) => {
       const organizationId = requireActiveOrg(context);
       const row = await loadProduct(context, input.id, organizationId);
+      // Access is granted to members of this organization only — a user id from
+      // another tenant is refused exactly like an unknown one.
+      await assertPermissionSubjectInOrganization(context.db, organizationId, {
+        subject: "user",
+        userId: input.userId,
+      });
       return firstRow(
         await context.db
           .insert(entitlement)
@@ -376,11 +388,7 @@ export const commerceRouter = {
 };
 
 /** A product in the caller's own organization, or NOT_FOUND. */
-async function loadProduct(
-  context: { db: import("@nilovon-wiki/db").Database },
-  id: string,
-  organizationId: string,
-) {
+async function loadProduct(context: { db: Database }, id: string, organizationId: string) {
   const row = await context.db.query.product.findFirst({
     where: and(eq(product.id, id), eq(product.organizationId, organizationId)),
   });

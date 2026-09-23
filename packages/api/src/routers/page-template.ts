@@ -6,8 +6,9 @@ import { page } from "@nilovon-wiki/db/schema/index";
 
 import { isOrgManager, protectedProcedure } from "../index";
 import { filterReadablePages, loadSpaceRole } from "../lib/access";
-import { recordActivity } from "../lib/activity";
+import { activityActor, recordActivity } from "../lib/activity";
 import { requirePageCapability, requireSpaceCapabilityById } from "../lib/authz";
+import { pageNotTrashed } from "../lib/lifecycle";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { extractPageLinks, syncPageLinks } from "../lib/page-links";
 import { assertParentInSpace, positionAtEnd } from "../lib/page-tree";
@@ -51,6 +52,8 @@ export const pageTemplateRouter = {
           eq(page.spaceId, input.spaceId),
           eq(page.isTemplate, true),
           isNull(page.archivedAt),
+          // A trashed template is gone for the catalogue as for every other view.
+          pageNotTrashed(),
         ),
         orderBy: [asc(page.title)],
       });
@@ -150,7 +153,7 @@ export const pageTemplateRouter = {
             await recordActivity(tx, {
               organizationId,
               action: "page.created",
-              actorId: userId,
+              ...activityActor(context),
               spaceId: row.spaceId,
               pageId: row.id,
               metadata: { title: row.title, source: "template", templateId: template.id },

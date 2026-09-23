@@ -16,7 +16,7 @@ import {
   requireLessonCapability,
   requireLessonRead,
 } from "../lib/learn-authz";
-import { findEnrollment, loadChapter, loadCourse } from "../lib/learn-loaders";
+import { findEnrollment, loadChapter, loadCourse, loadCourseAsset } from "../lib/learn-loaders";
 import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
@@ -243,6 +243,17 @@ export const lessonRouter = {
         throw new ORPCError("BAD_REQUEST", {
           message: "Only a video or document lesson carries an uploaded file",
         });
+      }
+      if (input.assetId) {
+        // The file is served under its own course's rules, so one from another
+        // course (or a learner's hand-in) would be unreadable for this lesson's
+        // learners — or worse, a way to surface a submission as course material.
+        const asset = await loadCourseAsset(context.db, input.assetId);
+        if (asset.courseId !== course.id || asset.kind === "submission") {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "That file does not belong to this course",
+          });
+        }
       }
 
       return context.db.transaction(async (tx) => {

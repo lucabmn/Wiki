@@ -142,6 +142,11 @@ export const submissionRouter = {
         } catch {
           throw new ORPCError("NOT_FOUND", { message: "Submission not found" });
         }
+        // A draft is the learner's own workspace — the queue never lists one,
+        // and reading it by id must not be the way around that.
+        if (row.status === "draft") {
+          throw new ORPCError("NOT_FOUND", { message: "Submission not found" });
+        }
       }
 
       const detail = await withTasks(context.db, row);
@@ -210,22 +215,31 @@ export const submissionRouter = {
         throw new ORPCError("CONFLICT", { message: "No attempts left for this assignment" });
       }
 
-      return context.db.transaction(async (tx) => {
-        const row = firstRow(
-          await tx
-            .insert(submission)
-            .values({
-              assignmentId: assignment.id,
-              userId,
-              attemptNumber: (latest?.attemptNumber ?? 0) + 1,
-              status: "draft",
-            })
-            .returning(),
-        );
-        // No activity row: a draft only the learner can see is not an event the
-        // course has happened yet. `submission.submitted` is where it starts.
-        return { ...row, tasks: [] };
+      const [row] = await context.db
+        .insert(submission)
+        .values({
+          assignmentId: assignment.id,
+          userId,
+          attemptNumber: (latest?.attemptNumber ?? 0) + 1,
+          status: "draft",
+        })
+        // A concurrent `start` (a double click, two tabs) already opened this
+        // attempt; hand that draft back instead of failing on the unique index.
+        .onConflictDoNothing({
+          target: [submission.assignmentId, submission.userId, submission.attemptNumber],
+        })
+        .returning();
+      // No activity row: a draft only the learner can see is not an event the
+      // course has happened yet. `submission.submitted` is where it starts.
+      if (row) return { ...row, tasks: [] };
+      const raced = await context.db.query.submission.findFirst({
+        where: and(eq(submission.assignmentId, assignment.id), eq(submission.userId, userId)),
+        orderBy: [desc(submission.attemptNumber)],
       });
+      if (raced?.status !== "draft") {
+        throw new ORPCError("CONFLICT", { message: "This attempt was changed in the meantime" });
+      }
+      return withTasks(context.db, raced);
     }),
 
   saveTask: protectedProcedure
@@ -338,13 +352,18 @@ export const submissionRouter = {
         tasks.every((task) => task.kind === "quiz");
 
       return context.db.transaction(async (tx) => {
-        const handedIn = firstRow(
-          await tx
-            .update(submission)
-            .set({ status: "submitted", submittedAt: now, isLate })
-            .where(eq(submission.id, row.id))
-            .returning(),
-        );
+        // Guarded on the status so a double submit hands in (and auto-grades)
+        // exactly once; the second call finds nothing left to update.
+        const [handedIn] = await tx
+          .update(submission)
+          .set({ status: "submitted", submittedAt: now, isLate })
+          .where(and(eq(submission.id, row.id), inArray(submission.status, EDITABLE)))
+          .returning();
+        if (!handedIn) {
+          throw new ORPCError("CONFLICT", {
+            message: "This attempt has been handed in and can no longer be changed",
+          });
+        }
         await recordActivity(tx, {
           organizationId: course.organizationId,
           action: "submission.submitted",
@@ -617,6 +636,13 @@ async function applyGrade(
   const maxScore = input.tasks.reduce((sum, task) => sum + task.maxGrade, 0);
   const passed = input.score >= input.assignment.passingGrade;
 
+  // Serialize concurrent grading of one hand-in: without the row lock two
+  // graders read the same latest version and collide on `submission_grade_uq`.
+  await tx
+    .select({ id: submission.id })
+    .from(submission)
+    .where(eq(submission.id, input.submission.id))
+    .for("update");
   const [previous] = await tx
     .select({ version: max(submissionGrade.version) })
     .from(submissionGrade)

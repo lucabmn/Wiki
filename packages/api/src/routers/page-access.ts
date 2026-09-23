@@ -203,22 +203,23 @@ export const pageAccessRouter = {
         context.headers,
         pageRow,
       );
-      await context.db
-        .update(pageMember)
-        .set({ role: input.role })
-        .where(eq(pageMember.id, input.id));
-      await recordActivity(context.db, {
-        organizationId,
-        action: "page.member_role_changed",
-        ...activityActor(context),
-        spaceId: pageRow.spaceId,
-        pageId: pageRow.id,
-        metadata: {
-          title: pageRow.title,
-          from: existing.role,
-          to: input.role,
-          ...grantee(existing),
-        },
+      // One transaction, as in `removeMember`: the grant change and its audit
+      // row must land (or fail) together.
+      await context.db.transaction(async (tx) => {
+        await tx.update(pageMember).set({ role: input.role }).where(eq(pageMember.id, input.id));
+        await recordActivity(tx, {
+          organizationId,
+          action: "page.member_role_changed",
+          ...activityActor(context),
+          spaceId: pageRow.spaceId,
+          pageId: pageRow.id,
+          metadata: {
+            title: pageRow.title,
+            from: existing.role,
+            to: input.role,
+            ...grantee(existing),
+          },
+        });
       });
       return loadPageMember(context.db, input.id);
     }),

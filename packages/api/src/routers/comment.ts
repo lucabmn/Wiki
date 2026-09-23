@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import type { Database } from "@nilovon-wiki/db";
 import { comment } from "@nilovon-wiki/db/schema/index";
 
 import { protectedProcedure } from "../index";
@@ -20,6 +21,17 @@ import {
 import { IdSchema } from "../schemas/shared";
 
 const TAGS = ["Comments"];
+
+/**
+ * Loads a comment that has not been soft-deleted. A deleted comment is gone
+ * for the UI, so editing, resolving or replying to it is a NOT_FOUND rather
+ * than a silent write to a row nobody can see.
+ */
+async function loadLiveComment(db: Database, id: string) {
+  const row = await loadComment(db, id);
+  if (row.deletedAt) throw new ORPCError("NOT_FOUND", { message: "Comment not found" });
+  return row;
+}
 
 export const commentRouter = {
   list: protectedProcedure
@@ -56,7 +68,7 @@ export const commentRouter = {
       // A reply must thread under a comment on the same page — the FK alone
       // would accept a parent on any (possibly inaccessible) page.
       if (input.parentId) {
-        const parent = await loadComment(context.db, input.parentId);
+        const parent = await loadLiveComment(context.db, input.parentId);
         if (parent.pageId !== input.pageId) {
           throw new ORPCError("BAD_REQUEST", {
             message: "Parent comment belongs to a different page",
@@ -100,7 +112,7 @@ export const commentRouter = {
     .input(UpdateCommentInputSchema)
     .output(CommentSchema)
     .handler(async ({ input, context }) => {
-      const existing = await loadComment(context.db, input.id);
+      const existing = await loadLiveComment(context.db, input.id);
       const target = await loadPage(context.db, existing.pageId);
       // Authors edit their own; otherwise moderating (page editor+) is required.
       const { organizationId } = await requireOwnerOrPageCapability(
@@ -153,7 +165,7 @@ export const commentRouter = {
     .input(z.object({ id: IdSchema, resolved: z.boolean().default(true) }))
     .output(CommentSchema)
     .handler(async ({ input, context }) => {
-      const existing = await loadComment(context.db, input.id);
+      const existing = await loadLiveComment(context.db, input.id);
       const target = await loadPage(context.db, existing.pageId);
       // Any participant (commenter+) may resolve or reopen a thread.
       const { organizationId } = await requirePageCapability(
@@ -199,7 +211,7 @@ export const commentRouter = {
     .input(z.object({ id: IdSchema }))
     .output(z.object({ id: IdSchema }))
     .handler(async ({ input, context }) => {
-      const existing = await loadComment(context.db, input.id);
+      const existing = await loadLiveComment(context.db, input.id);
       const target = await loadPage(context.db, existing.pageId);
       // Authors delete their own; moderators (page editor+) delete anyone's.
       const { organizationId } = await requireOwnerOrPageCapability(

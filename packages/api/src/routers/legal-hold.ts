@@ -232,7 +232,9 @@ async function resolveSubject(
 ): Promise<string> {
   if (input.subject === "organization") return organizationId;
   if (!input.subjectId) {
-    throw new ORPCError("BAD_REQUEST", { message: "subjectId is required for this subject" });
+    throw new ORPCError("BAD_REQUEST", {
+      message: "Wähle den Bereich oder die Seite aus, die gesperrt werden soll.",
+    });
   }
   if (input.subject === "space") {
     const row = await loadSpace(db, input.subjectId, { includeTrashed: true });
