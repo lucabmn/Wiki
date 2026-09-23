@@ -17,6 +17,7 @@ import { Textarea } from "@nilovon-wiki/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, ExternalLinkIcon, Globe, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 /** The dialog edits an existing link, or creates one when nothing is selected. */
 type Draft = { link: ExternalLink | null };
@@ -47,7 +48,13 @@ export function PageExternalLinks({ pageId, canEdit }: { pageId: string; canEdit
     orpc.externalLinks.move.mutationOptions({ onSuccess: applyResult, onError: toastError }),
   );
   const remove = useMutation(
-    orpc.externalLinks.delete.mutationOptions({ onSuccess: applyResult, onError: toastError }),
+    orpc.externalLinks.delete.mutationOptions({
+      onSuccess: (next) => {
+        applyResult(next);
+        toast.success("Link entfernt");
+      },
+      onError: toastError,
+    }),
   );
 
   const items = links ?? [];

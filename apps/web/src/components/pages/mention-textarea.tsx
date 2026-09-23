@@ -115,7 +115,10 @@ export function MentionTextarea({
             return;
           }
           if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-            requestAnimationFrame(() => syncQuery(event.currentTarget));
+            // Captured now: React clears `currentTarget` once the handler returns,
+            // so reading it inside the frame callback threw.
+            const element = event.currentTarget;
+            requestAnimationFrame(() => syncQuery(element));
           }
         }}
       />

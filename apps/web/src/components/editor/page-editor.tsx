@@ -202,7 +202,11 @@ function PageEditorForm({
   // continuously autosaved by the collab server) and close.
   const handleSave = async () => {
     if (!(await syncBody())) return;
-    await update.mutateAsync({ id: page.id, title: title.trim() || "Ohne Titel" });
+    try {
+      await update.mutateAsync({ id: page.id, title: title.trim() || "Ohne Titel" });
+    } catch {
+      return; // Already toasted by `onError`; stay in the editor.
+    }
     toast.success("Entwurf gespeichert");
     await finish();
   };
@@ -212,11 +216,15 @@ function PageEditorForm({
   const handlePublish = async () => {
     if (!(await syncBody())) return;
     const editor = editorRef.current;
-    await publish.mutateAsync({
-      id: page.id,
-      title: title.trim() || "Ohne Titel",
-      ...(editor ? { content: editor.getJSON(), textContent: editor.getText() } : {}),
-    });
+    try {
+      await publish.mutateAsync({
+        id: page.id,
+        title: title.trim() || "Ohne Titel",
+        ...(editor ? { content: editor.getJSON(), textContent: editor.getText() } : {}),
+      });
+    } catch {
+      return; // Already toasted by `onError`; stay in the editor.
+    }
     toast.success(
       page.status === "published" ? "Änderungen veröffentlicht" : "Seite veröffentlicht",
     );

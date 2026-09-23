@@ -175,6 +175,7 @@ export function ArchiveDialog({
       onSuccess: () => {
         invalidatePages();
         onOpenChange(false);
+        toast.success("Seite archiviert");
         // The page is now hidden — send the reader back to its space (or home).
         if (spaceSlug) navigate({ to: "/spaces/$slug", params: { slug: spaceSlug } });
         else navigate({ to: "/" });
@@ -254,7 +255,7 @@ export function DeleteDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Seite in den Papierkorb?</AlertDialogTitle>
           <AlertDialogDescription>
-            „{page.title}" verschwindet mit allen Unterseiten aus allen Ansichten — Suche, Verweise
+            „{page.title}“ verschwindet mit allen Unterseiten aus allen Ansichten — Suche, Verweise
             und Favoriten inklusive. Bis zum Ablauf der Aufbewahrungsfrist kannst du sie im
             Papierkorb des Bereichs wiederherstellen.
           </AlertDialogDescription>

@@ -260,7 +260,12 @@ vi.mock("@/utils/orpc", () => ({
       myRole: {
         queryOptions: () => ({
           queryKey: ["myRole"],
-          queryFn: async () => ({ role: "editor", canWrite: data.canEdit, canManage: false }),
+          queryFn: async () => ({
+            role: "editor",
+            canWrite: data.canEdit,
+            canComment: true,
+            canManage: false,
+          }),
         }),
       },
     },
@@ -511,6 +516,8 @@ describe("page view route", () => {
 
   it("deletes a comment", async () => {
     data.page = somePage;
+    // Deleting someone else's comment is moderation, so it needs edit rights.
+    data.canEdit = true;
     data.comments = [
       { id: "c1", body: "Q", resolvedAt: null, deletedAt: null, createdAt: new Date() },
     ];

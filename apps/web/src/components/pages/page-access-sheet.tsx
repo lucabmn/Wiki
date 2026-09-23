@@ -93,14 +93,17 @@ export function PageAccessSheet({
       <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
         <SheetHeader className="border-b border-border">
           <SheetTitle>Seitenzugriff</SheetTitle>
-          <SheetDescription>Wer darf „{pageTitle}" sehen und bearbeiten.</SheetDescription>
+          <SheetDescription>Wer darf „{pageTitle}“ sehen und bearbeiten?</SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 space-y-6 overflow-y-auto p-4">
           <section className="space-y-2">
-            <h3 className="text-sm font-semibold">Sichtbarkeit</h3>
+            <h3 id="page-access-visibility" className="text-sm font-semibold">
+              Sichtbarkeit
+            </h3>
             <NativeSelect
               className="w-full"
+              aria-labelledby="page-access-visibility"
               value={access?.visibility ?? INHERIT}
               disabled={setVisibility.isPending || accessQuery.isPending}
               onChange={(event) =>
@@ -150,7 +153,7 @@ export function PageAccessSheet({
                 removePending={removeMember.isPending}
                 emptyState={
                   <p className="text-sm text-muted-foreground">
-                    Noch keine expliziten Mitglieder. Bei „Privat" hat sonst nur ein Space-Admin
+                    Noch keine expliziten Mitglieder. Bei „Privat“ hat sonst nur ein Space-Admin
                     Zugriff.
                   </p>
                 }

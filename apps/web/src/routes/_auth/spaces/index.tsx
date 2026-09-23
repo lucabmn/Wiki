@@ -90,9 +90,11 @@ function RouteComponent() {
           <p className="text-sm text-muted-foreground">
             {isPending
               ? "Spaces werden geladen …"
-              : total === 0
-                ? "Noch keine Spaces vorhanden."
-                : `${total} ${total === 1 ? "Space" : "Spaces"}, auf die du Zugriff hast.`}
+              : isError
+                ? "Spaces konnten nicht geladen werden."
+                : total === 0
+                  ? "Noch keine Spaces vorhanden."
+                  : `${total} ${total === 1 ? "Space" : "Spaces"}, auf die du Zugriff hast.`}
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>

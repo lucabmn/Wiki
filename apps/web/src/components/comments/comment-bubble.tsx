@@ -57,7 +57,11 @@ export function CommentBubble({
     editor.on("transaction", update);
     editor.on("focus", update);
     editor.on("blur", hide);
+    // The bubble is `fixed`, so it has to follow the selection when the page
+    // scrolls underneath it (capture: the scroll container is not the window).
+    window.addEventListener("scroll", update, true);
     return () => {
+      window.removeEventListener("scroll", update, true);
       editor.off("selectionUpdate", update);
       editor.off("transaction", update);
       editor.off("focus", update);
@@ -86,6 +90,7 @@ export function CommentBubble({
       <button
         type="button"
         title="Kommentieren (⌘/Strg + Alt + M)"
+        aria-keyshortcuts="Control+Alt+M Meta+Alt+M"
         onMouseDown={(event) => event.preventDefault()}
         onClick={onComment}
         className="flex items-center gap-1.5 rounded-md border bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground shadow-md transition-colors hover:bg-accent"

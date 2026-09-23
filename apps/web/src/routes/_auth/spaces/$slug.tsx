@@ -2,6 +2,7 @@ import { CreatePageDialog } from "@/components/create-page-dialog";
 import { HtmlImportDialog } from "@/components/html-import-dialog";
 import { SpaceSettingsSheet } from "@/components/spaces/space-settings-sheet";
 import DashboardLayout from "@/components/layouts/dashboard-layout";
+import { QueryError } from "@/components/query-error";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { STATUS_LABEL, VISIBILITY_LABEL } from "@/lib/labels";
 import { orpc } from "@/utils/orpc";
@@ -53,6 +54,12 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
 
 function RouteComponent() {
   const { slug } = Route.useParams();
+  // Keyed by slug: switching spaces from the sidebar must not carry over the
+  // previous space's search text or an open dialog.
+  return <SpaceView key={slug} slug={slug} />;
+}
+
+function SpaceView({ slug }: { slug: string }) {
   const [createPageOpen, setCreatePageOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -71,12 +78,22 @@ function RouteComponent() {
   // resolving the slug here is a lookup, not an extra round-trip in practice.
   // Archived spaces are included so this route can still open one: its settings
   // sheet holds the only "restore" affordance there is.
-  const { data: spaces, isPending: spacesPending } = useQuery(
-    orpc.spaces.list.queryOptions({ input: { includeArchived: true } }),
-  );
+  const {
+    data: spaces,
+    isPending: spacesPending,
+    isError: spacesError,
+    error: spacesErrorValue,
+    refetch: refetchSpaces,
+  } = useQuery(orpc.spaces.list.queryOptions({ input: { includeArchived: true } }));
   const space = spaces?.find((s) => s.slug === slug);
 
-  const { data: pages, isPending: pagesPending } = useQuery(
+  const {
+    data: pages,
+    isPending: pagesPending,
+    isError: pagesError,
+    error: pagesErrorValue,
+    refetch: refetchPages,
+  } = useQuery(
     orpc.pages.list.queryOptions({
       input: { spaceId: space?.id ?? "", parentId: null },
       enabled: Boolean(space),
@@ -111,6 +128,16 @@ function RouteComponent() {
     );
   }
 
+  if (spacesError) {
+    return (
+      <DashboardLayout className="p-7">
+        <div className="mx-auto w-full max-w-6xl">
+          <QueryError error={spacesErrorValue} onRetry={() => refetchSpaces()} />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   if (!space) {
     return (
       <DashboardLayout className="p-7">
@@ -126,9 +153,9 @@ function RouteComponent() {
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Link to="/spaces">
-                <Button variant="outline">Zu allen Spaces</Button>
-              </Link>
+              <Button variant="outline" nativeButton={false} render={<Link to="/spaces" />}>
+                Zu allen Spaces
+              </Button>
             </EmptyContent>
           </Empty>
         </div>
@@ -188,7 +215,7 @@ function RouteComponent() {
               ) : null}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canWriteSpace ? (
               <Button variant="outline" onClick={() => setImportOpen(true)}>
                 <FileUp className="size-4" />
@@ -201,10 +228,12 @@ function RouteComponent() {
                 Einstellungen
               </Button>
             ) : null}
-            <Button onClick={() => setCreatePageOpen(true)}>
-              <Plus className="size-4" />
-              Neue Seite
-            </Button>
+            {canWriteSpace ? (
+              <Button onClick={() => setCreatePageOpen(true)}>
+                <Plus className="size-4" />
+                Neue Seite
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -246,6 +275,8 @@ function RouteComponent() {
                   <Skeleton key={i} className="m-4 h-6" />
                 ))}
               </Card>
+            ) : pagesError ? (
+              <QueryError error={pagesErrorValue} onRetry={() => refetchPages()} />
             ) : total === 0 ? (
               <Empty className="rounded-xl border border-dashed">
                 <EmptyHeader>
@@ -254,15 +285,19 @@ function RouteComponent() {
                   </EmptyMedia>
                   <EmptyTitle>Noch keine Seiten</EmptyTitle>
                   <EmptyDescription>
-                    Dieser Space ist leer. Erstelle die erste Seite, um Inhalte zu sammeln.
+                    {canWriteSpace
+                      ? "Dieser Space ist leer. Erstelle die erste Seite, um Inhalte zu sammeln."
+                      : "In diesem Space gibt es noch keine Seiten."}
                   </EmptyDescription>
                 </EmptyHeader>
-                <EmptyContent>
-                  <Button onClick={() => setCreatePageOpen(true)}>
-                    <Plus className="size-4" />
-                    Neue Seite
-                  </Button>
-                </EmptyContent>
+                {canWriteSpace ? (
+                  <EmptyContent>
+                    <Button onClick={() => setCreatePageOpen(true)}>
+                      <Plus className="size-4" />
+                      Neue Seite
+                    </Button>
+                  </EmptyContent>
+                ) : null}
               </Empty>
             ) : filtered.length === 0 ? (
               <Empty className="rounded-xl border border-dashed">
@@ -318,7 +353,13 @@ function RouteComponent() {
         </div>
       </div>
 
-      <CreatePageDialog open={createPageOpen} spaceId={space.id} onOpenChange={setCreatePageOpen} />
+      {canWriteSpace ? (
+        <CreatePageDialog
+          open={createPageOpen}
+          spaceId={space.id}
+          onOpenChange={setCreatePageOpen}
+        />
+      ) : null}
       {canWriteSpace ? (
         <HtmlImportDialog
           open={importOpen}

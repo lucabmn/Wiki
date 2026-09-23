@@ -61,6 +61,9 @@ export function createMentionSuggestion(spaceId: string): Partial<MentionOptions
     render: () => {
       let component: ReactRenderer<MentionListRef, MentionListProps> | null = null;
       let el: HTMLElement | null = null;
+      // Escape hides the list; keys must then reach the editor again, or Enter
+      // would still pick an invisible entry. Same approach as the slash menu.
+      let dismissed = false;
 
       return {
         onStart: (props) => {
@@ -76,14 +79,17 @@ export function createMentionSuggestion(spaceId: string): Partial<MentionOptions
           place(el, props.clientRect);
         },
         onUpdate: (props) => {
+          if (dismissed) return;
           component?.updateProps({ items: props.items, command: props.command });
           if (el) place(el, props.clientRect);
         },
         onKeyDown: (props) => {
           if (props.event.key === "Escape") {
-            el?.remove();
+            dismissed = true;
+            if (el) el.style.display = "none";
             return true;
           }
+          if (dismissed) return false;
           return component?.ref?.onKeyDown({ event: props.event }) ?? false;
         },
         onExit: () => {

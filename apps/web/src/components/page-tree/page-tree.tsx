@@ -331,6 +331,7 @@ function PageTreeRow({
         <button
           type="button"
           aria-label={collapsed ? "Ausklappen" : "Einklappen"}
+          aria-expanded={!collapsed}
           onClick={onToggle}
           className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-sidebar-accent"
         >
@@ -344,6 +345,7 @@ function PageTreeRow({
       <button
         type="button"
         onClick={onSelect}
+        aria-current={isActive ? "page" : undefined}
         {...(draggable ? { ...sortable.attributes, ...sortable.listeners } : {})}
         // AFTER the listener spread on purpose: `useSortable` supplies its own
         // `onKeyDown`, and spreading it last silently replaced this handler —
@@ -371,7 +373,7 @@ function PageTreeRow({
         ) : (
           <FileText className="size-4 shrink-0 text-muted-foreground" />
         )}
-        <span className="truncate">{item.title}</span>
+        <span className="truncate">{item.title || "Ohne Titel"}</span>
       </button>
       {canReorder && (
         // The same four moves as a menu. The keyboard shortcuts above are
@@ -386,7 +388,7 @@ function PageTreeRow({
                 // Visible on hover and whenever it has focus — a control that
                 // only appears on hover is invisible to the keyboard.
                 className="size-6 shrink-0 opacity-0 focus-visible:opacity-100 group-hover/page-row:opacity-100"
-                aria-label={`Seite „${item.title}" verschieben`}
+                aria-label={`Seite „${item.title || "Ohne Titel"}" verschieben`}
               >
                 <MoreHorizontal className="size-3.5" />
               </Button>
