@@ -5,12 +5,12 @@ import { getStorage } from "@nilovon-wiki/api/lib/storage";
 import { assertTwoFactorCompliance } from "@nilovon-wiki/api/lib/two-factor-policy";
 import { appRouter } from "@nilovon-wiki/api/routers/index";
 import { env } from "@nilovon-wiki/env/server";
-import { call, ORPCError } from "@orpc/server";
+import { call } from "@orpc/server";
 import { Hono } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { pdfExportLimits, renderPagePdf } from "./export-pdf";
 import { resolveLiveUrl } from "./export-urls";
+import { errorResponse, MESSAGES } from "./http-errors";
 import { createImageLoader } from "./pdf/pdf-images";
 import {
   documentToHtml,
@@ -53,11 +53,11 @@ const EXTENSION: Record<ExportFormat, string> = {
 pageExportRoutes.get("/pages/:id", async (c) => {
   const format = c.req.query("format") as ExportFormat | undefined;
   if (!format || !FORMATS.has(format)) {
-    return c.json({ message: "format must be markdown, html, json, or pdf" }, 400);
+    return c.json({ message: MESSAGES.invalidFormat }, 400);
   }
 
   const context = await createContext({ context: c });
-  if (!context.session?.user) return c.json({ message: "Unauthorized" }, 401);
+  if (!context.session?.user) return c.json({ message: MESSAGES.unauthorized }, 401);
   const authedContext = context as AuthedContext;
 
   try {
@@ -97,10 +97,7 @@ pageExportRoutes.get("/pages/:id", async (c) => {
       },
     });
   } catch (error) {
-    if (error instanceof ORPCError) {
-      return c.json({ message: error.message }, (error.status || 500) as ContentfulStatusCode);
-    }
-    throw error;
+    return errorResponse(c, error);
   }
 });
 

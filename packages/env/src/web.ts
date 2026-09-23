@@ -23,6 +23,8 @@ export const env = createEnv({
       }),
   },
   runtimeEnv: (import.meta as unknown as ViteImportMeta).env,
-  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  // Guarded: this module also runs in the browser, where `process` only exists
+  // if the bundler happens to shim it.
+  skipValidation: typeof process !== "undefined" && !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: true,
 });

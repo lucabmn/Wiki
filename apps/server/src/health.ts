@@ -63,9 +63,20 @@ async function probe(
   }
 }
 
+/** Rejects once `ms` have passed, so a probe cannot outlive its budget. */
+function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${what} timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function probeDatabase() {
   return probe("database", async () => {
-    await pingDb();
+    // A database that accepts the TCP connection but never answers would
+    // otherwise hang `/health` itself — and with it the orchestrator's probe.
+    await withTimeout(pingDb(), PROBE_TIMEOUT_MS, "database ping");
   });
 }
 
@@ -91,10 +102,13 @@ async function probeStorage(): Promise<[string, { status: ComponentStatus; detai
  */
 async function probeCollab() {
   return probe("collab", async () => {
-    await fetch(collabUrl(), {
+    const response = await fetch(collabUrl(), {
       method: "GET",
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
+    // Only the fact of a reply matters; release the body so the connection
+    // is not held open until garbage collection.
+    await response.body?.cancel().catch(() => {});
   });
 }
 

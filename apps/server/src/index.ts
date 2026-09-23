@@ -59,10 +59,14 @@ app.use(
 
 // Page documents are the largest legitimate payloads; 10 MB leaves generous
 // headroom while bounding what an unauthenticated client can make us buffer.
-// Attachment uploads are exempt — they carry file bytes and enforce their own,
-// larger ceiling (ATTACHMENT_MAX_MB) inside the route.
+// Attachment and course-asset uploads are exempt — they carry file bytes and
+// enforce their own, larger ceiling (ATTACHMENT_MAX_MB) inside the route.
+// Without the course-asset exemption every lesson video over 10 MB was refused
+// with a bare "Payload Too Large" before its own limit was even consulted.
 app.use("/*", async (c, next) => {
-  if (c.req.path.startsWith("/attachments/")) return next();
+  if (c.req.path.startsWith("/attachments/") || c.req.path.startsWith("/course-assets/")) {
+    return next();
+  }
   return bodyLimit({ maxSize: 10 * 1024 * 1024 })(c, next);
 });
 
@@ -85,22 +89,24 @@ const SCIM_RESOURCE_PREFIX = "/api/auth/scim/v2/";
 // per request would leak both.
 const authRateLimit = rateLimit({ max: env.RATE_LIMIT_AUTH_MAX, keyPrefix: "auth" });
 
+// One general-purpose bucket for every API surface. Separate `rateLimit()`
+// instances would each hold their own map, so a client could spend
+// RATE_LIMIT_MAX on /rpc *and* again on /v1, /attachments, /exports, … .
+const apiRateLimit = rateLimit({
+  max: env.RATE_LIMIT_MAX,
+  keyPrefix: "api",
+  // A batched request (`x-orpc-batch`) bundles up to RPC_BATCH_MAX calls in
+  // one HTTP request; charge it for the whole batch so 10 calls cost 10, not 1.
+  weight: (c) => (c.req.header("x-orpc-batch") ? RPC_BATCH_MAX : 1),
+});
+
 app.use("/api/auth/*", async (c, next) => {
   if (c.req.path.startsWith(SCIM_RESOURCE_PREFIX)) return next();
   return authRateLimit(c, next);
 });
 app.use(`${SCIM_RESOURCE_PREFIX}*`, rateLimit({ max: env.RATE_LIMIT_SCIM_MAX, keyPrefix: "scim" }));
-app.use(
-  "/rpc/*",
-  rateLimit({
-    max: env.RATE_LIMIT_MAX,
-    keyPrefix: "api",
-    // A batched request (`x-orpc-batch`) bundles up to RPC_BATCH_MAX calls in
-    // one HTTP request; charge it for the whole batch so 10 calls cost 10, not 1.
-    weight: (c) => (c.req.header("x-orpc-batch") ? RPC_BATCH_MAX : 1),
-  }),
-);
-app.use("/v1/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
+app.use("/rpc/*", apiRateLimit);
+app.use("/v1/*", apiRateLimit);
 
 // The full dependency report opens a connection to object storage and to the
 // collaboration service on every call, so it is the one health route worth a
@@ -110,9 +116,9 @@ app.use("/v1/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
 // getting 429s during an incident is worse than useless.
 app.use("/health/ready", rateLimit({ max: 60, keyPrefix: "health" }));
 
-app.use("/attachments/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
-app.use("/course-assets/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
-app.use("/exports/*", rateLimit({ max: env.RATE_LIMIT_MAX, keyPrefix: "api" }));
+app.use("/attachments/*", apiRateLimit);
+app.use("/course-assets/*", apiRateLimit);
+app.use("/exports/*", apiRateLimit);
 
 // PUT/PATCH/DELETE are not optional here: SCIM 2.0 replaces (`PUT`), patches
 // (`PATCH`) and deprovisions (`DELETE`) users over these very routes, and

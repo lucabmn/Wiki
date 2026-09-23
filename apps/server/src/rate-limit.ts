@@ -63,7 +63,14 @@ export function rateLimit(options: {
 
     if (bucket.count > options.max) {
       c.header("Retry-After", String(resetSeconds));
-      return c.json({ error: "Too many requests" }, 429);
+      // `message` is what the auth client and the upload dialogs show as-is.
+      return c.json(
+        {
+          error: "Too many requests",
+          message: "Zu viele Anfragen. Bitte warte einen Moment und versuch es dann erneut.",
+        },
+        429,
+      );
     }
 
     await next();

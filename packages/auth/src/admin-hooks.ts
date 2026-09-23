@@ -203,7 +203,7 @@ function auditMetadata(
 /**
  * Plugin that audits every instance-admin action and enforces the impersonation
  * kill-switch. Registered after `admin()` so it observes that plugin's
- * endpoints; `db` is the handle `createAuth` already built, so audit writes
+ * endpoints; `db` is the shared handle `createAuth` passes in, so audit writes
  * share its pool.
  */
 export function adminAuditPlugin(db: Database) {

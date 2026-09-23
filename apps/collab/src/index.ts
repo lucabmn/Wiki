@@ -1,9 +1,10 @@
 import { Server } from "@hocuspocus/server";
 import { initLogger, log, parseError } from "evlog";
 
+import { closeDb } from "@nilovon-wiki/db";
 import { env } from "@nilovon-wiki/env/collab";
 
-import { createCollabConfiguration } from "./hocuspocus";
+import { createCollabConfiguration, settleStores } from "./hocuspocus";
 
 /**
  * Real-time collaboration server for page bodies — long-lived process entry.
@@ -78,7 +79,8 @@ server
   });
 
 // Flush open documents before exiting: `destroy()` runs the debounced store
-// for every open doc, so a rolling restart doesn't drop in-flight edits.
+// for every open doc, so a rolling restart doesn't drop in-flight edits. Only
+// then is the pool drained, so those final writes still have a connection.
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
@@ -87,6 +89,8 @@ async function shutdown(signal: string): Promise<void> {
   log.info({ source: "collab", msg: "shutting down", signal });
   try {
     await server.destroy();
+    await settleStores();
+    await closeDb();
   } catch (error) {
     log.error({ source: "collab", msg: "shutdown error", ...parseError(error) });
   }

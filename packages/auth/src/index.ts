@@ -1,4 +1,4 @@
-import { createDb } from "@nilovon-wiki/db";
+import { db } from "@nilovon-wiki/db";
 import * as schema from "@nilovon-wiki/db/schema/auth";
 import { env } from "@nilovon-wiki/env/server";
 import { betterAuth } from "better-auth";
@@ -12,14 +12,12 @@ import { adminAuditPlugin } from "./admin-hooks";
 import { INSTANCE_ADMIN_ROLES, INSTANCE_ROLE_ADMIN, isInitialAdminEmail } from "./instance-admin";
 import { actionMail, sendMail } from "./mail";
 import { ac, roles } from "./permissions";
-import { cachedSessionVersion } from "./session-revocation";
+import { cachedSessionVersion, invalidateCachedSessions } from "./session-revocation";
 import { signupPolicyPlugin } from "./signup-policy";
 import { SSO_DOMAIN_TOKEN_PREFIX } from "./sso-domain";
 import { localization } from "better-auth-localization";
 
 export function createAuth() {
-  const db = createDb();
-
   // Fail fast rather than at the first registration: requiring verification
   // without a mail server means every new account is created and then locked
   // out, with nothing in the logs pointing at the cause.
@@ -122,6 +120,14 @@ export function createAuth() {
       // account. `createAuth` refuses to start in that combination, so by the
       // time this is true mail delivery is known to be configured.
       requireEmailVerification: env.REQUIRE_EMAIL_VERIFICATION,
+      // A reset is how someone recovers an account they believe is compromised;
+      // leaving the other sessions alive would let the intruder stay signed in.
+      revokeSessionsOnPasswordReset: true,
+      // …and their cached session cookies with them, or the revocation above
+      // would only bite once the five-minute cookie cache runs out.
+      onPasswordReset: async ({ user }) => {
+        invalidateCachedSessions(user.id);
+      },
       sendResetPassword: async ({ user, url }) => {
         await sendMail({
           to: user.email,

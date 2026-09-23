@@ -7,11 +7,11 @@ import { assertTwoFactorCompliance } from "@nilovon-wiki/api/lib/two-factor-poli
 import { space as spaceTable } from "@nilovon-wiki/db/schema/index";
 import { ZipArchive } from "archiver";
 import { eq } from "drizzle-orm";
-import { ORPCError } from "@orpc/server";
 import { Hono } from "hono";
 
 import { buildExportReport, pdfExportLimits, renderPagePdf, type ReportEntry } from "./export-pdf";
 import { resolveArchiveUrl } from "./export-urls";
+import { errorResponse, MESSAGES } from "./http-errors";
 import { placeholderPdf } from "./pdf/document-to-pdf";
 import { createImageLoader } from "./pdf/pdf-images";
 import {
@@ -37,11 +37,11 @@ export const spaceExportRoutes = new Hono();
 spaceExportRoutes.get("/spaces/:id", async (c) => {
   const format = c.req.query("format") as ExportFormat | undefined;
   if (!format || !FORMATS.has(format)) {
-    return c.json({ message: "format must be markdown, html, json, or pdf" }, 400);
+    return c.json({ message: MESSAGES.invalidFormat }, 400);
   }
 
   const context = await createContext({ context: c });
-  if (!context.session?.user) return c.json({ message: "Unauthorized" }, 401);
+  if (!context.session?.user) return c.json({ message: MESSAGES.unauthorized }, 401);
   const authedContext = context as AuthedContext;
   const authorizationSpace = await context.db.query.space.findFirst({
     where: eq(spaceTable.id, c.req.param("id")),
@@ -49,7 +49,7 @@ spaceExportRoutes.get("/spaces/:id", async (c) => {
   // A trashed space behaves as missing everywhere, exports included — otherwise
   // "deleted" would still be one URL away from a full archive of its contents.
   if (!authorizationSpace || authorizationSpace.deletedAt) {
-    return c.json({ message: "Space not found" }, 404);
+    return c.json({ message: "Dieser Space wurde nicht gefunden." }, 404);
   }
 
   try {
@@ -65,22 +65,34 @@ spaceExportRoutes.get("/spaces/:id", async (c) => {
       "manage",
     );
   } catch (error) {
-    if (error instanceof ORPCError) {
-      return c.json({ message: error.message }, error.status === 403 ? 403 : 500);
-    }
-    throw error;
+    // The same status mapping as every other route here: a two-factor refusal
+    // or a missing grant must not surface as a 500.
+    return errorResponse(c, error);
   }
 
   const snapshot = await loadSpaceSnapshot(context.db, authorizationSpace.id);
-  if (!snapshot) return c.json({ message: "Space changed during export" }, 409);
+  if (!snapshot) {
+    return c.json(
+      { message: "Der Space wurde während des Exports geändert. Bitte versuch es erneut." },
+      409,
+    );
+  }
   const { space, pages, attachments } = snapshot;
-  if (space.deletionPendingAt) return c.json({ message: "Space deletion is pending" }, 409);
+  if (space.deletionPendingAt) {
+    return c.json(
+      { message: "Dieser Space wird gerade gelöscht und kann nicht exportiert werden." },
+      409,
+    );
+  }
   if (attachments.some((item) => item.deletionPendingAt)) {
-    return c.json({ message: "Attachment deletion is pending" }, 409);
+    return c.json(
+      { message: "Ein Anhang dieses Space wird gerade gelöscht. Bitte versuch es später erneut." },
+      409,
+    );
   }
 
   const storage = getStorage();
-  if (attachments.length && !storage) return c.json({ message: "Attachments are disabled" }, 501);
+  if (attachments.length && !storage) return c.json({ message: MESSAGES.storageDisabled }, 501);
 
   const limits = format === "pdf" ? pdfExportLimits() : null;
   const paths = buildArchivePaths(snapshot, format);

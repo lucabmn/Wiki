@@ -57,7 +57,7 @@ export function pageEditorExtensions(options?: {
   /**
    * Browser-only renderer for the diagram node. The NODE is always in the
    * schema — the collab server has to know it, or it drops every diagram when
-   * it projects the Yjs document back to `content`. Only the view that turns
+   * it seeds the Yjs document from the published `content`. Only the view that turns
    * the source into an SVG (and lazy-loads Mermaid) is passed in here, by
    * `apps/web`; the server and the read-only renderer never do.
    */
@@ -91,11 +91,11 @@ export function pageEditorExtensions(options?: {
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     // Inline-comment anchor. Like the mention node it is unconditionally part
     // of the schema: the collab server drops marks it doesn't know when it
-    // projects the Yjs document into `page.content`, and the read-only renderer
+    // seeds the Yjs document from `page.content`, and the read-only renderer
     // needs it to serialize the highlight readers click on.
     CommentMark,
-    // `@mention` node. `renderText` feeds the plaintext search projection and the
-    // collab server's `textContent`, so a mention reads as "@Name" everywhere.
+    // `@mention` node. `renderText` feeds the plaintext search projection
+    // (`textContent`), so a mention reads as "@Name" everywhere.
     Mention.configure({
       HTMLAttributes: { class: "mention" },
       deleteTriggerWithBackspace: true,

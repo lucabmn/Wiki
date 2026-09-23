@@ -50,9 +50,9 @@ function mermaidSource(element: ParsedElement): string | null {
  *
  * This is the SPEC only: no React, no Mermaid import, nothing that needs a DOM
  * beyond ProseMirror's own serializer. It has to load in the collab server's
- * Node process (`apps/collab`), which projects the Yjs document back to
- * `content`/`textContent` against exactly this schema — a browser-only node type
- * would be dropped there and the diagram would vanish for everyone else. The
+ * Node process (`apps/collab`), which seeds the Yjs document from the published
+ * `content` against exactly this schema — a browser-only node type would be
+ * dropped there and the diagram would vanish for everyone else. The
  * rendering half is a node view added in `apps/web`
  * (`pageEditorExtensions({ mermaidNodeView })`), the same split the mention node
  * uses for its suggestion popup.
