@@ -7,8 +7,10 @@ import { SettingsCard, SettingsSection } from "@/components/settings/settings-se
 import { orpc } from "@/utils/orpc";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
+import { pageTitle } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_auth/admin/")({
+  head: () => pageTitle("Instanz-Verwaltung"),
   component: InstanceOverview,
 });
 

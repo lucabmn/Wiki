@@ -8,6 +8,7 @@ import {
   LegalHoldControl,
   useOrganizationHoldStatus,
 } from "@/components/lifecycle/legal-hold-control";
+import { QueryError } from "@/components/query-error";
 import { LegalHoldTable } from "@/components/lifecycle/legal-hold-table";
 import { TrashedSpaces } from "@/components/lifecycle/trashed-spaces";
 import { PermissionGate } from "@/components/settings/permission-gate";
@@ -17,6 +18,7 @@ import type { RetentionPolicy } from "@/components/settings/retention-form";
 import { SettingsCard, SettingsSection } from "@/components/settings/settings-section";
 import { formatDateTime } from "@/lib/format";
 import { toastError } from "@/lib/query";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
@@ -24,6 +26,7 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 const ORG_UPDATE: PermissionRequest[] = [{ organization: ["update"] }];
 
 export const Route = createFileRoute("/_auth/settings/data-lifecycle")({
+  head: () => pageTitle("Daten & Fristen", "Einstellungen"),
   component: () => (
     <PermissionGate permissions={ORG_UPDATE}>
       <DataLifecycle />
@@ -76,6 +79,10 @@ function DataLifecycle() {
       onError: toastError,
     }),
   );
+
+  if (settingsQuery.isError) {
+    return <QueryError error={settingsQuery.error} onRetry={() => settingsQuery.refetch()} />;
+  }
 
   if (settingsQuery.isPending || !draft) {
     return (

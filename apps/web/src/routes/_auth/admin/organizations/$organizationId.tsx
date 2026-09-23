@@ -7,11 +7,13 @@ import { QueryError } from "@/components/query-error";
 import { SettingsCard, SettingsSection } from "@/components/settings/settings-section";
 import { formatDate } from "@/lib/format";
 import { VISIBILITY_LABEL } from "@/lib/labels";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 
 export const Route = createFileRoute("/_auth/admin/organizations/$organizationId")({
+  head: () => pageTitle("Organisation", "Instanz-Verwaltung"),
   component: AdminOrganizationDetail,
 });
 

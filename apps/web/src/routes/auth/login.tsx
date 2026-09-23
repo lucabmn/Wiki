@@ -1,8 +1,10 @@
 import { useEffect } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import SignInForm from "@/components/auth/sign-in-form";
+import { getSignedIn } from "@/functions/get-session";
+import { pageTitle } from "@/lib/page-title";
 
 /**
  * A failed SSO sign-in comes *back* here as a redirect, not as a rejected
@@ -15,6 +17,7 @@ import SignInForm from "@/components/auth/sign-in-form";
 type SSOCallbackSearch = { error?: string; error_description?: string };
 
 export const Route = createFileRoute("/auth/login")({
+  head: () => pageTitle("Anmelden"),
   // Both keys stay *optional properties* rather than `string | undefined`: every
   // other route links here with a bare `to: "/auth/login"`, and a union type
   // would make `search` a required argument at all ten of those call sites.
@@ -24,6 +27,11 @@ export const Route = createFileRoute("/auth/login")({
       ? { error_description: search.error_description }
       : {}),
   }),
+  // Guest-only: someone already signed in has nothing to do here.
+  beforeLoad: async () => {
+    const { signedIn } = await getSignedIn();
+    if (signedIn) throw redirect({ to: "/" });
+  },
   component: RouteComponent,
 });
 

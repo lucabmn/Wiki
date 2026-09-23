@@ -6,6 +6,8 @@ import { Building2, Search } from "lucide-react";
 import { Pager, formatBytes } from "@/components/admin/admin-ui";
 import { QueryError } from "@/components/query-error";
 import { formatDate } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import {
   Empty,
@@ -18,6 +20,7 @@ import { Input } from "@nilovon-wiki/ui/components/input";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 
 export const Route = createFileRoute("/_auth/admin/organizations/")({
+  head: () => pageTitle("Organisationen", "Instanz-Verwaltung"),
   component: AdminOrganizations,
 });
 
@@ -28,10 +31,11 @@ const numberFormat = new Intl.NumberFormat("de-DE");
 function AdminOrganizations() {
   const [query, setQuery] = useState("");
   const [offset, setOffset] = useState(0);
+  const search = useDebouncedValue(query, 250);
 
   const { data, isPending, isError, error, refetch } = useQuery(
     orpc.admin.organizations.list.queryOptions({
-      input: { query: query.trim() || undefined, limit: PAGE_SIZE, offset },
+      input: { query: search || undefined, limit: PAGE_SIZE, offset },
       placeholderData: keepPreviousData,
     }),
   );
@@ -73,8 +77,8 @@ function AdminOrganizations() {
             </EmptyMedia>
             <EmptyTitle>Keine Organisation gefunden</EmptyTitle>
             <EmptyDescription>
-              {query
-                ? `Nichts passt zu „${query.trim()}".`
+              {search
+                ? `Nichts passt zu „${search}“.`
                 : "Auf dieser Instanz existiert noch keine Organisation."}
             </EmptyDescription>
           </EmptyHeader>

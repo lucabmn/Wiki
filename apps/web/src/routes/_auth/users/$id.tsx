@@ -7,6 +7,7 @@ import { QueryError } from "@/components/query-error";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { formatDate, initials, timeAgo } from "@/lib/format";
 import { ACTION_LABEL, ROLE_LABEL, ROLE_VARIANT, STATUS_LABEL } from "@/lib/labels";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import { Avatar, AvatarFallback, AvatarImage } from "@nilovon-wiki/ui/components/avatar";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
@@ -15,6 +16,7 @@ import { Card } from "@nilovon-wiki/ui/components/card";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 
 export const Route = createFileRoute("/_auth/users/$id")({
+  head: () => pageTitle("Person"),
   component: RouteComponent,
 });
 

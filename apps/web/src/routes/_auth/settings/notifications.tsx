@@ -4,8 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, Inbox, Lock, MailX } from "lucide-react";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { orpc } from "@/utils/orpc";
 import { toastError } from "@/lib/query";
+import { pageTitle } from "@/lib/page-title";
 import { SettingsCard, SettingsSection } from "@/components/settings/settings-section";
 import {
   DigestForm,
@@ -19,6 +21,7 @@ import { Button } from "@nilovon-wiki/ui/components/button";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 
 export const Route = createFileRoute("/_auth/settings/notifications")({
+  head: () => pageTitle("Benachrichtigungen", "Einstellungen"),
   component: NotificationSettings,
 });
 
@@ -66,6 +69,10 @@ function NotificationSettings() {
       onError: toastError,
     }),
   );
+
+  if (settingsQuery.isError) {
+    return <QueryError error={settingsQuery.error} onRetry={() => settingsQuery.refetch()} />;
+  }
 
   if (settingsQuery.isPending || !draft || !settingsQuery.data) {
     return (

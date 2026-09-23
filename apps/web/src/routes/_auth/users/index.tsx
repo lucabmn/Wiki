@@ -7,6 +7,7 @@ import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { QueryError } from "@/components/query-error";
 import { formatDate, initials } from "@/lib/format";
 import { ROLE_LABEL, ROLE_VARIANT } from "@/lib/labels";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import { Avatar, AvatarFallback, AvatarImage } from "@nilovon-wiki/ui/components/avatar";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
@@ -23,6 +24,7 @@ import { Input } from "@nilovon-wiki/ui/components/input";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 
 export const Route = createFileRoute("/_auth/users/")({
+  head: () => pageTitle("Personen"),
   component: RouteComponent,
 });
 

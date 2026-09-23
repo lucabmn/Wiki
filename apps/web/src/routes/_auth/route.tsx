@@ -15,7 +15,13 @@ export const Route = createFileRoute("/_auth")({
     // The auth middleware already redirects unauthenticated/org-less requests,
     // but guard here too so the context below is genuinely non-null.
     if (!auth.session) throw redirect({ to: "/auth/login" });
-    if (!auth.organization) throw redirect({ to: "/auth/onboarding" });
+    // Reaching this point without an organization means the user *has* one
+    // that could not be activated or loaded (the middleware sends everyone
+    // without a membership to onboarding). Onboarding would only offer to
+    // create a duplicate — an error with a retry is the honest answer.
+    if (!auth.organization) {
+      throw new Error("Deine Organisation konnte gerade nicht geladen werden.");
+    }
 
     return {
       auth: {

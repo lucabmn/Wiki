@@ -8,6 +8,8 @@ import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BatchLinkPlugin } from "@orpc/client/plugins";
 
+import { getServerUrl } from "@/lib/server-url";
+
 /**
  * Map transport/oRPC errors to friendly German copy instead of dumping raw
  * backend messages (often English or technical) into a toast.
@@ -61,33 +63,6 @@ export function createQueryClient() {
   });
 }
 
-function getServerUrl(url: string) {
-  const normalized = url.endsWith("/") ? url.slice(0, -1) : url;
-
-  if (!normalized.startsWith("/")) {
-    return normalized;
-  }
-
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}${normalized}`;
-  }
-
-  const processEnv = (
-    globalThis as {
-      process?: { env?: Record<string, string | undefined> };
-    }
-  ).process?.env;
-  const vercelUrl =
-    processEnv?.VERCEL_ENV === "production"
-      ? (processEnv?.VERCEL_PROJECT_PRODUCTION_URL ?? processEnv?.VERCEL_URL)
-      : (processEnv?.VERCEL_URL ?? processEnv?.VERCEL_PROJECT_PRODUCTION_URL);
-  if (vercelUrl) {
-    const origin = vercelUrl.startsWith("http") ? vercelUrl : `https://${vercelUrl}`;
-    return `${origin}${normalized}`;
-  }
-
-  return `http://localhost:3000${normalized}`;
-}
 const link = new RPCLink({
   url: `${getServerUrl(env.VITE_SERVER_URL)}/rpc`,
   fetch(url, options) {

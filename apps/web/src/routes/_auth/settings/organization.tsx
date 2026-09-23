@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { authClient } from "@/lib/auth-client";
+import { orgSlugSchema } from "@/lib/org-slug";
 import { usePermission } from "@/lib/permissions";
 import { toastError } from "@/lib/query";
 import { useOrgRefresh } from "@/lib/org-queries";
+import { pageTitle } from "@/lib/page-title";
 import { PermissionGate } from "@/components/settings/permission-gate";
 import { SettingsCard, SettingsSection } from "@/components/settings/settings-section";
 import {
@@ -35,20 +37,13 @@ import { useForm } from "@tanstack/react-form";
 const ORG_UPDATE: PermissionRequest[] = [{ organization: ["update"] }];
 
 export const Route = createFileRoute("/_auth/settings/organization")({
+  head: () => pageTitle("Organisation", "Einstellungen"),
   component: () => (
     <PermissionGate permissions={ORG_UPDATE}>
       <OrganizationSettings />
     </PermissionGate>
   ),
 });
-
-// Better Auth looks organizations up by slug, so it must stay URL-safe and
-// stable — the same shape the onboarding form enforces.
-const slugSchema = z
-  .string()
-  .min(2, "Mindestens 2 Zeichen")
-  .max(48, "Höchstens 48 Zeichen")
-  .regex(/^[a-z0-9-]+$/, "Nur Kleinbuchstaben, Ziffern und Bindestriche");
 
 function OrganizationSettings() {
   const { auth } = Route.useRouteContext();
@@ -69,7 +64,7 @@ function OrganizationSettings() {
 
 const formSchema = z.object({
   name: z.string().min(1, "Name darf nicht leer sein"),
-  slug: slugSchema,
+  slug: orgSlugSchema,
   logo: z.url("Ungültige URL").or(z.literal("")),
 });
 
@@ -97,7 +92,16 @@ function GeneralForm({
           logo: logo.trim() === "" ? null : logo.trim(),
         },
       });
-      if (result.error) throw new Error(result.error.message ?? "Speichern fehlgeschlagen");
+      if (result.error) {
+        // better-auth's messages are English; the one failure worth naming is
+        // a slug another organization already uses.
+        throw new Error(
+          result.error.code === "ORGANIZATION_SLUG_ALREADY_TAKEN" ||
+            result.error.code === "ORGANIZATION_ALREADY_EXISTS"
+            ? "Dieser Kurzname ist bereits vergeben."
+            : "Speichern fehlgeschlagen. Bitte versuche es erneut.",
+        );
+      }
       return result.data;
     },
     onSuccess: async () => {
@@ -105,7 +109,7 @@ function GeneralForm({
       await router.invalidate();
       toast.success("Organisation gespeichert");
     },
-    onError: toastError,
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const form = useForm({
@@ -222,8 +226,8 @@ function GeneralForm({
           </FieldGroup>
 
           <Field orientation="horizontal" className="flex justify-end">
-            <Button type="submit" size="sm" form="org-settings-form">
-              Speichern
+            <Button type="submit" size="sm" form="org-settings-form" disabled={save.isPending}>
+              {save.isPending ? "Speichern …" : "Speichern"}
             </Button>
           </Field>
         </form>
@@ -289,7 +293,7 @@ function DangerZone({ organizationId, name }: { organizationId: string; name: st
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>„{name}" endgültig löschen?</AlertDialogTitle>
+            <AlertDialogTitle>„{name}“ endgültig löschen?</AlertDialogTitle>
             <AlertDialogDescription>
               Alle Inhalte dieser Organisation gehen verloren. Tippe zur Bestätigung den Namen der
               Organisation ein.

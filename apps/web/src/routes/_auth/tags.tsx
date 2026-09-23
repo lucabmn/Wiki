@@ -1,6 +1,7 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { QueryError } from "@/components/query-error";
 import { timeAgo } from "@/lib/format";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card } from "@nilovon-wiki/ui/components/card";
@@ -18,7 +19,7 @@ import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FileText, Folder, Search, Tag, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type TagsSearch = { space: string; tag: string; q: string };
 
@@ -26,6 +27,7 @@ type TagsSearch = { space: string; tag: string; q: string };
 const PAGE_LIMIT = 100;
 
 export const Route = createFileRoute("/_auth/tags")({
+  head: () => pageTitle("Tags"),
   validateSearch: (search: Record<string, unknown>): TagsSearch => ({
     space: typeof search.space === "string" ? search.space : "",
     tag: typeof search.tag === "string" ? search.tag : "",
@@ -47,9 +49,8 @@ function TagDot({ color }: { color: string | null }) {
 function RouteComponent() {
   const { space, tag, q } = Route.useSearch();
   const navigate = useNavigate();
-  const { data: spaces, isPending: spacesPending } = useQuery(
-    orpc.spaces.list.queryOptions({ input: {} }),
-  );
+  const spacesQuery = useQuery(orpc.spaces.list.queryOptions({ input: {} }));
+  const spaces = spacesQuery.data;
 
   const selectedSpaceId = space || spaces?.[0]?.id || "";
   const selectedSpace = spaces?.find((candidate) => candidate.id === selectedSpaceId);
@@ -69,10 +70,20 @@ function RouteComponent() {
   // The URL owns the filter (shareable, survives reload); the input owns the
   // keystrokes and pushes them over debounced.
   const [term, setTerm] = useState(q);
-  useEffect(() => setTerm(q), [q]);
+  // Follow outside changes of `q` (back/forward, links) — but not the echo of
+  // our own debounced write: the navigation is async, and resetting the input
+  // to the value it had when the write started would drop keys typed since.
+  const written = useRef(q);
+  useEffect(() => {
+    if (q !== written.current) {
+      written.current = q;
+      setTerm(q);
+    }
+  }, [q]);
   useEffect(() => {
     if (term === q) return;
     const timer = setTimeout(() => {
+      written.current = term;
       navigate({ to: "/tags", search: { space: selectedSpaceId, tag, q: term }, replace: true });
     }, 200);
     return () => clearTimeout(timer);
@@ -129,7 +140,9 @@ function RouteComponent() {
         ) : null}
       </header>
 
-      {!spacesPending && !spaces?.length ? (
+      {spacesQuery.isError ? (
+        <QueryError error={spacesQuery.error} onRetry={() => spacesQuery.refetch()} />
+      ) : spacesQuery.isSuccess && !spaces?.length ? (
         <Empty className="border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -145,6 +158,8 @@ function RouteComponent() {
             <div className="relative sm:max-w-xs">
               <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                type="search"
+                aria-label="Tags filtern"
                 value={term}
                 onChange={(event) => setTerm(event.target.value)}
                 placeholder="Tags filtern …"

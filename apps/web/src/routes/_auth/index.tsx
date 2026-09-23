@@ -5,6 +5,7 @@ import { QueryError } from "@/components/query-error";
 import { DEFAULT_SPACE_COLOR } from "@/lib/constants";
 import { timeAgo } from "@/lib/format";
 import { ACTION_LABEL } from "@/lib/labels";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card } from "@nilovon-wiki/ui/components/card";
@@ -34,6 +35,7 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/_auth/")({
+  head: () => pageTitle("Übersicht"),
   component: RouteComponent,
 });
 
@@ -125,7 +127,9 @@ function Header() {
   const { auth } = Route.useRouteContext();
   const [newPageOpen, setNewPageOpen] = useState(false);
 
-  const { data: overview } = useQuery(orpc.dashboard.overview.queryOptions({ input: {} }));
+  const { data: overview, isError: overviewFailed } = useQuery(
+    orpc.dashboard.overview.queryOptions({ input: {} }),
+  );
   const { data: spaces } = useQuery(orpc.spaces.list.queryOptions({ input: {} }));
 
   // One factual line instead of a stat wall: how much there is to read, how
@@ -146,7 +150,9 @@ function Header() {
         <h1 className="text-xl font-semibold tracking-tight">{auth.organization.name}</h1>
         {summary ? (
           <p className="text-sm text-muted-foreground">{summary}</p>
-        ) : (
+        ) : overviewFailed ? null : (
+          // A failed count is not worth an inline error (the global toast
+          // reports it) — but it must not shimmer forever either.
           <Skeleton className="mt-1.5 h-3.5 w-56" />
         )}
       </div>

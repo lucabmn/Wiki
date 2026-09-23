@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Search, ShieldBan, Users, X } from "lucide-react";
@@ -6,6 +6,8 @@ import { Search, ShieldBan, Users, X } from "lucide-react";
 import { InstanceRoleBadge, Pager } from "@/components/admin/admin-ui";
 import { QueryError } from "@/components/query-error";
 import { formatDate, initials, timeAgo } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import { Avatar, AvatarFallback, AvatarImage } from "@nilovon-wiki/ui/components/avatar";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
@@ -23,6 +25,7 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@nilovon-wiki/ui/components/tabs";
 
 export const Route = createFileRoute("/_auth/admin/users/")({
+  head: () => pageTitle("Benutzer", "Instanz-Verwaltung"),
   component: AdminUsers,
 });
 
@@ -39,12 +42,16 @@ type Filter = (typeof FILTERS)[number]["value"];
 function AdminUsers() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [offset, setOffset] = useState(0);
-  const search = useDebounced(query, 250);
+  const search = useDebouncedValue(query, 250);
 
   // Any narrowing invalidates the current page; staying on page 4 of a
-  // three-page result would show an empty list that looks like a failure.
-  useEffect(() => setOffset(0), [search, filter]);
+  // three-page result would show an empty list that looks like a failure. The
+  // offset is keyed to the narrowing it belongs to, so a new search starts at
+  // page one in the same render — no effect, no request for the stale page.
+  const scope = `${filter}\u0000${search}`;
+  const [paging, setPaging] = useState({ scope, offset: 0 });
+  const offset = paging.scope === scope ? paging.offset : 0;
+  const setOffset = (next: number) => setPaging({ scope, offset: next });
 
   const { data, isPending, isError, error, refetch } = useQuery(
     orpc.admin.users.list.queryOptions({
@@ -111,7 +118,7 @@ function AdminUsers() {
             <EmptyTitle>Keine Treffer</EmptyTitle>
             <EmptyDescription>
               {search
-                ? `Kein Konto passt zu „${search}".`
+                ? `Kein Konto passt zu „${search}“.`
                 : "In dieser Ansicht gibt es keine Konten."}
             </EmptyDescription>
           </EmptyHeader>
@@ -178,14 +185,4 @@ function Stat({ label, value }: { label: string; value: number }) {
       <dd className="text-sm tabular-nums">{value}</dd>
     </div>
   );
-}
-
-/** Keeps the search box responsive without firing a query per keystroke. */
-function useDebounced(value: string, delayMs: number): string {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value.trim()), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
 }

@@ -5,9 +5,11 @@ import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 import { MoreHorizontal, Plus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { authClient } from "@/lib/auth-client";
 import { toastError } from "@/lib/query";
 import { teamsQueryOptions, useOrgRefresh } from "@/lib/org-queries";
+import { pageTitle } from "@/lib/page-title";
 import { PermissionGate } from "@/components/settings/permission-gate";
 import { SettingsSection } from "@/components/settings/settings-section";
 import { TeamMembersSheet, type TeamTarget } from "@/components/settings/team-members-sheet";
@@ -53,6 +55,7 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 const TEAM_MANAGE: PermissionRequest[] = [{ team: ["create"] }];
 
 export const Route = createFileRoute("/_auth/settings/teams")({
+  head: () => pageTitle("Teams", "Einstellungen"),
   component: () => (
     <PermissionGate permissions={TEAM_MANAGE}>
       <TeamsSettings />
@@ -105,6 +108,8 @@ function TeamsSettings() {
               <Skeleton key={row} className="h-20 w-full rounded-xl" />
             ))}
           </div>
+        ) : teamsQuery.isError ? (
+          <QueryError error={teamsQuery.error} onRetry={() => teamsQuery.refetch()} />
         ) : teams.length === 0 ? (
           <Empty className="rounded-xl border border-dashed border-border">
             <EmptyHeader>
@@ -113,7 +118,7 @@ function TeamsSettings() {
               </EmptyMedia>
               <EmptyTitle>Noch keine Teams</EmptyTitle>
               <EmptyDescription>
-                Ein Team wie „Produktion" lässt sich in einem Space mit einer Rolle hinterlegen —
+                Ein Team wie „Produktion“ lässt sich in einem Space mit einer Rolle hinterlegen —
                 statt jede Person einzeln einzutragen.
               </EmptyDescription>
             </EmptyHeader>
@@ -197,7 +202,7 @@ function TeamsSettings() {
             <AlertDialogTitle>Team löschen?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget
-                ? `„${deleteTarget.name}" wird gelöscht. Spaces und Seiten, die dieses Team als Mitglied führen, verlieren diesen Zugang.`
+                ? `„${deleteTarget.name}“ wird gelöscht. Spaces und Seiten, die dieses Team als Mitglied führen, verlieren diesen Zugang.`
                 : null}
             </AlertDialogDescription>
           </AlertDialogHeader>

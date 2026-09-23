@@ -4,8 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { orpc } from "@/utils/orpc";
 import { toastError } from "@/lib/query";
+import { pageTitle } from "@/lib/page-title";
 import { PermissionGate } from "@/components/settings/permission-gate";
 import { DirectNotificationDefaults } from "@/components/settings/direct-notification-defaults";
 import { SettingsCard, SettingsSection } from "@/components/settings/settings-section";
@@ -21,6 +23,7 @@ import { Switch } from "@nilovon-wiki/ui/components/switch";
 const ORG_UPDATE: PermissionRequest[] = [{ organization: ["update"] }];
 
 export const Route = createFileRoute("/_auth/settings/notification-defaults")({
+  head: () => pageTitle("Standard-Benachrichtigungen", "Einstellungen"),
   component: () => (
     <PermissionGate permissions={ORG_UPDATE}>
       <NotificationDefaults />
@@ -61,6 +64,10 @@ function NotificationDefaults() {
       onError: toastError,
     }),
   );
+
+  if (defaultsQuery.isError) {
+    return <QueryError error={defaultsQuery.error} onRetry={() => defaultsQuery.refetch()} />;
+  }
 
   if (defaultsQuery.isPending || !draft) {
     return (

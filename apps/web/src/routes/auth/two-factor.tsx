@@ -4,11 +4,13 @@ import { toast } from "sonner";
 
 import AuthLayout from "@/components/layouts/auth-layout";
 import { authClient } from "@/lib/auth-client";
+import { pageTitle } from "@/lib/page-title";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Field, FieldDescription, FieldLabel } from "@nilovon-wiki/ui/components/field";
 import { Input } from "@nilovon-wiki/ui/components/input";
 
 export const Route = createFileRoute("/auth/two-factor")({
+  head: () => pageTitle("Bestätigung"),
   component: TwoFactorChallenge,
 });
 
@@ -30,10 +32,19 @@ function TwoFactorChallenge() {
     const value = code.trim();
     if (!value) return;
     setPending(true);
-    const { error } = useBackup
-      ? await authClient.twoFactor.verifyBackupCode({ code: value })
-      : await authClient.twoFactor.verifyTotp({ code: value });
-    setPending(false);
+    let error: unknown;
+    try {
+      ({ error } = useBackup
+        ? await authClient.twoFactor.verifyBackupCode({ code: value })
+        : await authClient.twoFactor.verifyTotp({ code: value }));
+    } catch {
+      // A network failure throws rather than returning `error` — it is not a
+      // wrong code, and must not leave the button stuck on "Wird geprüft …".
+      toast.error("Der Server ist gerade nicht erreichbar. Prüfe deine Verbindung.");
+      return;
+    } finally {
+      setPending(false);
+    }
 
     if (error) {
       toast.error(
