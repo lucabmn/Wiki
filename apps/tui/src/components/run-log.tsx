@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { theme } from "../theme";
-import { allHealthy, composePs, serviceReady, type ServiceStatus } from "../lib/docker";
+import { allHealthy, composePs, composeUp, serviceOk, type ServiceStatus } from "../lib/docker";
 
-export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const LOG_KEEP = 500;
 
 /** Append-only log buffer with a bounded tail, plus a live service-status row. */
@@ -21,14 +21,15 @@ export function useRunLog() {
  * Poll `docker compose ps` until every service is healthy, or the retry budget
  * runs out. Returns true on success. Honours the AbortSignal for unmount.
  */
-export async function pollUntilHealthy(
+async function pollUntilHealthy(
+  production: boolean,
   onStatuses: (s: ServiceStatus[]) => void,
   signal: AbortSignal,
   { retries = 40, interval = 3000 } = {},
 ): Promise<boolean> {
   for (let i = 0; i < retries; i++) {
     if (signal.aborted) return false;
-    const s = await composePs();
+    const s = await composePs(production);
     if (signal.aborted) return false;
     onStatuses(s);
     if (allHealthy(s)) return true;
@@ -37,28 +38,42 @@ export async function pollUntilHealthy(
   return false;
 }
 
-/** Poll until one named service is ready (used to gate the schema push). */
-export async function pollUntilServiceReady(
-  name: string,
-  onStatuses: (s: ServiceStatus[]) => void,
-  signal: AbortSignal,
-  { retries = 30, interval = 2000 } = {},
-): Promise<boolean> {
-  for (let i = 0; i < retries; i++) {
-    if (signal.aborted) return false;
-    const s = await composePs();
-    if (signal.aborted) return false;
-    onStatuses(s);
-    if (serviceReady(s, name)) return true;
-    await sleep(interval);
+/**
+ * The shared tail of install/configure/update: `compose up -d --build`, then
+ * wait for health checks. Resolves "done" only when every service is healthy —
+ * a build failure or a health-check timeout is an "error" (retryable), and
+ * "aborted" means the screen unmounted and the caller must not touch state.
+ */
+export async function upAndWaitHealthy(opts: {
+  production: boolean;
+  append: (line: string) => void;
+  onStatuses: (s: ServiceStatus[]) => void;
+  signal: AbortSignal;
+  successMessage: string;
+}): Promise<"done" | "error" | "aborted"> {
+  const { production, append, onStatuses, signal, successMessage } = opts;
+  const code = await composeUp(production, (l) => !signal.aborted && append(l));
+  if (signal.aborted) return "aborted";
+  if (code !== 0) {
+    append(`✘ docker compose beendet mit Code ${code}.`);
+    return "error";
   }
-  return false;
+
+  append("→ Warte auf Health-Checks …");
+  const healthy = await pollUntilHealthy(production, onStatuses, signal);
+  if (signal.aborted) return "aborted";
+  if (!healthy) {
+    append("✘ Timeout — nicht alle Dienste wurden healthy. Prüfe `docker compose logs`.");
+    return "error";
+  }
+  append(successMessage);
+  return "done";
 }
 
 export function StatusRow({ statuses }: { statuses: ServiceStatus[] }) {
   if (statuses.length === 0) return null;
   return (
-    <box flexDirection="row" gap={2}>
+    <box flexDirection="row" flexWrap="wrap" columnGap={2} flexShrink={0}>
       {statuses.map((s) => (
         <box key={s.name} flexDirection="row" gap={1}>
           <text fg={healthColor(s)}>{healthGlyph(s)}</text>
@@ -69,6 +84,7 @@ export function StatusRow({ statuses }: { statuses: ServiceStatus[] }) {
   );
 }
 
+/** Scrollable log that sticks to the newest line and adapts to terminal height. */
 export function LogBox({ log, title = " Ausgabe " }: { log: string[]; title?: string }) {
   return (
     <box
@@ -81,24 +97,27 @@ export function LogBox({ log, title = " Ausgabe " }: { log: string[]; title?: st
       titleColor={theme.accent}
       paddingX={1}
     >
-      {log.slice(-16).map((line, i) => (
-        <text key={i} fg={logColor(line)}>
-          {line}
-        </text>
-      ))}
+      <scrollbox flexGrow={1} stickyScroll stickyStart="bottom">
+        {log.map((line, i) => (
+          <text key={i} fg={logColor(line)}>
+            {line}
+          </text>
+        ))}
+      </scrollbox>
     </box>
   );
 }
 
+// A completed one-shot (e.g. `migrate`, exited 0) is a success, not a failure.
 function healthColor(s: ServiceStatus): string {
-  if (s.state !== "running" || s.health === "unhealthy") return theme.err;
-  if (s.health === "starting") return theme.warn;
-  return theme.ok;
+  if (serviceOk(s)) return theme.ok;
+  if (s.state === "running" && s.health === "starting") return theme.warn;
+  return theme.err;
 }
 function healthGlyph(s: ServiceStatus): string {
-  if (s.state !== "running" || s.health === "unhealthy") return "✘";
-  if (s.health === "starting") return "●";
-  return "✔";
+  if (serviceOk(s)) return "✔";
+  if (s.state === "running" && s.health === "starting") return "●";
+  return "✘";
 }
 function logColor(line: string): string {
   if (line.startsWith("✘") || /error|fehlgeschlagen/i.test(line)) return theme.err;

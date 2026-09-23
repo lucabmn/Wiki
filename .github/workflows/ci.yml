@@ -22,9 +22,10 @@ jobs:
     env:
       TURBO_TELEMETRY_DISABLED: 1
       # CI has no .env files; skip t3-env runtime validation and provide the
-      # one public variable the web build bakes in.
+      # public variables the web build bakes in (same as release.yml).
       SKIP_ENV_VALIDATION: 1
       VITE_SERVER_URL: http://localhost:3000
+      VITE_COLLAB_URL: ws://localhost:1234
     steps:
       - name: Checkout
         uses: actions/checkout@v7

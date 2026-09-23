@@ -35,7 +35,12 @@ hooks that lint and format staged files on commit.
 
 ### Start PostgreSQL
 
+Compose reads the database password from the root `.env`, so create it first
+and set `POSTGRES_PASSWORD` (e.g. to `password`, which matches the
+`DATABASE_URL` in the app `.env.example` files):
+
 ```bash
+cp .env.example .env    # then set POSTGRES_PASSWORD
 pnpm db:start
 ```
 
@@ -51,6 +56,7 @@ Copy the example env files and fill in values:
 
 ```bash
 cp apps/server/.env.example apps/server/.env
+cp apps/collab/.env.example apps/collab/.env
 cp apps/web/.env.example apps/web/.env
 ```
 

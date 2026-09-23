@@ -82,6 +82,7 @@ function MarketingHeader() {
         </nav>
         <a
           href={githubUrl}
+          aria-label="GitHub"
           className="inline-flex items-center gap-2 rounded-lg border border-fd-border bg-fd-card px-3 py-1.5 text-sm font-medium transition-colors hover:bg-fd-accent"
         >
           <GithubIcon className="size-4" />
@@ -112,7 +113,7 @@ function Hero() {
           className="mb-6 inline-flex items-center gap-2 rounded-full border border-fd-border bg-fd-card/60 px-3 py-1 text-sm text-fd-muted-foreground backdrop-blur transition-colors hover:text-fd-foreground"
         >
           <span className="inline-block size-1.5 rounded-full bg-fd-primary" />
-          Open source · MIT licensed · Self-hostable
+          Open source · GPL-3.0 · Self-hostable
         </a>
 
         <h1 className="max-w-3xl text-balance text-4xl font-semibold tracking-tight sm:text-6xl">
@@ -168,7 +169,12 @@ function Terminal_() {
           </span>
           <span className="text-fd-primary">git</span> clone https://github.com/lucabmn/Wiki.git
           {"\n"}
-          <span className="text-fd-primary">cd</span> Wiki &&{" "}
+          <span className="text-fd-primary">cd</span> Wiki
+          {"\n"}
+          <span className="text-fd-primary">curl</span> -fsSLo installer
+          https://github.com/lucabmn/Wiki/releases/latest/download/nilovon-wiki-installer-linux-x64
+          {"\n"}
+          <span className="text-fd-primary">chmod</span> +x installer &&{" "}
           <span className="text-fd-primary">./installer</span>
           {"\n\n"}
           <span className="text-fd-muted-foreground">
@@ -299,15 +305,11 @@ function Architecture() {
         <SectionHeading
           eyebrow="Architecture"
           title="A clean boundary between transport, logic and clients"
-          subtitle="The web and terminal clients talk to a Hono server over a type-safe oRPC client. All business logic and data contracts live in one place; the database, auth and env are isolated packages."
+          subtitle="The web client talks to a Hono server over a type-safe oRPC client. All business logic and data contracts live in one place; the database, auth and env are isolated packages."
         />
         <div className="mt-14 grid gap-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
           <div className="grid gap-4">
-            <Node
-              icon={Layers}
-              title="apps/web · apps/tui"
-              sub="React (TanStack Start) & OpenTUI clients"
-            />
+            <Node icon={Layers} title="apps/web" sub="React (TanStack Start) client" />
           </div>
           <div className="flex items-center justify-center text-fd-muted-foreground">
             <ArrowRight className="hidden size-6 lg:block" />
@@ -485,8 +487,8 @@ function FinalCta() {
         Own your team's knowledge base.
       </h2>
       <p className="mx-auto mt-4 max-w-xl text-balance text-fd-muted-foreground">
-        Read the docs, spin it up on your own hardware, and make it yours. It's MIT licensed — no
-        seats, no lock-in.
+        Read the docs, spin it up on your own hardware, and make it yours. It's GPL-3.0 licensed —
+        no seats, no lock-in.
       </p>
       <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <Link
@@ -515,7 +517,7 @@ function Footer() {
   return (
     <footer className="border-t border-fd-border">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-10 text-sm text-fd-muted-foreground sm:flex-row">
-        <p>© {appName}. Released under the MIT License.</p>
+        <p>© {appName}. Released under the GPL-3.0 License.</p>
         <nav className="flex items-center gap-6">
           <Link to="/docs/$" params={{ _splat: "" }} className="hover:text-fd-foreground">
             Docs

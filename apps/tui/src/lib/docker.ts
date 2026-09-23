@@ -16,18 +16,13 @@ function composeFiles(production: boolean): string[] {
  * stdout+stderr to `onLine`. Resolves with the process exit code (0 = success).
  * Never throws on a non-zero exit — the caller inspects the code.
  */
-export function runCompose(args: string[], onLine?: (line: string) => void): Promise<number> {
+function runCompose(args: string[], onLine?: (line: string) => void): Promise<number> {
   return spawnStream(["docker", "compose", ...args], onLine);
 }
 
 /** Bring the whole stack up in the background, rebuilding images. */
 export function composeUp(production: boolean, onLine?: (line: string) => void): Promise<number> {
   return runCompose([...composeFiles(production), "up", "-d", "--build"], onLine);
-}
-
-/** Tear the stack down (used by a failed/cancelled install). */
-export function composeDown(onLine?: (line: string) => void): Promise<number> {
-  return runCompose(["down"], onLine);
 }
 
 export type ServiceHealth = "healthy" | "unhealthy" | "starting" | "none" | "unknown";
@@ -61,9 +56,10 @@ function normalizeHealth(raw: string | undefined): ServiceHealth {
  * Parse `docker compose ps --format json`. Docker emits either NDJSON (one
  * object per line, newer CLIs) or a single JSON array — handle both.
  */
-export async function composePs(): Promise<ServiceStatus[]> {
+export async function composePs(production: boolean): Promise<ServiceStatus[]> {
   const lines: string[] = [];
-  await runCompose(["ps", "--format", "json"], (l) => {
+  // Same compose files as `up`, so overlay-only services (Caddy) are included.
+  await runCompose([...composeFiles(production), "ps", "--format", "json"], (l) => {
     const t = l.trim();
     if (t) lines.push(t);
   });
@@ -71,7 +67,15 @@ export async function composePs(): Promise<ServiceStatus[]> {
   const raw = lines.join("\n").trim();
   if (!raw) return [];
 
-  let records: any[];
+  // Shape of the fields we read from `docker compose ps --format json`.
+  type PsRecord = {
+    Service?: string;
+    Name?: string;
+    State?: unknown;
+    Health?: string;
+    ExitCode?: unknown;
+  };
+  let records: PsRecord[];
   try {
     if (raw.startsWith("[")) {
       records = JSON.parse(raw);
@@ -95,7 +99,7 @@ export async function composePs(): Promise<ServiceStatus[]> {
  * healthcheck — or when it is a completed one-shot (state "exited" with code
  * 0), like the `migrate` service that applies database migrations and stops.
  */
-function serviceOk(s: ServiceStatus): boolean {
+export function serviceOk(s: ServiceStatus): boolean {
   if (s.state === "exited") return s.exitCode === 0;
   return s.state === "running" && (s.health === "healthy" || s.health === "none");
 }
@@ -104,10 +108,4 @@ function serviceOk(s: ServiceStatus): boolean {
 export function allHealthy(statuses: ServiceStatus[]): boolean {
   if (statuses.length === 0) return false;
   return statuses.every(serviceOk);
-}
-
-/** A single service is up and its healthcheck (if any) is green. */
-export function serviceReady(statuses: ServiceStatus[], name: string): boolean {
-  const s = statuses.find((x) => x.name === name);
-  return !!s && serviceOk(s);
 }

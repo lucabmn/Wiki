@@ -37,7 +37,16 @@ export function findRepoRoot(): string {
   );
 }
 
-export const repoRoot = findRepoRoot();
+// Resolved at import time, before the renderer takes over the terminal — so a
+// plain message + exit is safe here and far clearer than an uncaught stack trace.
+export const repoRoot = (() => {
+  try {
+    return findRepoRoot();
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+})();
 
 /** Absolute path to an env file the installer writes, relative to the repo root. */
 export function envPath(rel: string): string {
