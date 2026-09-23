@@ -1,6 +1,16 @@
 import { z } from "zod";
 
-import { IdSchema } from "./shared";
+import {
+  GRANT_SUBJECT_MESSAGE,
+  GrantRoleNameSchema,
+  HexColorSchema,
+  IdSchema,
+  SlugSchema,
+  WikiRoleSchema,
+  grantNamesSubject,
+} from "./shared";
+
+export { WikiRoleSchema };
 
 export const SpaceVisibilitySchema = z.enum(["public", "private", "restricted"]);
 
@@ -22,32 +32,21 @@ export const SpaceSchema = z.object({
 export type Space = z.infer<typeof SpaceSchema>;
 
 export const CreateSpaceInputSchema = z.object({
-  name: z.string().min(1).max(120),
+  name: z.string().trim().min(1).max(120),
   // Optional; derived from `name` and de-duplicated per org when omitted.
-  slug: z
-    .string()
-    .min(1)
-    .max(80)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be a lowercase kebab-case slug")
-    .optional(),
+  slug: SlugSchema.optional(),
   description: z.string().max(2000).nullish(),
   icon: z.string().max(64).nullish(),
-  color: z
-    .string()
-    .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "must be a hex color")
-    .nullish(),
+  color: HexColorSchema.nullish(),
   visibility: SpaceVisibilitySchema.default("private"),
 });
 
 export const UpdateSpaceInputSchema = z.object({
   id: IdSchema,
-  name: z.string().min(1).max(120).optional(),
+  name: z.string().trim().min(1).max(120).optional(),
   description: z.string().max(2000).nullish(),
   icon: z.string().max(64).nullish(),
-  color: z
-    .string()
-    .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "must be a hex color")
-    .nullish(),
+  color: HexColorSchema.nullish(),
   visibility: SpaceVisibilitySchema.optional(),
 });
 
@@ -59,7 +58,6 @@ export const ListSpacesInputSchema = z.object({
 
 // --- Space members (per-space roles) ---------------------------------------
 
-export const WikiRoleSchema = z.enum(["viewer", "commenter", "editor", "admin"]);
 export type WikiRoleValue = z.infer<typeof WikiRoleSchema>;
 
 export const PermissionSubjectSchema = z.enum(["user", "team", "role"]);
@@ -85,13 +83,10 @@ export const AddSpaceMemberInputSchema = z
     subject: PermissionSubjectSchema,
     userId: IdSchema.optional(),
     teamId: IdSchema.optional(),
-    roleName: z.string().min(1).optional(),
+    roleName: GrantRoleNameSchema.optional(),
     role: WikiRoleSchema.default("viewer"),
   })
-  .refine(
-    (v) => (v.subject === "user" ? !!v.userId : v.subject === "team" ? !!v.teamId : !!v.roleName),
-    { message: "Provide userId (user), teamId (team), or roleName (group)" },
-  );
+  .refine(grantNamesSubject, { message: GRANT_SUBJECT_MESSAGE });
 
 export const UpdateSpaceMemberInputSchema = z.object({ id: IdSchema, role: WikiRoleSchema });
 export const RemoveSpaceMemberInputSchema = z.object({ id: IdSchema });

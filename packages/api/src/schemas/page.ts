@@ -1,14 +1,17 @@
 import { z } from "zod";
 
-import { IdSchema } from "./shared";
+import {
+  GRANT_SUBJECT_MESSAGE,
+  GrantRoleNameSchema,
+  IdSchema,
+  SlugSchema,
+  WikiRoleSchema,
+  grantNamesSubject,
+} from "./shared";
+
+export { WikiRoleSchema };
 
 export const PageStatusSchema = z.enum(["draft", "published", "archived"]);
-
-const SlugSchema = z
-  .string()
-  .min(1)
-  .max(80)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be a lowercase kebab-case slug");
 
 /** Rich-text document (ProseMirror/TipTap JSON). Opaque to the API layer. */
 const DocumentSchema = z.unknown();
@@ -80,12 +83,12 @@ export const ListPagesInputSchema = z.object({
 export const CreatePageInputSchema = z.object({
   spaceId: IdSchema,
   parentId: IdSchema.nullish(),
-  title: z.string().min(1).max(300).default("Untitled"),
+  title: z.string().trim().min(1).max(300).default("Ohne Titel"),
   slug: SlugSchema.optional(),
   icon: z.string().max(64).nullish(),
   coverImage: z.string().max(2048).nullish(),
   content: DocumentSchema.optional(),
-  textContent: z.string().default(""),
+  textContent: z.string().max(2_000_000).default(""),
   isTemplate: z.boolean().default(false),
 });
 
@@ -119,7 +122,7 @@ export const CreateFromTemplateInputSchema = z.object({
   spaceId: IdSchema,
   parentId: IdSchema.nullish(),
   /** Defaults to the template's title. */
-  title: z.string().min(1).max(300).optional(),
+  title: z.string().trim().min(1).max(300).optional(),
 });
 
 const ImportPageSchema = z.object({
@@ -181,7 +184,7 @@ export const FinalizeImportAssetsResultSchema = z.object({
 // only.
 export const UpdatePageInputSchema = z.object({
   id: IdSchema,
-  title: z.string().min(1).max(300).optional(),
+  title: z.string().trim().min(1).max(300).optional(),
   slug: SlugSchema.optional(),
   icon: z.string().max(64).nullish(),
   coverImage: z.string().max(2048).nullish(),
@@ -196,10 +199,10 @@ export const UpdatePageInputSchema = z.object({
  */
 export const PublishPageInputSchema = z.object({
   id: IdSchema,
-  title: z.string().min(1).max(300).optional(),
+  title: z.string().trim().min(1).max(300).optional(),
   content: DocumentSchema.optional(),
-  textContent: z.string().optional(),
-  summary: z.string().max(500).optional(),
+  textContent: z.string().max(2_000_000).optional(),
+  summary: z.string().trim().max(500).optional(),
 });
 
 export const MovePageInputSchema = z
@@ -212,7 +215,7 @@ export const MovePageInputSchema = z
     afterId: IdSchema.optional(),
   })
   .refine((v) => !(v.beforeId && v.afterId), {
-    message: "provide beforeId or afterId, not both",
+    message: "Gib entweder beforeId oder afterId an, nicht beides.",
   });
 
 /** Immutable version snapshot. */
@@ -229,8 +232,6 @@ export const PageRevisionSchema = z.object({
 });
 
 // --- Page access (per-page ACL) --------------------------------------------
-
-export const WikiRoleSchema = z.enum(["viewer", "commenter", "editor", "admin"]);
 
 export const PageMemberSchema = z.object({
   id: IdSchema,
@@ -271,13 +272,10 @@ export const AddPageMemberInputSchema = z
     subject: z.enum(["user", "team", "role"]),
     userId: IdSchema.optional(),
     teamId: IdSchema.optional(),
-    roleName: z.string().min(1).optional(),
+    roleName: GrantRoleNameSchema.optional(),
     role: WikiRoleSchema.default("viewer"),
   })
-  .refine(
-    (v) => (v.subject === "user" ? !!v.userId : v.subject === "team" ? !!v.teamId : !!v.roleName),
-    { message: "Provide userId (user), teamId (team), or roleName (group)" },
-  );
+  .refine(grantNamesSubject, { message: GRANT_SUBJECT_MESSAGE });
 
 export const UpdatePageMemberInputSchema = z.object({ id: IdSchema, role: WikiRoleSchema });
 export const RemovePageMemberInputSchema = z.object({ id: IdSchema });

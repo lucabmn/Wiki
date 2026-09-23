@@ -7,10 +7,12 @@ export function slugify(input: string, fallback = "untitled"): string {
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "") // strip combining diacritics
     .toLowerCase()
-    .trim()
+    // NFKD leaves "ß" alone, so without this "Straße" would become "strae".
+    .replaceAll("ß", "ss")
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
+    // Cut before trimming dashes, so the cap cannot leave a trailing "-".
+    .slice(0, 80)
+    .replace(/^-+|-+$/g, "");
   return slug || fallback;
 }
 

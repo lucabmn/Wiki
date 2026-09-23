@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-import { IdSchema } from "./shared";
-
-const ColorSchema = z.string().regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "must be a hex color");
+import { HexColorSchema, IdSchema } from "./shared";
 
 export const TagSchema = z.object({
   id: IdSchema,
@@ -36,14 +34,14 @@ export const ListPagesByTagInputSchema = z.object({
 
 export const CreateTagInputSchema = z.object({
   spaceId: IdSchema,
-  name: z.string().min(1).max(60),
-  color: ColorSchema.nullish(),
+  name: z.string().trim().min(1).max(60),
+  color: HexColorSchema.nullish(),
 });
 
 export const UpdateTagInputSchema = z.object({
   id: IdSchema,
-  name: z.string().min(1).max(60).optional(),
-  color: ColorSchema.nullish(),
+  name: z.string().trim().min(1).max(60).optional(),
+  color: HexColorSchema.nullish(),
 });
 
 /** Attach/detach a tag to a page (join row). */

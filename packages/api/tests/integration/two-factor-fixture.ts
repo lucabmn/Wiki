@@ -11,7 +11,9 @@ import type { TestDb } from "./db";
 
 export const NOW = new Date("2026-08-04T10:00:00Z");
 export const PAST = new Date("2026-07-01T10:00:00Z");
-export const FUTURE = new Date("2026-09-01T10:00:00Z");
+// Far out on purpose: the procedures under test read the real clock, so a
+// "future" grace date close to today turns into a past one and the suite rots.
+export const FUTURE = new Date("2099-09-01T10:00:00Z");
 
 /**
  * The cast of the two-factor policy suite.

@@ -57,7 +57,7 @@ export function requireActiveOrg(context: AuthedContext): string {
   const organizationId = context.session.session.activeOrganizationId;
   if (!organizationId) {
     throw new ORPCError("BAD_REQUEST", {
-      message: "No active organization. Select one before continuing.",
+      message: "Keine aktive Organisation. Wähle zuerst eine Organisation aus.",
     });
   }
   return organizationId;

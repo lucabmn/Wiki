@@ -63,12 +63,14 @@ export function mentionedUserIdsInText(text: string, candidates: MentionCandidat
 
   for (let at = haystack.indexOf("@"); at !== -1; at = haystack.indexOf("@", at + 1)) {
     // `foo@example.com` is an address, not a mention.
-    const before = at > 0 ? text[at - 1] : "";
+    // Read neighbours from `haystack`, not `text`: lower-casing can change the
+    // string's length (e.g. "İ"), which would misalign the two by index.
+    const before = at > 0 ? haystack[at - 1] : "";
     if (before && WORD.test(before)) continue;
     for (const candidate of byLength) {
       const name = candidate.name.trim().toLowerCase();
       if (!name || !haystack.startsWith(name, at + 1)) continue;
-      const after = text[at + 1 + name.length] ?? "";
+      const after = haystack[at + 1 + name.length] ?? "";
       if (after && WORD.test(after)) continue;
       found.add(candidate.id);
       break;

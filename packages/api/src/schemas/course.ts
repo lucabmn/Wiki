@@ -1,6 +1,13 @@
 import { z } from "zod";
 
-import { IdSchema } from "./shared";
+import {
+  GRANT_SUBJECT_MESSAGE,
+  GrantRoleNameSchema,
+  HexColorSchema,
+  IdSchema,
+  SlugSchema,
+  grantNamesSubject,
+} from "./shared";
 
 /**
  * Course I/O contracts. Hand-written rather than derived from the drizzle table
@@ -14,12 +21,6 @@ export const EnrollmentPolicySchema = z.enum(["open", "request", "invite", "paid
 export const CourseLevelSchema = z.enum(["beginner", "intermediate", "advanced"]);
 export const CourseRoleSchema = z.enum(["reviewer", "assistant", "instructor", "owner"]);
 export const PermissionSubjectSchema = z.enum(["user", "team", "role"]);
-
-const SlugSchema = z
-  .string()
-  .min(1)
-  .max(80)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be a lowercase kebab-case slug");
 
 /**
  * What the caller may do with a course, resolved server-side and sent with the
@@ -197,14 +198,11 @@ export const AddCourseMemberInputSchema = z
     subject: PermissionSubjectSchema,
     userId: IdSchema.optional(),
     teamId: IdSchema.optional(),
-    roleName: z.string().min(1).optional(),
+    roleName: GrantRoleNameSchema.optional(),
     role: CourseRoleSchema.default("instructor"),
     isPublic: z.boolean().default(true),
   })
-  .refine(
-    (v) => (v.subject === "user" ? !!v.userId : v.subject === "team" ? !!v.teamId : !!v.roleName),
-    { message: "Provide userId (user), teamId (team), or roleName (group)" },
-  );
+  .refine(grantNamesSubject, { message: GRANT_SUBJECT_MESSAGE });
 
 export const UpdateCourseMemberInputSchema = z.object({
   id: IdSchema,
@@ -227,10 +225,7 @@ export const CourseTopicSchema = z.object({
 export const CreateCourseTopicInputSchema = z.object({
   name: z.string().min(1).max(80),
   slug: SlugSchema.optional(),
-  color: z
-    .string()
-    .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "must be a hex color")
-    .nullish(),
+  color: HexColorSchema.nullish(),
 });
 
 export const SetCourseTopicsInputSchema = z.object({

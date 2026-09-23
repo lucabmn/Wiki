@@ -28,11 +28,11 @@ export const ListCommentsInputSchema = z.object({
 export const CreateCommentInputSchema = z.object({
   pageId: IdSchema,
   parentId: IdSchema.nullish(),
-  body: z.string().min(1).max(10_000),
+  body: z.string().trim().min(1).max(10_000),
   anchor: AnchorSchema.optional(),
 });
 
 export const UpdateCommentInputSchema = z.object({
   id: IdSchema,
-  body: z.string().min(1).max(10_000),
+  body: z.string().trim().min(1).max(10_000),
 });

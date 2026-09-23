@@ -71,8 +71,10 @@ async function removeObjects(
     try {
       await storage.delete(row.storageKey);
       deleted.push(row.id);
-    } catch {
-      // Left pending on purpose: the marker stays and the next run retries.
+    } catch (error) {
+      // Left pending on purpose: the marker stays and the next run retries. Still
+      // logged — an object that fails on every run is otherwise invisible.
+      console.error(`[retention] deleting object ${row.storageKey} failed`, error);
     }
   }
   if (deleted.length > 0) {

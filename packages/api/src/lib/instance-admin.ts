@@ -33,7 +33,7 @@ export function isInstanceAdmin(context: AuthedContext): boolean {
 export const instanceAdminProcedure = protectedProcedure.use(async ({ context, next }) => {
   if (!isInstanceAdmin(context)) {
     throw new ORPCError("FORBIDDEN", {
-      message: "Diese Aktion ist Instanz-Administratoren vorbehalten",
+      message: "Diese Aktion ist Instanz-Administratoren vorbehalten.",
     });
   }
   return next();

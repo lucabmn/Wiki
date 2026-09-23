@@ -27,7 +27,9 @@ export async function assertPermissionSubjectInOrganization(
         })
       : undefined;
     if (!membership) {
-      throw new ORPCError("NOT_FOUND", { message: "User not found in this organization" });
+      throw new ORPCError("NOT_FOUND", {
+        message: "Person in dieser Organisation nicht gefunden.",
+      });
     }
   }
 
@@ -39,7 +41,7 @@ export async function assertPermissionSubjectInOrganization(
         })
       : undefined;
     if (!organizationTeam) {
-      throw new ORPCError("NOT_FOUND", { message: "Team not found in this organization" });
+      throw new ORPCError("NOT_FOUND", { message: "Team in dieser Organisation nicht gefunden." });
     }
   }
 }

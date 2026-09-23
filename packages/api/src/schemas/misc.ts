@@ -145,13 +145,13 @@ export const DashboardOverviewSchema = z.object({
 // --- Search --------------------------------------------------------------
 
 export const SearchInputSchema = z.object({
-  query: z.string().min(1).max(200),
+  query: z.string().trim().min(1).max(200),
   spaceId: IdSchema.optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
 export const CourseSearchInputSchema = z.object({
-  query: z.string().min(1).max(200),
+  query: z.string().trim().min(1).max(200),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 

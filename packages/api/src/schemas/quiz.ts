@@ -267,7 +267,7 @@ export const MoveQuestionInputSchema = z
     afterId: IdSchema.optional(),
   })
   .refine((v) => !(v.beforeId && v.afterId), {
-    message: "provide beforeId or afterId, not both",
+    message: "Gib entweder beforeId oder afterId an, nicht beides.",
   });
 
 export const AddOptionInputSchema = z.object({

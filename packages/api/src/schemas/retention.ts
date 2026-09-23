@@ -85,7 +85,7 @@ export const HoldStatusInputSchema = z
     spaceId: IdSchema.optional(),
   })
   .refine((value) => !!value.pageId !== !!value.spaceId, {
-    message: "Provide exactly one of pageId or spaceId",
+    message: "Gib genau eines von pageId oder spaceId an.",
   });
 
 // ── Trash ───────────────────────────────────────────────────────────────────

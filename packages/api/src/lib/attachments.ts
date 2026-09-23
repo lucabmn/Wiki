@@ -8,7 +8,7 @@ import { activityActor, recordActivity } from "./activity";
 import { requirePageCapability, requireSpaceCapabilityById } from "./authz";
 import { loadPage, loadSpace } from "./loaders";
 import { firstRow } from "./rows";
-import { buildStorageKey, getStorage } from "./storage";
+import { buildStorageKey, requireStorage } from "./storage";
 
 /**
  * Stores an uploaded file and records its metadata row, in that order, as one
@@ -27,12 +27,7 @@ export async function createAttachment(
     file: { name: string; type: string; size: number; body: Blob };
   },
 ): Promise<Attachment> {
-  const storage = getStorage();
-  if (!storage) {
-    throw new ORPCError("NOT_IMPLEMENTED", {
-      message: "Attachments are disabled: no object storage is configured (see S3_* in .env).",
-    });
-  }
+  const storage = requireStorage();
 
   // Attaching to a page requires write on that page; a bare space upload
   // requires write on the space. The row's spaceId comes from the checked
@@ -72,7 +67,7 @@ export async function createAttachment(
   // snapshot was persisted, or the final cascade could orphan those bytes.
   const targetSpace = await loadSpace(context.db, spaceId);
   if (targetSpace.deletionPendingAt) {
-    throw new ORPCError("CONFLICT", { message: "Space deletion is already in progress." });
+    throw new ORPCError("CONFLICT", { message: "Dieser Bereich wird gerade gelöscht." });
   }
 
   const storageKey = buildStorageKey(spaceId, input.file.name);

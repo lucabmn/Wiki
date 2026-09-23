@@ -24,6 +24,14 @@ describe("slugify", () => {
   it("caps length at 80 characters", () => {
     expect(slugify("a".repeat(200)).length).toBe(80);
   });
+
+  it("never ends in a dash after capping", () => {
+    expect(slugify(`${"a".repeat(79)} bcd`)).toBe("a".repeat(79));
+  });
+
+  it("spells out the German sharp s", () => {
+    expect(slugify("Straße")).toBe("strasse");
+  });
 });
 
 describe("uniqueSlug", () => {
