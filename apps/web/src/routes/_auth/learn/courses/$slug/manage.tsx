@@ -110,12 +110,7 @@ function RouteComponent() {
                 />
               ) : (
                 <Refusal
-                  requirement={
-                    <>
-                      Die Teilnehmendenliste nennt einzelne Personen. Sie steht ab der Rolle „
-                      {COURSE_ROLE_LABEL.assistant}" offen.
-                    </>
-                  }
+                  requirement={`Die Teilnehmendenliste nennt einzelne Personen. Sie steht ab der Rolle „${COURSE_ROLE_LABEL.assistant}“ offen.`}
                 />
               )}
             </TabsContent>
@@ -125,12 +120,7 @@ function RouteComponent() {
                 <GradingQueue courseId={data.id} />
               ) : (
                 <Refusal
-                  requirement={
-                    <>
-                      Abgaben bewerten darf, wer mindestens die Rolle „{COURSE_ROLE_LABEL.assistant}
-                      " hat.
-                    </>
-                  }
+                  requirement={`Abgaben bewerten darf, wer mindestens die Rolle „${COURSE_ROLE_LABEL.assistant}“ hat.`}
                 />
               )}
             </TabsContent>

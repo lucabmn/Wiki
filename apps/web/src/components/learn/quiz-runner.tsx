@@ -1,6 +1,6 @@
 import { PageContent } from "@/components/editor/page-content";
 import { QueryError } from "@/components/query-error";
-import { toastError } from "@/lib/query";
+import { toastError, useInvalidate } from "@/lib/query";
 import { client, friendlyErrorMessage, orpc } from "@/utils/orpc";
 import { Alert, AlertDescription, AlertTitle } from "@nilovon-wiki/ui/components/alert";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
@@ -51,6 +51,10 @@ export function QuizRunner({
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [result, setResult] = useState<AttemptDetail | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  // A passed quiz can complete its lesson server-side; the outline's tick marks
+  // and the course percentage have to hear about that.
+  const invalidateOutline = useInvalidate(orpc.learn.lessons.outline.key());
+  const invalidateCourses = useInvalidate(orpc.learn.courses.key());
 
   const start = useMutation(
     orpc.learn.quizzes.startAttempt.mutationOptions({
@@ -61,6 +65,9 @@ export function QuizRunner({
         setRefusal(null);
       },
       onError: (error) => {
+        // Back to the briefing, which is where the refusal is shown — a failed
+        // "Neuer Versuch" from the result screen used to fail silently.
+        setResult(null);
         // A learner cannot count their own attempts — listing them needs the
         // grading capability — so the refusal is the only signal there is, and
         // the generic "Dafür fehlt dir die Berechtigung" would misname it.
@@ -78,6 +85,8 @@ export function QuizRunner({
       onSuccess: (scored) => {
         setResult(scored);
         setAttempt(null);
+        invalidateOutline();
+        invalidateCourses();
         onAttemptFinished?.({ id: scored.attempt.id, passed: scored.attempt.passed });
       },
       onError: toastError,
@@ -115,7 +124,21 @@ export function QuizRunner({
         onAnswer={(questionId, answer) =>
           setAnswers((previous) => ({ ...previous, [questionId]: answer }))
         }
-        onSubmit={() =>
+        onSubmit={() => {
+          const unanswered = attempt.questions.filter((question) => {
+            const answer = answers[question.id] ?? EMPTY_ANSWER;
+            return answer.optionIds.length === 0 && !answer.text.trim();
+          }).length;
+          if (
+            unanswered > 0 &&
+            !window.confirm(
+              unanswered === 1
+                ? "Eine Frage ist noch unbeantwortet. Trotzdem abgeben?"
+                : `${unanswered} Fragen sind noch unbeantwortet. Trotzdem abgeben?`,
+            )
+          ) {
+            return;
+          }
           submit.mutate({
             id: attempt.attempt.id,
             responses: attempt.questions.map((question) => {
@@ -126,8 +149,8 @@ export function QuizRunner({
                 textAnswer: answer.text.trim() || null,
               };
             }),
-          })
-        }
+          });
+        }}
         submitting={submit.isPending}
       />
     );

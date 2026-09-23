@@ -22,14 +22,21 @@ type UploadedAsset = {
 };
 
 /**
+ * A refusal from the upload route. Its message is already German and written
+ * for the author, so callers show it as-is instead of mapping it through
+ * `friendlyErrorMessage`, which only knows oRPC codes and would flatten it to
+ * "Etwas ist schiefgelaufen".
+ */
+export class CourseAssetUploadError extends Error {}
+
+/**
  * Sends one file to the course-asset route and returns the stored row.
  *
  * Uploads bypass oRPC for the same reason page attachments do — an RPC envelope
  * cannot carry bytes — so this is the builder's only plain `fetch`.
  * `credentials: "include"` is required: the session is a cookie and the API is a
- * different origin. Lives here rather than in a shared module because the two
- * callers (this component and the lesson editor) are both mine, and the strict
- * file scope of this feature has no seventh file to put it in.
+ * different origin. Shared by this component, the lesson editor and the
+ * assignment hand-in.
  */
 export async function uploadCourseAsset({
   courseId,
@@ -37,7 +44,7 @@ export async function uploadCourseAsset({
   file,
 }: {
   courseId: string;
-  kind: "thumbnail" | "video" | "document" | "other";
+  kind: "thumbnail" | "video" | "document" | "submission" | "other";
   file: File;
 }): Promise<UploadedAsset> {
   const body = new FormData();
@@ -56,7 +63,7 @@ export async function uploadCourseAsset({
   if (!response.ok || !payload?.id) {
     // The route already answers in German for the cases an author can cause
     // (too large, wrong kind), so its message beats a generic one.
-    throw new Error(payload?.message ?? "Upload fehlgeschlagen");
+    throw new CourseAssetUploadError(payload?.message ?? "Upload fehlgeschlagen");
   }
   return payload as UploadedAsset;
 }
@@ -93,7 +100,10 @@ export function CourseThumbnailUpload({
   const capabilities = useQuery(orpc.learn.assets.capabilities.queryOptions({ input: {} }));
   const update = useMutation(
     orpc.learn.courses.update.mutationOptions({
-      onSuccess: () => invalidateCourses(),
+      onSuccess: (_course, variables) => {
+        invalidateCourses();
+        toast.success(variables.thumbnailAssetId ? "Kursbild aktualisiert" : "Kursbild entfernt");
+      },
       onError: toastError,
     }),
   );
@@ -115,10 +125,16 @@ export function CourseThumbnailUpload({
     setUploading(true);
     try {
       const asset = await uploadCourseAsset({ courseId: course.id, kind: "thumbnail", file });
-      await update.mutateAsync({ id: course.id, thumbnailAssetId: asset.id });
-      toast.success("Kursbild aktualisiert");
+      // `mutate`, not `mutateAsync` in this try: the mutation's own callbacks
+      // already toast success and failure, and catching it here as well showed
+      // every refusal twice.
+      update.mutate({ id: course.id, thumbnailAssetId: asset.id });
     } catch (error) {
-      toast.error(friendlyErrorMessage(error as Error));
+      toast.error(
+        error instanceof CourseAssetUploadError
+          ? error.message
+          : friendlyErrorMessage(error as Error),
+      );
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -170,7 +186,11 @@ export function CourseThumbnailUpload({
               variant="ghost"
               size="sm"
               disabled={disabled || busy}
-              onClick={() => update.mutate({ id: course.id, thumbnailAssetId: null })}
+              onClick={() => {
+                if (window.confirm("Kursbild entfernen?")) {
+                  update.mutate({ id: course.id, thumbnailAssetId: null });
+                }
+              }}
             >
               <Trash2 className="size-4" aria-hidden />
               Entfernen
@@ -215,6 +235,9 @@ export function CourseThumbnailUpload({
         type="file"
         accept="image/png,image/jpeg,image/gif,image/webp,image/avif"
         className="sr-only"
+        // Opened through the buttons above; a second, invisible tab stop for
+        // the same action only confuses keyboard users.
+        tabIndex={-1}
         aria-label="Kursbild auswählen"
         onChange={(event) => {
           const file = event.target.files?.[0];

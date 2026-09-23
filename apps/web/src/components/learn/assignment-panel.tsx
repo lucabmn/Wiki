@@ -1,4 +1,8 @@
 import { PageContent } from "@/components/editor/page-content";
+import {
+  CourseAssetUploadError,
+  uploadCourseAsset,
+} from "@/components/learn/course-thumbnail-upload";
 import { QuizRunner } from "@/components/learn/quiz-runner";
 import { QueryError } from "@/components/query-error";
 import { SUBMISSION_STATUS_LABEL } from "@/lib/learn-labels";
@@ -57,6 +61,11 @@ export function AssignmentPanel({ lessonId, courseId }: { lessonId: string; cour
     enabled: Boolean(submissionId),
   });
   const detail = detailQuery.data ?? null;
+  // Text answers typed but not yet saved as a draft, by task id. Handing in
+  // saves these first — otherwise "Abgeben" silently dropped whatever the
+  // learner had not explicitly saved.
+  const unsavedText = useRef(new Map<string, string>());
+  const [savingDrafts, setSavingDrafts] = useState(false);
 
   const refresh = () => {
     invalidateAssignments();
@@ -99,6 +108,31 @@ export function AssignmentPanel({ lessonId, courseId }: { lessonId: string; cour
       onError: toastError,
     }),
   );
+
+  const handIn = async () => {
+    if (!detail) return;
+    if (!window.confirm("Jetzt abgeben? Danach kannst du deine Antworten nicht mehr ändern.")) {
+      return;
+    }
+    setSavingDrafts(true);
+    try {
+      for (const [taskId, contentText] of unsavedText.current) {
+        await client.learn.submissions.saveTask({
+          id: detail.id,
+          taskId,
+          contentText,
+          content: null,
+        });
+        unsavedText.current.delete(taskId);
+      }
+    } catch (error) {
+      toastError(error as Error);
+      return;
+    } finally {
+      setSavingDrafts(false);
+    }
+    submit.mutate({ id: detail.id });
+  };
 
   if (assignment.isError) {
     // A lesson whose brief is missing or still a draft answers NOT_FOUND, which
@@ -213,14 +247,25 @@ export function AssignmentPanel({ lessonId, courseId }: { lessonId: string; cour
                 answer={answersByTask.get(task.id) ?? null}
                 courseId={courseId}
                 editable={editable}
+                onTextChange={(text) => unsavedText.current.set(task.id, text)}
                 onSaveText={(text) =>
                   detail &&
-                  saveTask.mutate({
-                    id: detail.id,
-                    taskId: task.id,
-                    contentText: text,
-                    content: null,
-                  })
+                  saveTask.mutate(
+                    {
+                      id: detail.id,
+                      taskId: task.id,
+                      contentText: text,
+                      content: null,
+                    },
+                    {
+                      onSuccess: () => {
+                        // Only if nothing was typed while the save was in flight.
+                        if (unsavedText.current.get(task.id) === text) {
+                          unsavedText.current.delete(task.id);
+                        }
+                      },
+                    },
+                  )
                 }
                 onSaveAsset={(assetId) =>
                   detail && saveTask.mutate({ id: detail.id, taskId: task.id, assetId })
@@ -249,10 +294,10 @@ export function AssignmentPanel({ lessonId, courseId }: { lessonId: string; cour
         />
         {editable && (
           <Button
-            disabled={submit.isPending || (overdue && !brief.allowLateSubmission)}
-            onClick={() => detail && submit.mutate({ id: detail.id })}
+            disabled={savingDrafts || submit.isPending || (overdue && !brief.allowLateSubmission)}
+            onClick={() => void handIn()}
           >
-            {submit.isPending ? "Wird abgegeben…" : "Abgeben"}
+            {savingDrafts || submit.isPending ? "Wird abgegeben…" : "Abgeben"}
           </Button>
         )}
       </div>
@@ -327,6 +372,7 @@ function TaskCard({
   answer,
   courseId,
   editable,
+  onTextChange,
   onSaveText,
   onSaveAsset,
   onSaveAttempt,
@@ -337,6 +383,7 @@ function TaskCard({
   answer: SubmissionTask | null;
   courseId: string;
   editable: boolean;
+  onTextChange: (text: string) => void;
   onSaveText: (text: string) => void;
   onSaveAsset: (assetId: string) => void;
   onSaveAttempt: (quizAttemptId: string) => void;
@@ -351,26 +398,15 @@ function TaskCard({
   const upload = async (file: File) => {
     setUploading(true);
     try {
-      // Bytes cannot ride an RPC envelope, so hand-ins take the server's
-      // multipart route; `credentials: "include"` because the session is a
-      // cookie on another origin.
-      const body = new FormData();
-      body.set("file", file);
-      body.set("courseId", courseId);
-      body.set("kind", "submission");
-      const response = await fetch(`${env.VITE_SERVER_URL}/course-assets/upload`, {
-        method: "POST",
-        credentials: "include",
-        body,
-      });
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(payload?.message ?? "Upload fehlgeschlagen");
-      }
-      const asset = (await response.json()) as { id: string };
+      const asset = await uploadCourseAsset({ courseId, kind: "submission", file });
       onSaveAsset(asset.id);
     } catch (error) {
-      toast.error(friendlyErrorMessage(error as Error));
+      // The upload route answers in German already; keep its reason.
+      toast.error(
+        error instanceof CourseAssetUploadError
+          ? error.message
+          : friendlyErrorMessage(error as Error),
+      );
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -400,7 +436,10 @@ function TaskCard({
             rows={6}
             value={text}
             disabled={!editable}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              setText(event.target.value);
+              onTextChange(event.target.value);
+            }}
           />
           {editable && (
             <Button variant="outline" size="sm" disabled={saving} onClick={() => onSaveText(text)}>
@@ -427,6 +466,7 @@ function TaskCard({
                 ref={fileRef}
                 type="file"
                 className="sr-only"
+                tabIndex={-1}
                 aria-label={`Datei für ${task.title} auswählen`}
                 onChange={(event) => {
                   const file = event.target.files?.[0];

@@ -87,9 +87,21 @@ export function CourseBuilder({ course }: { course: CourseDetail }) {
               type="button"
               variant={published ? "outline" : "default"}
               disabled={busy}
-              onClick={() =>
-                published ? unpublish.mutate({ id: course.id }) : publish.mutate({ id: course.id })
-              }
+              onClick={() => {
+                if (!published) {
+                  publish.mutate({ id: course.id });
+                  return;
+                }
+                // Pulling a live course hides it from everyone enrolled, so it
+                // is not a one-click action.
+                if (
+                  window.confirm(
+                    "Veröffentlichung zurückziehen? Der Kurs ist danach nur noch für das Kursteam sichtbar.",
+                  )
+                ) {
+                  unpublish.mutate({ id: course.id });
+                }
+              }}
             >
               {published ? (
                 <EyeOff className="size-4" aria-hidden />

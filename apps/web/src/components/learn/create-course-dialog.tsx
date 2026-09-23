@@ -35,9 +35,9 @@ type Policy = "open" | "request" | "invite" | "paid";
 /**
  * Creates a course and takes the author straight into the builder.
  *
- * A new course is deliberately private and invite-only: it starts as a draft
- * nobody else can see, and going live is a separate, explicit act — the same
- * shape as publishing a page.
+ * Visibility and enrolment policy only take effect once the course is live: it
+ * starts as a draft nobody else can see, and going live is a separate, explicit
+ * act — the same shape as publishing a page.
  */
 export function CreateCourseDialog({
   open,
@@ -59,6 +59,8 @@ export function CreateCourseDialog({
         invalidateCourses();
         setTitle("");
         setTagline("");
+        setVisibility("organization");
+        setPolicy("open");
         onOpenChange(false);
         void navigate({ to: "/learn/courses/$slug/edit", params: { slug: course.slug } });
       },

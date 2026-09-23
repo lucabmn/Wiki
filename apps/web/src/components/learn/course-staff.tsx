@@ -7,8 +7,7 @@ import { QueryError } from "@/components/query-error";
 import { initials } from "@/lib/format";
 import { COURSE_ROLE_DESCRIPTION, COURSE_ROLE_LABEL } from "@/lib/learn-labels";
 import { membersQueryOptions, rolesQueryOptions, teamsQueryOptions } from "@/lib/org-queries";
-import { friendlyErrorMessage } from "@/utils/orpc";
-import { orpc } from "@/utils/orpc";
+import { friendlyErrorMessage, orpc } from "@/utils/orpc";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,8 +80,13 @@ export function CourseStaff({
   const teams = useQuery({ ...teamsQueryOptions(organizationId), enabled: canManage });
   const groups = useQuery({ ...rolesQueryOptions(organizationId), enabled: canManage });
 
+  // The course's own `access` block is derived from this list too — demoting
+  // or removing yourself has to reach the page's capability checks.
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: orpc.learn.courseMembers.list.key() });
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: orpc.learn.courseMembers.list.key() }),
+      queryClient.invalidateQueries({ queryKey: orpc.learn.courses.key() }),
+    ]);
 
   const add = useMutation(
     orpc.learn.courseMembers.add.mutationOptions({
@@ -132,6 +136,7 @@ export function CourseStaff({
   const teamOptions = (teams.data ?? []).filter((team) => !takenTeamIds.has(team.id));
   const groupOptions = (groups.data ?? []).filter((group) => !takenGroups.has(group.role));
 
+  const candidates = subject === "user" ? members : subject === "team" ? teams : groups;
   const hasOptions =
     subject === "user"
       ? userOptions.length > 0
@@ -216,7 +221,16 @@ export function CourseStaff({
             ))}
           </div>
 
-          {hasOptions ? (
+          {candidates.isPending ? (
+            <Skeleton className="h-9 w-full" />
+          ) : candidates.isError ? (
+            // Otherwise a failed load read as "everyone is already on the team".
+            <QueryError
+              compact
+              error={candidates.error}
+              onRetry={() => void candidates.refetch()}
+            />
+          ) : hasOptions ? (
             <>
               <div className="space-y-1.5">
                 <label

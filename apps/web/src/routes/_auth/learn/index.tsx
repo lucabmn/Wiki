@@ -46,7 +46,9 @@ function RouteComponent() {
   const [query, setQuery] = useState("");
   const [topicId, setTopicId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const canCreate = usePermission({ course: ["create"] });
+  // `usePermission` answers with an object; using it bare as a boolean showed
+  // "Kurs erstellen" to everyone, since an object is always truthy.
+  const { allowed: canCreate } = usePermission({ course: ["create"] });
 
   const courses = useQuery(
     orpc.learn.courses.list.queryOptions({
@@ -161,7 +163,16 @@ function RouteComponent() {
         ) : courses.isPending ? (
           <CourseGridSkeleton />
         ) : visible.length === 0 ? (
-          <EmptyCatalog scope={scope} filtered={query.length > 0 || topicId !== null} />
+          <EmptyCatalog
+            scope={scope}
+            filtered={query.length > 0 || topicId !== null}
+            canCreate={canCreate}
+            onCreate={() => setCreateOpen(true)}
+            onResetFilters={() => {
+              setQuery("");
+              setTopicId(null);
+            }}
+          />
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((course) => (
@@ -190,7 +201,12 @@ function TopicChip({
   children: React.ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active}>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className="focus-visible:ring-ring rounded-md outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+    >
       <Badge
         variant={active ? "default" : "outline"}
         className={cn("cursor-pointer", !active && "hover:bg-accent")}
@@ -216,7 +232,19 @@ function CourseGridSkeleton() {
   );
 }
 
-function EmptyCatalog({ scope, filtered }: { scope: Scope; filtered: boolean }) {
+function EmptyCatalog({
+  scope,
+  filtered,
+  canCreate,
+  onCreate,
+  onResetFilters,
+}: {
+  scope: Scope;
+  filtered: boolean;
+  canCreate: boolean;
+  onCreate: () => void;
+  onResetFilters: () => void;
+}) {
   const copy = filtered
     ? {
         title: "Nichts gefunden",
@@ -234,7 +262,10 @@ function EmptyCatalog({ scope, filtered }: { scope: Scope; filtered: boolean }) 
           }
         : {
             title: "Noch keine Kurse",
-            description: "Erstelle den ersten Kurs deiner Organisation.",
+            // Telling someone without the permission to create one is a dead end.
+            description: canCreate
+              ? "Erstelle den ersten Kurs deiner Organisation."
+              : "Sobald Kurse für dich freigegeben sind, erscheinen sie hier.",
           };
 
   return (
@@ -246,7 +277,20 @@ function EmptyCatalog({ scope, filtered }: { scope: Scope; filtered: boolean }) 
         <EmptyTitle>{copy.title}</EmptyTitle>
         <EmptyDescription>{copy.description}</EmptyDescription>
       </EmptyHeader>
-      <EmptyContent />
+      {filtered ? (
+        <EmptyContent>
+          <Button variant="outline" onClick={onResetFilters}>
+            Filter zurücksetzen
+          </Button>
+        </EmptyContent>
+      ) : scope === "catalog" && canCreate ? (
+        <EmptyContent>
+          <Button onClick={onCreate}>
+            <Plus className="size-4" aria-hidden />
+            Kurs erstellen
+          </Button>
+        </EmptyContent>
+      ) : null}
     </Empty>
   );
 }
