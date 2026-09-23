@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Bell, CheckCheck } from "lucide-react";
 
+import { QueryError } from "@/components/query-error";
 import { NotificationItem } from "./notification-item";
 import { useInboxList, useInboxMutations, useUnreadCount } from "./use-inbox";
 import { Button } from "@nilovon-wiki/ui/components/button";
@@ -67,6 +68,8 @@ export function NotificationBell() {
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
             </div>
+          ) : list.isError ? (
+            <QueryError compact onRetry={() => list.refetch()} />
           ) : !list.data?.length ? (
             <p className="px-3 py-8 text-center text-[13px] text-muted-foreground">
               Nichts Neues. Wenn dich jemand erwähnt, steht es hier.

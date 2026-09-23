@@ -30,7 +30,6 @@ export function NotificationItem({
       params={{ id: item.page.id }}
       hash={item.commentId ? `comment-${item.commentId}` : undefined}
       onClick={() => onNavigate?.(item)}
-      aria-label={`${describe(item)} — ${timeAgo(item.createdAt)}`}
       className={cn(
         "flex gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden",
         unread && "bg-primary/[0.04]",
@@ -59,11 +58,13 @@ export function NotificationItem({
         <p className="mt-0.5 text-[11.5px] text-muted-foreground">{timeAgo(item.createdAt)}</p>
       </div>
 
+      {/* The link's own text is its accessible name (an aria-label here used to
+          stringify the JSX description into "[object Object]"), so the unread
+          state is spoken via sr-only text rather than a label on a bare span. */}
       {unread ? (
-        <span
-          aria-label="Ungelesen"
-          className="mt-1.5 size-2 shrink-0 self-start rounded-full bg-primary"
-        />
+        <span className="mt-1.5 size-2 shrink-0 self-start rounded-full bg-primary">
+          <span className="sr-only">Ungelesen</span>
+        </span>
       ) : null}
     </Link>
   );

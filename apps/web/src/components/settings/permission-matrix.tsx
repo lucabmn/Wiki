@@ -67,6 +67,7 @@ function ResourceRow({
           Alle
           <Checkbox
             id={`all-${resource.resource}`}
+            aria-label={`Alle Rechte für ${resource.label}`}
             checked={allChecked}
             indeterminate={someChecked}
             onCheckedChange={(checked) => onChange(withResource(value, resource, checked === true))}
@@ -142,6 +143,7 @@ export function PermissionMatrix({
             <button
               type="button"
               className="flex w-full items-start justify-between gap-3 text-left"
+              aria-expanded={showDangerous}
               onClick={() => setShowDangerous((prev) => !prev)}
             >
               <div className="flex items-start gap-2">

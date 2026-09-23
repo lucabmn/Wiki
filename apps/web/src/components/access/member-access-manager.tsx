@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Plus, Search, Trash2, Users, X } from "lucide-react";
 
 import { initials } from "@/lib/format";
@@ -83,6 +83,9 @@ export function MemberAccessManager({
   removeTitle?: string;
   removeDescription: (label: string) => string;
 }) {
+  // Both the space sheet and the page-access sheet mount this; fixed ids would
+  // tie a label to the other instance's select.
+  const fieldId = useId();
   const [adding, setAdding] = useState(false);
   const [subject, setSubject] = useState<"user" | "role">("user");
   const [value, setValue] = useState("");
@@ -174,7 +177,7 @@ export function MemberAccessManager({
         <Button
           variant="ghost"
           size="icon-sm"
-          title="Entfernen"
+          title={`${label} entfernen`}
           className="text-muted-foreground hover:text-destructive"
           disabled={removePending}
           onClick={() => setRemoveTarget({ id: member.id, label })}
@@ -249,12 +252,12 @@ export function MemberAccessManager({
               <div className="space-y-1.5">
                 <label
                   className="text-xs font-medium text-muted-foreground"
-                  htmlFor="access-subject"
+                  htmlFor={`${fieldId}-subject`}
                 >
                   {subject === "user" ? "Person" : "Gruppe"}
                 </label>
                 <NativeSelect
-                  id="access-subject"
+                  id={`${fieldId}-subject`}
                   className="w-full"
                   value={value}
                   onChange={(event) => setValue(event.target.value)}
@@ -285,12 +288,12 @@ export function MemberAccessManager({
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <label
                     className="text-xs font-medium text-muted-foreground"
-                    htmlFor="access-role"
+                    htmlFor={`${fieldId}-role`}
                   >
                     Rolle
                   </label>
                   <NativeSelect
-                    id="access-role"
+                    id={`${fieldId}-role`}
                     className="w-full"
                     value={role}
                     onChange={(event) => setRole(event.target.value)}

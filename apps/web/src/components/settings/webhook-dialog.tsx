@@ -1,9 +1,10 @@
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { orpc, client } from "@/utils/orpc";
+import { QueryError } from "@/components/query-error";
 import { toastError } from "@/lib/query";
 import { CopyField } from "./copy-field";
 import { WebhookEventPicker } from "./webhook-event-picker";
@@ -66,22 +67,28 @@ export function WebhookDialog({
   const eventsQuery = useQuery(orpc.webhooks.listEvents.queryOptions({ input: {}, enabled: open }));
   const spacesQuery = useQuery(orpc.spaces.list.queryOptions({ input: {}, enabled: open }));
 
-  useEffect(() => {
-    if (!open) return;
-    setError(null);
-    setSecret(null);
-    setDraft(
-      existing
-        ? {
-            name: existing.name,
-            url: existing.url,
-            spaceId: existing.spaceId ?? "",
-            events: [...existing.events],
-            active: existing.active,
-          }
-        : EMPTY,
-    );
-  }, [open, existing]);
+  // Seeded during render when the dialog opens, not in an effect, so the first
+  // frame never shows the previously edited webhook's values.
+  const seedKey = open ? (existing?.id ?? "new") : null;
+  const [seededFor, setSeededFor] = useState<string | null>(null);
+  if (seedKey !== seededFor) {
+    setSeededFor(seedKey);
+    if (seedKey !== null) {
+      setError(null);
+      setSecret(null);
+      setDraft(
+        existing
+          ? {
+              name: existing.name,
+              url: existing.url,
+              spaceId: existing.spaceId ?? "",
+              events: [...existing.events],
+              active: existing.active,
+            }
+          : EMPTY,
+      );
+    }
+  }
 
   const patch = (values: Partial<Draft>) => setDraft((current) => ({ ...current, ...values }));
 
@@ -186,7 +193,7 @@ export function WebhookDialog({
                   ))}
                 </NativeSelect>
                 <FieldDescription>
-                  „Alle Spaces" schließt später angelegte Spaces mit ein.
+                  „Alle Spaces“ schließt später angelegte Spaces mit ein.
                 </FieldDescription>
               </Field>
 
@@ -194,6 +201,8 @@ export function WebhookDialog({
                 <span className="text-sm font-medium">Ereignisse</span>
                 {eventsQuery.isPending ? (
                   <Skeleton className="h-40 w-full rounded-lg" />
+                ) : eventsQuery.isError ? (
+                  <QueryError onRetry={() => eventsQuery.refetch()} error={eventsQuery.error} />
                 ) : (
                   <WebhookEventPicker
                     available={eventsQuery.data ?? []}

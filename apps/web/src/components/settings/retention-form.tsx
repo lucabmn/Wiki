@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Field, FieldDescription, FieldLabel } from "@nilovon-wiki/ui/components/field";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
@@ -52,10 +54,14 @@ export function RetentionForm({
   // A stored value that is not one of the presets keeps the custom input open,
   // so re-opening the page never silently rounds the admin's number to a preset.
   const days = value.auditRetentionDays;
+  // Picking "Andere Frist …" has to stick even while the number still matches a
+  // preset — derived from the value alone, choosing it from "1 Jahr" or
+  // "Unbegrenzt" snapped straight back to "1 Jahr" and the input never opened.
+  const [customChosen, setCustomChosen] = useState(false);
   const preset =
     days === null
       ? "unlimited"
-      : AUDIT_PRESETS.some((option) => option.days === days)
+      : !customChosen && AUDIT_PRESETS.some((option) => option.days === days)
         ? String(days)
         : "custom";
 
@@ -70,6 +76,7 @@ export function RetentionForm({
           value={preset}
           onChange={(event) => {
             const next = event.target.value;
+            setCustomChosen(next === "custom");
             if (next === "unlimited") return patch({ auditRetentionDays: null });
             if (next === "custom") return patch({ auditRetentionDays: days ?? 365 });
             patch({ auditRetentionDays: Number(next) });
@@ -91,25 +98,10 @@ export function RetentionForm({
       {preset === "custom" ? (
         <Field>
           <FieldLabel htmlFor="audit-retention-days">Frist in Tagen</FieldLabel>
-          <Input
-            id="audit-retention-days"
-            type="number"
-            inputMode="numeric"
-            min={MIN_DAYS}
-            max={MAX_DAYS}
-            className="w-40"
+          <CustomDaysInput
+            value={days ?? MIN_DAYS}
             disabled={disabled}
-            value={days ?? ""}
-            onChange={(event) => {
-              const parsed = Number(event.target.value);
-              // Clamped here rather than only server-side, so the number the
-              // confirmation dialog counts against is the one that gets saved.
-              patch({
-                auditRetentionDays: Number.isFinite(parsed)
-                  ? Math.min(MAX_DAYS, Math.max(MIN_DAYS, Math.trunc(parsed)))
-                  : MIN_DAYS,
-              });
-            }}
+            onChange={(next) => patch({ auditRetentionDays: next })}
           />
           <FieldDescription>
             Zwischen {MIN_DAYS} und {MAX_DAYS} Tagen (10 Jahre).
@@ -141,5 +133,45 @@ export function RetentionForm({
         </FieldDescription>
       </Field>
     </div>
+  );
+}
+
+/**
+ * The free-form day count. Typing goes into a local draft so the field can be
+ * cleared and retyped — clamping every keystroke turned an emptied field into
+ * "1" under the cursor. Valid numbers still reach the policy immediately
+ * (clamped, so the confirmation dialog counts against what gets saved); blur
+ * snaps the draft back to the stored value.
+ */
+function CustomDaysInput({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: number;
+  disabled: boolean;
+  onChange: (next: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  return (
+    <Input
+      id="audit-retention-days"
+      type="number"
+      inputMode="numeric"
+      min={MIN_DAYS}
+      max={MAX_DAYS}
+      className="w-40"
+      disabled={disabled}
+      value={draft ?? String(value)}
+      onChange={(event) => {
+        setDraft(event.target.value);
+        const parsed = Number(event.target.value);
+        if (event.target.value !== "" && Number.isFinite(parsed)) {
+          onChange(Math.min(MAX_DAYS, Math.max(MIN_DAYS, Math.trunc(parsed))));
+        }
+      }}
+      onBlur={() => setDraft(null)}
+    />
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 import { toast } from "sonner";
@@ -60,12 +60,20 @@ export function GroupEditorSheet({
   const refresh = useOrgRefresh();
 
   // Seed the form each time the sheet opens (create → blank, edit → the group).
-  useEffect(() => {
-    if (!open) return;
-    setName(existing?.role ?? "");
-    setPermission(existing?.permission ?? {});
-    setNameError(null);
-  }, [open, existing]);
+  // Done during render rather than in an effect: the permission matrix decides
+  // on mount whether to reveal the dangerous section, and with an effect it
+  // mounted against the previous group's value — hiding admin rights the group
+  // being edited actually holds.
+  const seedKey = open ? (existing?.id ?? "new") : null;
+  const [seededFor, setSeededFor] = useState<string | null>(null);
+  if (seedKey !== seededFor) {
+    setSeededFor(seedKey);
+    if (seedKey !== null) {
+      setName(existing?.role ?? "");
+      setPermission(existing?.permission ?? {});
+      setNameError(null);
+    }
+  }
 
   const otherNames = new Set(
     allGroups.filter((group) => group.id !== existing?.id).map((group) => group.role.toLowerCase()),
@@ -153,7 +161,11 @@ export function GroupEditorSheet({
                 {grantCount} {grantCount === 1 ? "Recht" : "Rechte"} gewählt
               </span>
             </div>
-            <PermissionMatrix value={permission} onChange={setPermission} />
+            <PermissionMatrix
+              key={seedKey ?? "closed"}
+              value={permission}
+              onChange={setPermission}
+            />
           </div>
         </div>
 

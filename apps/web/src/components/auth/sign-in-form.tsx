@@ -16,7 +16,9 @@ import Loader from "../loader";
 
 const formSchema = z.object({
   email: z.email("Ungültige E-Mail-Adresse"),
-  password: z.string().min(8, "Passwort muss mindestens 8 Zeichen haben"),
+  // Only "not empty" here: length rules belong to choosing a password, and an
+  // account whose password predates a stricter rule must still be able to sign in.
+  password: z.string().min(1, "Bitte gib dein Passwort ein"),
 });
 
 export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
@@ -238,16 +240,21 @@ function SSOSignIn({ email }: { email: string }) {
     setPending(true);
     // On success the browser is redirected to the identity provider, so this
     // promise only ever resolves on failure — no success branch to write.
-    const result = await authClient.signIn.sso({
-      email: address,
-      callbackURL: `${window.location.origin}/`,
-      errorCallbackURL: `${window.location.origin}/auth/login`,
-    });
-    setPending(false);
-
-    if (result?.error) {
-      const domain = address.split("@")[1];
-      toast.error(ssoErrorMessage(result.error.status, domain));
+    try {
+      const result = await authClient.signIn.sso({
+        email: address,
+        callbackURL: `${window.location.origin}/`,
+        errorCallbackURL: `${window.location.origin}/auth/login`,
+      });
+      if (result?.error) {
+        const domain = address.split("@")[1];
+        toast.error(ssoErrorMessage(result.error.status, domain));
+      }
+    } catch {
+      // A network failure would otherwise leave the button stuck on "Weiterleitung …".
+      toast.error(ssoErrorMessage(undefined, undefined));
+    } finally {
+      setPending(false);
     }
   };
 
@@ -281,10 +288,20 @@ function PasskeySignIn() {
 
   const signIn = async () => {
     setPending(true);
-    const result = await authClient.signIn.passkey();
-    setPending(false);
+    let result: Awaited<ReturnType<typeof authClient.signIn.passkey>>;
+    try {
+      result = await authClient.signIn.passkey();
+    } catch {
+      toast.error("Anmeldung mit Passkey fehlgeschlagen.");
+      return;
+    } finally {
+      setPending(false);
+    }
 
     if (result?.error) {
+      // Dismissing the browser prompt is a choice, not a failure — stay silent,
+      // as promised above.
+      if ("code" in result.error && result.error.code === "AUTH_CANCELLED") return;
       toast.error("Anmeldung mit Passkey fehlgeschlagen.");
       return;
     }

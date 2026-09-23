@@ -104,7 +104,7 @@ export function UserActions({
         destructive={isAdmin}
         disabled={isSelf}
         disabledReason="Die eigene Rolle lässt sich hier nicht ändern."
-        onConfirm={() => setRole.mutate({ userId: user.id, role: isAdmin ? "user" : "admin" })}
+        onConfirm={() => setRole.mutateAsync({ userId: user.id, role: isAdmin ? "user" : "admin" })}
         isPending={setRole.isPending}
       />
 
@@ -128,7 +128,7 @@ export function UserActions({
         title="Passwort zurücksetzen lassen?"
         description={`${user.email} erhält den gewohnten Link zum Zurücksetzen. Du erfährst das neue Passwort nicht — der Zugang bleibt an das Postfach gebunden.`}
         confirmLabel="Link senden"
-        onConfirm={() => sendReset.mutate({ userId: user.id })}
+        onConfirm={() => sendReset.mutateAsync({ userId: user.id })}
         isPending={sendReset.isPending}
       />
 
@@ -145,7 +145,7 @@ export function UserActions({
               ? "Das ist dein eigenes Konto."
               : "Andere Instanz-Administratoren lassen sich nicht übernehmen."
           }
-          onConfirm={() => impersonate.mutate()}
+          onConfirm={() => impersonate.mutateAsync()}
           isPending={impersonate.isPending}
         />
       ) : null}
@@ -183,7 +183,7 @@ function DeleteUserButton({ user, isSelf }: { user: TargetUser; isSelf: boolean 
       disabledReason="Das eigene Konto lässt sich hier nicht löschen."
       confirmDisabled={confirmation !== user.email}
       onClose={() => setConfirmation("")}
-      onConfirm={() => remove.mutate({ userId: user.id })}
+      onConfirm={() => remove.mutateAsync({ userId: user.id })}
       isPending={remove.isPending}
     >
       <Field>

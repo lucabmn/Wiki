@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 
+import { QueryError } from "@/components/query-error";
 import { orpc } from "@/utils/orpc";
 import type { RetentionPolicy } from "@/components/settings/retention-form";
 import {
@@ -61,14 +62,19 @@ export function RetentionConfirmDialog({
           <AlertDialogDescription>
             {impact.isPending
               ? "Es wird geprüft, was der nächste Lauf entfernen würde …"
-              : total === 0
-                ? "Beim nächsten Lauf wird nichts gelöscht. Die neuen Fristen greifen ab sofort für künftige Daten."
-                : "Der nächste Aufräum-Lauf löscht damit endgültig:"}
+              : impact.isError
+                ? // Without the numbers this must not claim "nothing is deleted".
+                  "Es konnte nicht ermittelt werden, was der nächste Lauf entfernen würde. Gekürzte Fristen löschen ältere Daten endgültig."
+                : total === 0
+                  ? "Beim nächsten Lauf wird nichts gelöscht. Die neuen Fristen greifen ab sofort für künftige Daten."
+                  : "Der nächste Aufräum-Lauf löscht damit endgültig:"}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         {impact.isPending ? (
           <Skeleton className="h-20 w-full rounded-lg" />
+        ) : impact.isError ? (
+          <QueryError compact className="px-0" onRetry={() => impact.refetch()} />
         ) : total > 0 ? (
           <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
             <ul className="space-y-1">
@@ -100,7 +106,13 @@ export function RetentionConfirmDialog({
               onConfirm();
             }}
           >
-            {pending ? "Speichern …" : total > 0 ? "Speichern und löschen" : "Speichern"}
+            {pending
+              ? "Speichern …"
+              : impact.isError
+                ? "Trotzdem speichern"
+                : total > 0
+                  ? "Speichern und löschen"
+                  : "Speichern"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

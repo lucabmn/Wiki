@@ -58,8 +58,7 @@ export function InviteMemberDialog({
     onSuccess: async () => {
       await refresh();
       toast.success("Einladung verschickt");
-      reset();
-      onOpenChange(false);
+      close();
     },
     onError: toastError,
   });
@@ -68,6 +67,10 @@ export function InviteMemberDialog({
     setEmail("");
     setRole("member");
     setError(null);
+  };
+  const close = () => {
+    reset();
+    onOpenChange(false);
   };
 
   const submit = () => {
@@ -81,13 +84,7 @@ export function InviteMemberDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) reset();
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Mitglied einladen</DialogTitle>
@@ -107,6 +104,7 @@ export function InviteMemberDialog({
             <Input
               id="invite-email"
               type="email"
+              autoComplete="off"
               autoFocus
               value={email}
               onChange={(event) => {
@@ -147,12 +145,7 @@ export function InviteMemberDialog({
           </Field>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={invite.isPending}
-            >
+            <Button type="button" variant="outline" onClick={close} disabled={invite.isPending}>
               Abbrechen
             </Button>
             <Button type="submit" disabled={invite.isPending || !email.trim()}>

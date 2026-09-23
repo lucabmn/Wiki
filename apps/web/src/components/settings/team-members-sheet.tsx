@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { authClient } from "@/lib/auth-client";
 import { initials } from "@/lib/format";
 import { toastError } from "@/lib/query";
@@ -74,7 +75,7 @@ export function TeamMembersSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
         <SheetHeader className="border-b border-border">
-          <SheetTitle>Mitglieder von „{team?.name ?? ""}"</SheetTitle>
+          <SheetTitle>Mitglieder von „{team?.name ?? ""}“</SheetTitle>
           <SheetDescription>
             Teams bündeln Personen. Zugriff auf Inhalte bekommt ein Team erst, wenn du es in einem
             Space oder auf einer Seite als Mitglied hinzufügst.
@@ -88,6 +89,15 @@ export function TeamMembersSheet({
                 <Skeleton key={row} className="h-11 w-full rounded-md" />
               ))}
             </div>
+          ) : membersQuery.isError || teamMembersQuery.isError ? (
+            // Without both lists every switch would read "not in team".
+            <QueryError
+              onRetry={() => {
+                void membersQuery.refetch();
+                void teamMembersQuery.refetch();
+              }}
+              error={membersQuery.error ?? teamMembersQuery.error}
+            />
           ) : members.length === 0 ? (
             <p className="text-sm text-muted-foreground">Keine Mitglieder in der Organisation.</p>
           ) : (

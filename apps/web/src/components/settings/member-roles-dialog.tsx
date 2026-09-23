@@ -89,7 +89,10 @@ export function MemberRolesDialog({
   const ownerLocked = isLastOwner && selected.has("owner");
   const isEmpty = selected.size === 0;
 
-  const Row = ({
+  // Called as a function, not rendered as <Row>: a component defined inside
+  // render is a new type every render, so each toggle remounted the checkbox
+  // and dropped keyboard focus.
+  const renderRow = ({
     value,
     label,
     description,
@@ -101,6 +104,7 @@ export function MemberRolesDialog({
     disabled?: boolean;
   }) => (
     <label
+      key={value}
       className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent/40 has-data-checked:border-primary/40 has-data-checked:bg-primary/5"
       htmlFor={`role-${value}`}
     >
@@ -134,15 +138,14 @@ export function MemberRolesDialog({
               Rollen
             </h3>
             <div className="space-y-2">
-              {STATIC_ROLES.map((role) => (
-                <Row
-                  key={role.value}
-                  value={role.value}
-                  label={ROLE_LABEL[role.value] ?? role.value}
-                  description={role.description}
-                  disabled={role.value === "owner" && ownerLocked}
-                />
-              ))}
+              {STATIC_ROLES.map((role) =>
+                renderRow({
+                  value: role.value,
+                  label: ROLE_LABEL[role.value] ?? role.value,
+                  description: role.description,
+                  disabled: role.value === "owner" && ownerLocked,
+                }),
+              )}
             </div>
           </section>
 
@@ -152,13 +155,11 @@ export function MemberRolesDialog({
             </h3>
             {groups.length > 0 ? (
               <div className="space-y-2">
-                {groups.map((group) => (
-                  <Row key={group.id} value={group.role} label={group.role} />
-                ))}
+                {groups.map((group) => renderRow({ value: group.role, label: group.role }))}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Noch keine Gruppen. Lege im Tab „Gruppen" welche an.
+                Noch keine Gruppen. Lege im Tab „Gruppen“ welche an.
               </p>
             )}
           </section>

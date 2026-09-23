@@ -139,6 +139,12 @@ function EnableDialog({
     setCode("");
     setProvisioned(null);
   };
+  // Every way out of the dialog goes through here: it stays mounted, so state
+  // left behind would reopen on a stale secret and its backup codes.
+  const close = () => {
+    reset();
+    onOpenChange(false);
+  };
 
   const start = useMutation({
     mutationFn: async () => {
@@ -164,8 +170,7 @@ function EnableDialog({
     },
     onSuccess: () => {
       toast.success("Zwei-Faktor-Authentifizierung aktiv");
-      reset();
-      onOpenChange(false);
+      close();
     },
     onError: toastError,
   });
@@ -173,13 +178,7 @@ function EnableDialog({
   const secret = provisioned ? secretFromUri(provisioned.totpURI) : null;
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) reset();
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Zwei-Faktor-Authentifizierung aktivieren</DialogTitle>
@@ -212,6 +211,7 @@ function EnableDialog({
                     variant="outline"
                     size="icon"
                     title="Schlüssel kopieren"
+                    aria-label="Schlüssel kopieren"
                     onClick={() => copy(secret, "Schlüssel kopiert")}
                   >
                     <Copy className="size-4" />
@@ -242,12 +242,7 @@ function EnableDialog({
             </Field>
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={confirm.isPending}
-              >
+              <Button type="button" variant="outline" onClick={close} disabled={confirm.isPending}>
                 Abbrechen
               </Button>
               <Button type="submit" disabled={confirm.isPending || code.trim().length < 6}>
@@ -275,12 +270,7 @@ function EnableDialog({
               />
             </Field>
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={start.isPending}
-              >
+              <Button type="button" variant="outline" onClick={close} disabled={start.isPending}>
                 Abbrechen
               </Button>
               <Button type="submit" disabled={start.isPending || !password}>
@@ -302,6 +292,10 @@ function DisableDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [password, setPassword] = useState("");
+  const close = () => {
+    setPassword("");
+    onOpenChange(false);
+  };
 
   const disable = useMutation({
     mutationFn: async () => {
@@ -311,20 +305,13 @@ function DisableDialog({
     },
     onSuccess: () => {
       toast.success("Zwei-Faktor-Authentifizierung deaktiviert");
-      setPassword("");
-      onOpenChange(false);
+      close();
     },
     onError: toastError,
   });
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) setPassword("");
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Zwei-Faktor-Authentifizierung deaktivieren</DialogTitle>
@@ -351,12 +338,7 @@ function DisableDialog({
             />
           </Field>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={disable.isPending}
-            >
+            <Button type="button" variant="outline" onClick={close} disabled={disable.isPending}>
               Abbrechen
             </Button>
             <Button type="submit" variant="destructive" disabled={disable.isPending || !password}>
@@ -378,6 +360,12 @@ function RegenerateCodesDialog({
 }) {
   const [password, setPassword] = useState("");
   const [codes, setCodes] = useState<string[] | null>(null);
+  // The fresh codes must not survive a close: reopening would show them again.
+  const close = () => {
+    setPassword("");
+    setCodes(null);
+    onOpenChange(false);
+  };
 
   const regenerate = useMutation({
     mutationFn: async () => {
@@ -393,16 +381,7 @@ function RegenerateCodesDialog({
   });
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) {
-          setPassword("");
-          setCodes(null);
-        }
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Backup-Codes neu erzeugen</DialogTitle>
@@ -415,7 +394,7 @@ function RegenerateCodesDialog({
           <div className="space-y-4">
             <BackupCodes codes={codes} />
             <DialogFooter>
-              <Button type="button" onClick={() => onOpenChange(false)}>
+              <Button type="button" onClick={close}>
                 Fertig
               </Button>
             </DialogFooter>
@@ -443,7 +422,7 @@ function RegenerateCodesDialog({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={close}
                 disabled={regenerate.isPending}
               >
                 Abbrechen

@@ -230,7 +230,7 @@ export function SSOProviderDialog({
         <DialogHeader>
           <DialogTitle>{existing ? "Anbieter bearbeiten" : "Anbieter verbinden"}</DialogTitle>
           <DialogDescription>
-            Lege im Identitätsanbieter eine OIDC-Anwendung („Web application") an und trage die
+            Lege im Identitätsanbieter eine OIDC-Anwendung („Web application“) an und trage die
             Zugangsdaten hier ein. Die Weiterleitungs-URL unten braucht der Anbieter dafür.
           </DialogDescription>
         </DialogHeader>

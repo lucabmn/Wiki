@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock } from "lucide-react";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { orpc } from "@/utils/orpc";
 import { toastError } from "@/lib/query";
 import {
@@ -49,6 +50,10 @@ export function DirectNotificationSettings() {
       onError: toastError,
     }),
   );
+
+  if (settingsQuery.isError) {
+    return <QueryError onRetry={() => settingsQuery.refetch()} error={settingsQuery.error} />;
+  }
 
   if (settingsQuery.isPending || !settingsQuery.data) {
     return (

@@ -47,16 +47,22 @@ export function WebhookEventPicker<T extends string>({
     <fieldset className="space-y-4" disabled={disabled}>
       {grouped.map((group) => {
         const allSelected = group.events.every((event) => selected.includes(event));
+        const headingId = `${idPrefix}-group-${group.label}`;
+        // A fieldset allows exactly one leading <legend>, so each group is
+        // labelled as an ARIA group instead of by a stray legend per group.
         return (
-          <div key={group.label} className="space-y-2">
+          <div key={group.label} role="group" aria-labelledby={headingId} className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <legend className="text-xs font-medium text-muted-foreground">{group.label}</legend>
+              <span id={headingId} className="text-xs font-medium text-muted-foreground">
+                {group.label}
+              </span>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="h-6 px-2 text-xs"
                 disabled={disabled}
+                aria-label={`${group.label}: ${allSelected ? "keine" : "alle"} auswählen`}
                 onClick={() =>
                   onChange(
                     allSelected
@@ -65,7 +71,7 @@ export function WebhookEventPicker<T extends string>({
                   )
                 }
               >
-                {allSelected ? "Keines" : "Alle"}
+                {allSelected ? "Keine" : "Alle"}
               </Button>
             </div>
             <div className="grid gap-1.5 sm:grid-cols-2">

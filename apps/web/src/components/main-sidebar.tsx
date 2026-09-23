@@ -61,6 +61,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { useTheme } from "./theme-provider";
 import { Link, useMatchRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
 
@@ -310,7 +311,13 @@ export default function MainSidebar() {
   const { data: organizations } = authClient.useListOrganizations();
   const switchOrganization = async (organizationId: string) => {
     if (organizationId === auth.organization.id) return;
-    await authClient.organization.setActive({ organizationId });
+    const { error } = await authClient.organization.setActive({ organizationId });
+    // Reloading after a refused switch would land back in the old organization
+    // with no hint that anything went wrong.
+    if (error) {
+      toast.error(error.message ?? "Organisation konnte nicht gewechselt werden.");
+      return;
+    }
     window.location.assign("/");
   };
 
@@ -462,7 +469,8 @@ export default function MainSidebar() {
         <Button
           variant="ghost"
           size="icon-sm"
-          title="Theme wechseln"
+          title={theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"}
+          aria-label={theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"}
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >
           {theme === "light" ? <Sun /> : <Moon />}

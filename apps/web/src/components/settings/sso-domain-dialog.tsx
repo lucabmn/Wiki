@@ -110,10 +110,20 @@ export function SSODomainDialog({
               <Skeleton className="h-16 w-full" />
             </>
           ) : tokenQuery.isError ? (
-            <p className="text-sm text-destructive">
-              Der Bestätigungs-Token konnte nicht angefordert werden. Schließe den Dialog und
-              versuche es erneut.
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm text-destructive">
+                Der Bestätigungs-Token konnte nicht angefordert werden.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={tokenQuery.isFetching}
+                onClick={() => void tokenQuery.refetch()}
+              >
+                Erneut versuchen
+              </Button>
+            </div>
           ) : token ? (
             <>
               {domains.map((domain) => (

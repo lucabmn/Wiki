@@ -12,7 +12,9 @@ import {
 } from "@nilovon-wiki/ui/components/dialog";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
 
 /**
  * Controlled dialog that creates a space in the active organization. Real data
@@ -25,17 +27,29 @@ export function CreateSpaceDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [icon, setIcon] = useState<string | null>(null);
   const invalidateSpaces = useInvalidate(orpc.spaces.list.key());
 
+  const reset = () => {
+    setName("");
+    setIcon(null);
+  };
+  const close = () => {
+    reset();
+    onOpenChange(false);
+  };
+
   const create = useMutation(
     orpc.spaces.create.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (space) => {
         invalidateSpaces();
-        setName("");
-        setIcon(null);
-        onOpenChange(false);
+        close();
+        toast.success(`Space „${space.name}“ angelegt`);
+        // Straight into the new space, like a new page opens its draft — the
+        // dialog closing on its own was the only sign that anything happened.
+        navigate({ to: "/spaces/$slug", params: { slug: space.slug } });
       },
       onError: toastError,
     }),
@@ -49,7 +63,7 @@ export function CreateSpaceDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Neuer Space</DialogTitle>
@@ -68,6 +82,7 @@ export function CreateSpaceDialog({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Space-Name"
+            aria-label="Space-Name"
             maxLength={120}
           />
           <div className="mt-3 space-y-1.5">
@@ -81,12 +96,7 @@ export function CreateSpaceDialog({
             />
           </div>
           <DialogFooter className="mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={create.isPending}
-            >
+            <Button type="button" variant="outline" onClick={close} disabled={create.isPending}>
               Abbrechen
             </Button>
             <Button type="submit" disabled={create.isPending || !name.trim()}>

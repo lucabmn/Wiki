@@ -150,7 +150,7 @@ export function SpaceLifecycleSections({
                 onClick={() => restoreSpace.mutate({ id: space.id })}
               >
                 <Archive className="size-3.5" />
-                {restoreSpace.isPending ? "Aktivieren …" : "Wiederherstellen"}
+                {restoreSpace.isPending ? "Wiederherstellen …" : "Wiederherstellen"}
               </Button>
             ) : (
               <Button
@@ -191,7 +191,7 @@ export function SpaceLifecycleSections({
           <AlertDialogHeader>
             <AlertDialogTitle>Space archivieren?</AlertDialogTitle>
             <AlertDialogDescription>
-              „{space.name}" wird ausgeblendet und erscheint nicht mehr in der Übersicht. Die Seiten
+              „{space.name}“ wird ausgeblendet und erscheint nicht mehr in der Übersicht. Die Seiten
               bleiben erhalten.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -215,7 +215,7 @@ export function SpaceLifecycleSections({
           <AlertDialogHeader>
             <AlertDialogTitle>Space in den Papierkorb?</AlertDialogTitle>
             <AlertDialogDescription>
-              „{space.name}" verschwindet mit allen Seiten aus allen Ansichten, bleibt aber bis zum
+              „{space.name}“ verschwindet mit allen Seiten aus allen Ansichten, bleibt aber bis zum
               Ablauf der Aufbewahrungsfrist wiederherstellbar. Danach wird er samt Anhängen
               endgültig gelöscht.
             </AlertDialogDescription>
