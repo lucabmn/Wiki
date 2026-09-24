@@ -18,7 +18,7 @@ overrides:
   postcss: 8.5.18
 catalog:
   dotenv: ^17.4.2
-  zod: ^4.4.3
+  zod: ^4.6.5
   typescript: ^7
   "@types/bun": ^1.3.14
   hono: ^4.13.3
