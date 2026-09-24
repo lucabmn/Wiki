@@ -11,9 +11,13 @@ Releases.
 
 ## Getting it
 
-Download the binary for your platform from GitHub Releases:
+The installer operates on a checkout of this repository — it looks for
+`docker-compose.yml` in the current directory and its parents — so clone first,
+then download the binary for your platform from GitHub Releases into the
+checkout:
 
 ```sh
+git clone https://github.com/lucabmn/Wiki.git && cd Wiki
 curl -fsSLo installer "https://github.com/lucabmn/Wiki/releases/latest/download/nilovon-wiki-installer-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
 chmod +x installer && ./installer
 ```
@@ -31,7 +35,7 @@ The wizard is menu-driven. Its three main actions:
 | Action            | What it does                                                                           |
 | ----------------- | -------------------------------------------------------------------------------------- |
 | **Installieren**  | Generate secrets, write `.env`, build images, start the stack, wait for health.        |
-| **Konfigurieren** | Reconfigure an existing install (change domains, secrets, ports).                      |
+| **Konfigurieren** | Change the public URLs of an existing install and restart; secrets stay read-only.     |
 | **Updaten**       | `git pull --ff-only`, rebuild, restart — with the TLS overlay if the install is HTTPS. |
 
 For a public install, enter `https://` / `wss://` URLs plus a Let's Encrypt email
@@ -45,10 +49,15 @@ automatically.
 
 ## Under the hood
 
-The installer generates each secret with strong entropy (equivalent to
-`openssl rand -base64 48`) and refuses placeholder values — the same startup
-validation the services enforce. Migrations always run inside the stack, so the
-installer never touches your database directly.
+The installer generates each secret from the system CSPRNG (the auth and
+storage secrets are equivalent to `openssl rand -base64 32`, the database
+password to `openssl rand -hex 18`), writes the `.env` files with mode `0600`,
+and refuses to continue while a value is too short or a URL is malformed.
+Re-running **Installieren** over an existing deployment regenerates every
+secret — the new database password will not match the existing Postgres
+volume — so use **Konfigurieren** for installs that already run. Migrations
+always run inside the stack, so the installer never touches your database
+directly.
 
 ## Related
 

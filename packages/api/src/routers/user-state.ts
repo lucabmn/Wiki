@@ -10,6 +10,7 @@ import { filterReadablePagesAcrossSpaces, requirePageCapability } from "../lib/a
 import { loadPage } from "../lib/loaders";
 import { PageSchema } from "../schemas/page";
 import { PageRefInputSchema, ToggleResultSchema } from "../schemas/user-state";
+import { redactDraftBody } from "./page";
 
 const TAGS = ["Me"];
 
@@ -50,12 +51,14 @@ export const userStateRouter = {
       ]);
       // Space read alone is not enough: a page may carry a restrictive per-page
       // override, and this endpoint returns full content.
-      return filterReadablePagesAcrossSpaces(
+      const readable = await filterReadablePagesAcrossSpaces(
         context.db,
         context,
         context.headers,
         rows.filter((r) => canRead(r.space)).map((r) => r.page),
       );
+      // Draft bodies never cross reader APIs — same rule as `pages.list`.
+      return readable.map(redactDraftBody);
     }),
 
   addFavorite: protectedProcedure
@@ -119,12 +122,14 @@ export const userStateRouter = {
           .orderBy(desc(pageSubscription.createdAt)),
         buildSpaceReadFilter(context.db, context),
       ]);
-      return filterReadablePagesAcrossSpaces(
+      const readable = await filterReadablePagesAcrossSpaces(
         context.db,
         context,
         context.headers,
         rows.filter((r) => canRead(r.space)).map((r) => r.page),
       );
+      // Draft bodies never cross reader APIs — same rule as `pages.list`.
+      return readable.map(redactDraftBody);
     }),
 
   subscribe: protectedProcedure

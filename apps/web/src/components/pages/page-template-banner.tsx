@@ -64,7 +64,7 @@ export function PageTemplateBanner({ page }: { page: TemplatePage }) {
     orpc.pages.createFromTemplate.mutationOptions({
       onSuccess: (created) => {
         invalidatePages();
-        toast.success(`„${created.title}" aus der Vorlage erstellt.`);
+        toast.success(`„${created.title}“ aus der Vorlage erstellt.`);
         navigate({ to: "/pages/$id", params: { id: created.id } });
       },
       onError: toastError,

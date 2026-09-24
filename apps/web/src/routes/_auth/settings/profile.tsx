@@ -8,6 +8,7 @@ import { z } from "zod";
 import { authClient } from "@/lib/auth-client";
 import { initials } from "@/lib/format";
 import { toastError } from "@/lib/query";
+import { pageTitle } from "@/lib/page-title";
 import { SettingsCard, SettingsSection } from "@/components/settings/settings-section";
 import { Avatar, AvatarFallback, AvatarImage } from "@nilovon-wiki/ui/components/avatar";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
@@ -23,6 +24,7 @@ import { Input } from "@nilovon-wiki/ui/components/input";
 import { useForm } from "@tanstack/react-form";
 
 export const Route = createFileRoute("/_auth/settings/profile")({
+  head: () => pageTitle("Profil", "Einstellungen"),
   component: ProfileSettings,
 });
 
@@ -158,8 +160,8 @@ function ProfileForm({ name, image }: { name: string; image: string }) {
           </FieldGroup>
 
           <Field orientation="horizontal" className="flex justify-end">
-            <Button type="submit" size="sm" form="profile-form">
-              Speichern
+            <Button type="submit" size="sm" form="profile-form" disabled={save.isPending}>
+              {save.isPending ? "Speichern …" : "Speichern"}
             </Button>
           </Field>
         </form>
@@ -258,6 +260,7 @@ function EmailForm({ email, verified }: { email: string; verified: boolean }) {
             <Input
               id="profile-email"
               type="email"
+              autoComplete="email"
               value={nextEmail}
               onChange={(event) => {
                 setNextEmail(event.target.value);
@@ -282,7 +285,7 @@ function EmailForm({ email, verified }: { email: string; verified: boolean }) {
               size="sm"
               disabled={change.isPending || nextEmail.trim() === email || !nextEmail.trim()}
             >
-              {change.isPending ? "Ändern …" : "Adresse ändern"}
+              {change.isPending ? "Wird geändert …" : "Adresse ändern"}
             </Button>
           </div>
         </form>

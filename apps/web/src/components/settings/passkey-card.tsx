@@ -7,6 +7,16 @@ import { authClient } from "@/lib/auth-client";
 import { formatDateTime } from "@/lib/format";
 import { toastError } from "@/lib/query";
 import { SettingsCard, SettingsSection } from "./settings-section";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@nilovon-wiki/ui/components/alert-dialog";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import {
   Dialog,
@@ -41,6 +51,7 @@ type Passkey = {
 export function PasskeyCard() {
   const { data, isPending } = authClient.useListPasskeys();
   const [addOpen, setAddOpen] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<Passkey | null>(null);
   const supported = passkeysSupported();
 
   const passkeys = (data ?? []) as Passkey[];
@@ -51,7 +62,10 @@ export function PasskeyCard() {
       if (result.error) throw new Error(result.error.message ?? "Löschen fehlgeschlagen");
       return result.data;
     },
-    onSuccess: () => toast.success("Passkey entfernt"),
+    onSuccess: () => {
+      setConfirmRemove(null);
+      toast.success("Passkey entfernt");
+    },
     onError: toastError,
   });
 
@@ -100,7 +114,7 @@ export function PasskeyCard() {
                   size="icon-sm"
                   title="Passkey entfernen"
                   disabled={remove.isPending}
-                  onClick={() => remove.mutate(passkey.id)}
+                  onClick={() => setConfirmRemove(passkey)}
                 >
                   <Trash2 className="size-4" />
                   <span className="sr-only">Passkey entfernen</span>
@@ -112,6 +126,34 @@ export function PasskeyCard() {
       </SettingsCard>
 
       <AddPasskeyDialog open={addOpen} onOpenChange={setAddOpen} />
+
+      <AlertDialog
+        open={confirmRemove !== null}
+        onOpenChange={(next) => !next && setConfirmRemove(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Passkey entfernen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Mit „{confirmRemove?.name ?? "Unbenannter Passkey"}“ kannst du dich danach nicht mehr
+              anmelden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={remove.isPending}>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={remove.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (confirmRemove) remove.mutate(confirmRemove.id);
+              }}
+            >
+              {remove.isPending ? "Entfernen …" : "Entfernen"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SettingsSection>
   );
 }
@@ -124,6 +166,10 @@ function AddPasskeyDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [name, setName] = useState("");
+  const close = () => {
+    setName("");
+    onOpenChange(false);
+  };
 
   const add = useMutation({
     mutationFn: async () => {
@@ -135,20 +181,13 @@ function AddPasskeyDialog({
     },
     onSuccess: () => {
       toast.success("Passkey hinzugefügt");
-      setName("");
-      onOpenChange(false);
+      close();
     },
     onError: toastError,
   });
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) setName("");
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Passkey hinzufügen</DialogTitle>
@@ -177,12 +216,7 @@ function AddPasskeyDialog({
             </FieldDescription>
           </Field>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={add.isPending}
-            >
+            <Button type="button" variant="outline" onClick={close} disabled={add.isPending}>
               Abbrechen
             </Button>
             <Button type="submit" disabled={add.isPending}>

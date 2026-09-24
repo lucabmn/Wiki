@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { ExternalUrlSchema } from "./external-link";
 import { IdSchema } from "./shared";
 
 /**
@@ -96,7 +97,10 @@ export const UpdateLessonInputSchema = z.object({
   /** Plaintext projection of `content`, supplied by the editor for search. */
   textContent: z.string().max(2_000_000).optional(),
   assetId: IdSchema.nullish(),
-  embedUrl: z.string().url().max(2000).nullish(),
+  // Rendered as an iframe `src` and a link `href`, so it goes through the same
+  // http(s)-only allowlist as every other outbound URL — `z.string().url()`
+  // alone accepts `javascript:` and `data:`.
+  embedUrl: ExternalUrlSchema.nullish(),
   durationSeconds: z.number().int().min(0).max(86_400).nullish(),
   isRequired: z.boolean().optional(),
   autoCompleteAtPercent: z.number().int().min(1).max(100).nullish(),

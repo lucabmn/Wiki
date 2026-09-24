@@ -59,7 +59,10 @@ export function PageAttachments({
 
   const remove = useMutation(
     orpc.attachments.delete.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.attachments.list.key() }),
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: orpc.attachments.list.key() });
+        toast.success("Anhang gelöscht");
+      },
       onError: toastError,
     }),
   );

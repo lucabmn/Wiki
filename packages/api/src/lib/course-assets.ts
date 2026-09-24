@@ -1,12 +1,10 @@
-import { ORPCError } from "@orpc/server";
-
 import { courseAsset } from "@nilovon-wiki/db/schema/index";
 
 import type { AuthedContext } from "../context";
 import { requireCourseCapabilityById, requireCourseLearn } from "./learn-authz";
 import { loadCourse } from "./learn-loaders";
 import { firstRow } from "./rows";
-import { getStorage } from "./storage";
+import { requireStorage, safeExtension } from "./storage";
 
 /**
  * Files owned by the learning product — thumbnails, lesson videos, documents
@@ -26,9 +24,7 @@ export type CourseAssetKind = "thumbnail" | "video" | "document" | "submission" 
  * name never collide.
  */
 export function buildCourseStorageKey(courseId: string, fileName: string): string {
-  const extension = fileName.includes(".") ? `.${fileName.split(".").pop()}` : "";
-  const safeExtension = /^\.[A-Za-z0-9]{1,12}$/.test(extension) ? extension.toLowerCase() : "";
-  return `courses/${courseId}/${crypto.randomUUID()}${safeExtension}`;
+  return `courses/${courseId}/${crypto.randomUUID()}${safeExtension(fileName)}`;
 }
 
 /**
@@ -47,12 +43,7 @@ export async function createCourseAsset(
     file: { name: string; type: string; size: number; body: Blob };
   },
 ) {
-  const storage = getStorage();
-  if (!storage) {
-    throw new ORPCError("NOT_IMPLEMENTED", {
-      message: "Uploads are disabled: no object storage is configured (see S3_* in .env).",
-    });
-  }
+  const storage = requireStorage();
 
   const course = await loadCourse(context.db, input.courseId);
   if (input.kind === "submission") {

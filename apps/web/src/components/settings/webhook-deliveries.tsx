@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Clock, RefreshCw, XCircle } from "lucide-react";
 
+import { QueryError } from "@/components/query-error";
 import { orpc } from "@/utils/orpc";
 import { ACTION_LABEL } from "@/lib/labels";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
@@ -20,6 +21,7 @@ import {
   SheetTitle,
 } from "@nilovon-wiki/ui/components/sheet";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
+import { cn } from "@nilovon-wiki/ui/lib/utils";
 
 const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "medium" });
 
@@ -57,7 +59,7 @@ export function WebhookDeliveriesSheet({
       <SheetContent className="flex w-full flex-col gap-0 sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>Zustellungen</SheetTitle>
-          <SheetDescription>Die letzten 25 Versuche an „{webhookName}".</SheetDescription>
+          <SheetDescription>Die letzten 25 Versuche an „{webhookName}“.</SheetDescription>
         </SheetHeader>
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
@@ -66,6 +68,8 @@ export function WebhookDeliveriesSheet({
               <Skeleton className="h-16 w-full rounded-lg" />
               <Skeleton className="h-16 w-full rounded-lg" />
             </>
+          ) : query.isError ? (
+            <QueryError onRetry={() => query.refetch()} error={query.error} />
           ) : deliveries.length === 0 ? (
             <Empty className="rounded-xl border border-dashed border-border">
               <EmptyHeader>
@@ -116,7 +120,7 @@ export function WebhookDeliveriesSheet({
             onClick={() => void query.refetch()}
             disabled={query.isFetching}
           >
-            <RefreshCw className="size-4" /> Aktualisieren
+            <RefreshCw className={cn("size-4", query.isFetching && "animate-spin")} /> Aktualisieren
           </Button>
         </div>
       </SheetContent>

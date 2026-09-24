@@ -18,7 +18,7 @@ export const ExternalUrlSchema = z
     if (!normalized) {
       ctx.addIssue({
         code: "custom",
-        message: "must be a valid http(s) URL",
+        message: "Gib eine gültige Web-Adresse (http oder https) ein.",
       });
       return z.NEVER;
     }

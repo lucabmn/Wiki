@@ -113,7 +113,7 @@ export function CommandPalette({
       open={open}
       onOpenChange={onOpenChange}
       title="Suche"
-      description="Seiten suchen"
+      description="Seiten und Kurse suchen"
     >
       <Command shouldFilter={false}>
         <CommandInput placeholder="Seiten suchen …" value={query} onValueChange={setQuery} />

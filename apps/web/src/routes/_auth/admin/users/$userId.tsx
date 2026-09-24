@@ -10,12 +10,14 @@ import { SettingsCard, SettingsSection } from "@/components/settings/settings-se
 import { authClient } from "@/lib/auth-client";
 import { formatDate, formatDateTime, initials, timeAgo } from "@/lib/format";
 import { ROLE_LABEL } from "@/lib/labels";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import { Avatar, AvatarFallback, AvatarImage } from "@nilovon-wiki/ui/components/avatar";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 
 export const Route = createFileRoute("/_auth/admin/users/$userId")({
+  head: () => pageTitle("Benutzer", "Instanz-Verwaltung"),
   component: AdminUserDetail,
 });
 

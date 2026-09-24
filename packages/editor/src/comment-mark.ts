@@ -8,9 +8,9 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
  *
  * This lives in the shared schema package on purpose: `apps/collab` builds its
  * ProseMirror schema from the exact same extension list, and a mark the collab
- * server doesn't know is silently dropped when it projects the Yjs document
- * back into `page.content` — every highlight on the page would vanish on the
- * next save.
+ * server doesn't know is silently dropped when it seeds the Yjs document from
+ * `page.content` — every highlight on the page would vanish from the working
+ * copy.
  */
 export const COMMENT_MARK_NAME = "comment";
 export const COMMENT_MARK_ATTRIBUTE = "data-comment-id";

@@ -10,7 +10,7 @@ export const Route = createFileRoute("/docs/{$}.md")({
         if (!page) throw notFound();
 
         return new Response(await getLLMText(page), {
-          headers: { "Content-Type": "text/markdown" },
+          headers: { "Content-Type": "text/markdown; charset=utf-8" },
         });
       },
     },

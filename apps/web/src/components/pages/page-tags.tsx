@@ -164,7 +164,7 @@ export function PageTags({
                       }}
                     >
                       <Plus className="size-3.5" />
-                      <span className="truncate">„{trimmed}" anlegen</span>
+                      <span className="truncate">„{trimmed}“ anlegen</span>
                     </CommandItem>
                   </CommandGroup>
                 ) : null}

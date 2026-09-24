@@ -400,7 +400,11 @@ export async function assertCourseLearn(
 ): Promise<CourseAccess> {
   const access = await loadCourseAccess(db, context, target, isOrgManager);
   if (!access.canView) throw new ORPCError("NOT_FOUND");
-  if (!access.canLearn) throw new ORPCError("FORBIDDEN", { message: "Enrol to open this course" });
+  if (!access.canLearn) {
+    throw new ORPCError("FORBIDDEN", {
+      message: "Schreib dich in den Kurs ein, um ihn zu öffnen.",
+    });
+  }
   return access;
 }
 

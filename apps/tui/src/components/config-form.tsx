@@ -14,7 +14,7 @@ import { generatePassword, generateSecret } from "../lib/secrets";
 
 /**
  * Keyboard + focus model shared by the install and configure forms:
- * ↑↓/Tab move between fields, Ctrl+R regenerates the focused secret, Enter
+ * ↑↓/Tab/Shift+Tab move between fields, Ctrl+R regenerates the focused secret, Enter
  * advances (and submits once valid on the last field), Esc cancels. Typed
  * characters fall through to the focused `<input>`.
  *
@@ -43,7 +43,7 @@ export function useConfigForm(opts: {
   useKeyboard((key) => {
     if (!enabled) return;
     if (key.name === "escape") return onCancel();
-    if (key.name === "up")
+    if (key.name === "up" || (key.name === "tab" && key.shift))
       return setFieldIndex((i) => (i - 1 + formFields.length) % formFields.length);
     if (key.name === "down" || key.name === "tab")
       return setFieldIndex((i) => (i + 1) % formFields.length);
@@ -61,6 +61,10 @@ export function useConfigForm(opts: {
     if (key.name === "return" || key.name === "enter") {
       if (fieldIndex < formFields.length - 1) return setFieldIndex((i) => i + 1);
       if (isValid(config)) return onSubmit();
+      // Invalid on submit: jump to the first editable field with an error so
+      // Enter never silently does nothing.
+      const firstInvalid = formFields.findIndex((f) => errors[f.key]);
+      if (firstInvalid !== -1) setFieldIndex(firstInvalid);
     }
   });
 
@@ -87,12 +91,13 @@ export function ConfigFormView({
   const active = formFields[fieldIndex]!;
   return (
     <box flexDirection="column" gap={1} flexGrow={1}>
-      <box flexDirection="column" gap={1}>
+      {/* Rows never shrink: squeezed rows overlap on short (80×24) terminals. */}
+      <box flexDirection="column" flexShrink={0}>
         {formFields.map((f, i) => {
           const on = i === fieldIndex;
           const err = errors[f.key];
           return (
-            <box key={f.key} flexDirection="row" gap={1} alignItems="center">
+            <box key={f.key} flexDirection="row" gap={1} alignItems="center" flexShrink={0}>
               <text fg={on ? theme.accent : theme.dim}>{on ? "▶" : " "}</text>
               <text fg={theme.dim} attributes={on ? TextAttributes.BOLD : undefined}>
                 {f.label.padEnd(12)}
@@ -114,12 +119,12 @@ export function ConfigFormView({
       </box>
 
       {readonlyFields.length > 0 ? (
-        <box flexDirection="column">
+        <box flexDirection="column" flexShrink={0}>
           {readonlyFields.map((f) => {
             const err = errors[f.key];
             const value = config[f.key];
             return (
-              <box key={f.key} flexDirection="row" gap={1} alignItems="center">
+              <box key={f.key} flexDirection="row" gap={1} alignItems="center" flexShrink={0}>
                 <text fg={theme.dim}> </text>
                 <text fg={theme.dim}>{f.label.padEnd(12)}</text>
                 <text fg={err ? theme.err : theme.dim}>
@@ -131,7 +136,7 @@ export function ConfigFormView({
         </box>
       ) : null}
 
-      <box border borderStyle="rounded" borderColor={theme.accentDim} padding={1}>
+      <box border borderStyle="rounded" borderColor={theme.accentDim} paddingX={1} flexShrink={0}>
         <text fg={theme.dim}>{active.help}</text>
         {errors[active.key] ? <text fg={theme.err}>Fehler: {errors[active.key]}</text> : null}
         {active.secret ? (

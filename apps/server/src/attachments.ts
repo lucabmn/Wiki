@@ -4,10 +4,11 @@ import { getStorage } from "@nilovon-wiki/api/lib/storage";
 import { assertTwoFactorCompliance } from "@nilovon-wiki/api/lib/two-factor-policy";
 import { appRouter } from "@nilovon-wiki/api/routers/index";
 import { env } from "@nilovon-wiki/env/server";
-import { call, ORPCError } from "@orpc/server";
-import { Hono, type Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { call } from "@orpc/server";
+import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+
+import { errorResponse, MESSAGES, readFormData } from "./http-errors";
 
 /**
  * Binary transfer for attachments. Everything *about* an attachment (listing,
@@ -35,19 +36,20 @@ attachmentRoutes.post(
   "/upload",
   bodyLimit({
     maxSize: MAX_UPLOAD_BYTES,
-    onError: (c) => c.json({ message: `Datei ist größer als ${env.ATTACHMENT_MAX_MB} MB.` }, 413),
+    onError: (c) => c.json({ message: MESSAGES.tooLarge(env.ATTACHMENT_MAX_MB) }, 413),
   }),
   async (c) => {
     const context = await createContext({ context: c });
-    if (!context.session?.user) return c.json({ message: "Unauthorized" }, 401);
+    if (!context.session?.user) return c.json({ message: MESSAGES.unauthorized }, 401);
 
-    const form = await c.req.formData();
+    const form = await readFormData(c);
+    if (!form) return c.json({ message: MESSAGES.invalidForm }, 400);
     const file = form.get("file");
     const spaceId = form.get("spaceId");
     const pageId = form.get("pageId");
     const draft = form.get("draft") === "true";
 
-    if (!(file instanceof File)) return c.json({ message: "No file provided" }, 400);
+    if (!(file instanceof File)) return c.json({ message: MESSAGES.noFile }, 400);
     if (typeof spaceId !== "string" || !spaceId) {
       return c.json({ message: "spaceId is required" }, 400);
     }
@@ -82,15 +84,15 @@ attachmentRoutes.post(
 
 attachmentRoutes.get("/:id/inline", async (c) => {
   const context = await createContext({ context: c });
-  if (!context.session?.user) return c.json({ message: "Unauthorized" }, 401);
+  if (!context.session?.user) return c.json({ message: MESSAGES.unauthorized }, 401);
 
   try {
     const row = await call(appRouter.attachments.get, { id: c.req.param("id") }, { context });
     if (!INLINE_IMAGE_TYPES.has(row.mimeType.toLowerCase())) {
-      return c.json({ message: "Dieser Dateityp kann nicht inline angezeigt werden" }, 415);
+      return c.json({ message: MESSAGES.notInline }, 415);
     }
     const storage = getStorage();
-    if (!storage) return c.json({ message: "Attachments are disabled" }, 501);
+    if (!storage) return c.json({ message: MESSAGES.storageDisabled }, 501);
     const stored = await storage.download(row.storageKey);
     return new Response(stored.stream(), {
       headers: {
@@ -109,7 +111,7 @@ attachmentRoutes.get("/:id/inline", async (c) => {
 
 attachmentRoutes.get("/:id/download", async (c) => {
   const context = await createContext({ context: c });
-  if (!context.session?.user) return c.json({ message: "Unauthorized" }, 401);
+  if (!context.session?.user) return c.json({ message: MESSAGES.unauthorized }, 401);
 
   try {
     // Authorization lives in the router procedure, so the proxy cannot drift
@@ -117,7 +119,7 @@ attachmentRoutes.get("/:id/download", async (c) => {
     const row = await call(appRouter.attachments.get, { id: c.req.param("id") }, { context });
 
     const storage = getStorage();
-    if (!storage) return c.json({ message: "Attachments are disabled" }, 501);
+    if (!storage) return c.json({ message: MESSAGES.storageDisabled }, 501);
 
     const stored = await storage.download(row.storageKey);
     return new Response(stored.stream(), {
@@ -134,11 +136,3 @@ attachmentRoutes.get("/:id/download", async (c) => {
     return errorResponse(c, error);
   }
 });
-
-/** Maps an oRPC error onto the HTTP status its RPC counterpart would return. */
-function errorResponse(c: Context, error: unknown) {
-  if (error instanceof ORPCError) {
-    return c.json({ message: error.message }, (error.status || 500) as ContentfulStatusCode);
-  }
-  throw error;
-}

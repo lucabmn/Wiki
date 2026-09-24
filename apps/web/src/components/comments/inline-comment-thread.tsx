@@ -92,7 +92,7 @@ export function InlineCommentThread({
 
   const submitReply = () => {
     const body = reply.trim();
-    if (body) create.mutate({ pageId, parentId: thread.root.id, body });
+    if (body && !create.isPending) create.mutate({ pageId, parentId: thread.root.id, body });
   };
   const mayDelete = (comment: CommentRow) =>
     permissions.canModerate ||
@@ -206,7 +206,13 @@ export function InlineCommentThread({
         </div>
       ) : null}
 
-      <AlertDialog open={pendingDelete !== null} onOpenChange={() => setPendingDelete(null)}>
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          // Stay open while the delete is in flight, so its outcome is visible.
+          if (!open && !remove.isPending) setPendingDelete(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Kommentar löschen?</AlertDialogTitle>

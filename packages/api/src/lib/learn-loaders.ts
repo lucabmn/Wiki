@@ -28,7 +28,7 @@ type Row<T> = NonNullable<Awaited<T>>;
 export async function loadCourse(db: Database, id: string, options: LoadOptions = {}) {
   const row = await db.query.course.findFirst({ where: eq(course.id, id) });
   if (!row || (row.deletedAt && !options.includeTrashed)) {
-    throw new ORPCError("NOT_FOUND", { message: "Course not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Kurs nicht gefunden." });
   }
   return row;
 }
@@ -44,56 +44,56 @@ export async function loadCourseBySlug(db: Database, organizationId: string, slu
       ),
   });
   if (!row) {
-    throw new ORPCError("NOT_FOUND", { message: "Course not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Kurs nicht gefunden." });
   }
   return row;
 }
 
 export async function loadChapter(db: Database, id: string) {
   const row = await db.query.chapter.findFirst({ where: eq(chapter.id, id) });
-  if (!row) throw new ORPCError("NOT_FOUND", { message: "Chapter not found" });
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Kapitel nicht gefunden." });
   return row;
 }
 
 export async function loadLesson(db: Database, id: string) {
   const row = await db.query.lesson.findFirst({ where: eq(lesson.id, id) });
-  if (!row) throw new ORPCError("NOT_FOUND", { message: "Lesson not found" });
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Lektion nicht gefunden." });
   return row;
 }
 
 export async function loadCollection(db: Database, id: string) {
   const row = await db.query.courseCollection.findFirst({ where: eq(courseCollection.id, id) });
-  if (!row) throw new ORPCError("NOT_FOUND", { message: "Collection not found" });
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Sammlung nicht gefunden." });
   return row;
 }
 
 export async function loadCourseAsset(db: Database, id: string) {
   const row = await db.query.courseAsset.findFirst({ where: eq(courseAsset.id, id) });
-  if (!row) throw new ORPCError("NOT_FOUND", { message: "Asset not found" });
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Datei nicht gefunden." });
   return row;
 }
 
 export async function loadEnrollment(db: Database, id: string) {
   const row = await db.query.enrollment.findFirst({ where: eq(enrollment.id, id) });
-  if (!row) throw new ORPCError("NOT_FOUND", { message: "Enrollment not found" });
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Einschreibung nicht gefunden." });
   return row;
 }
 
 export async function loadAssignment(db: Database, id: string) {
   const row = await db.query.assignment.findFirst({ where: eq(assignment.id, id) });
-  if (!row) throw new ORPCError("NOT_FOUND", { message: "Assignment not found" });
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Aufgabe nicht gefunden." });
   return row;
 }
 
 export async function loadSubmission(db: Database, id: string) {
   const row = await db.query.submission.findFirst({ where: eq(submission.id, id) });
-  if (!row) throw new ORPCError("NOT_FOUND", { message: "Submission not found" });
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Abgabe nicht gefunden." });
   return row;
 }
 
 export async function loadQuiz(db: Database, id: string) {
   const row = await db.query.quiz.findFirst({ where: eq(quiz.id, id) });
-  if (!row) throw new ORPCError("NOT_FOUND", { message: "Quiz not found" });
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Quiz nicht gefunden." });
   return row;
 }
 
@@ -110,7 +110,8 @@ export async function findEnrollment(db: Database, courseId: string, userId: str
 /** The caller's enrolment, or NOT_FOUND when they are not in the course. */
 export async function requireEnrollment(db: Database, courseId: string, userId: string) {
   const row = await findEnrollment(db, courseId, userId);
-  if (!row) throw new ORPCError("NOT_FOUND", { message: "Not enrolled in this course" });
+  if (!row)
+    throw new ORPCError("NOT_FOUND", { message: "Du bist in diesem Kurs nicht eingeschrieben." });
   return row;
 }
 

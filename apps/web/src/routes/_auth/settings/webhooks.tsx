@@ -5,9 +5,11 @@ import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 import { History, MoreHorizontal, Plus, Send, Webhook as WebhookIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { orpc, client } from "@/utils/orpc";
 import { toastError, useInvalidate } from "@/lib/query";
 import { ACTION_LABEL } from "@/lib/labels";
+import { pageTitle } from "@/lib/page-title";
 import { PermissionGate } from "@/components/settings/permission-gate";
 import { SettingsSection } from "@/components/settings/settings-section";
 import { StatusBadge, WebhookDeliveriesSheet } from "@/components/settings/webhook-deliveries";
@@ -45,6 +47,7 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 const ORG_UPDATE: PermissionRequest[] = [{ organization: ["update"] }];
 
 export const Route = createFileRoute("/_auth/settings/webhooks")({
+  head: () => pageTitle("Webhooks", "Einstellungen"),
   component: () => (
     <PermissionGate permissions={ORG_UPDATE}>
       <WebhookSettings />
@@ -84,6 +87,8 @@ function WebhookSettings() {
     >
       {webhooksQuery.isPending ? (
         <Skeleton className="h-28 w-full rounded-xl" />
+      ) : webhooksQuery.isError ? (
+        <QueryError error={webhooksQuery.error} onRetry={() => webhooksQuery.refetch()} />
       ) : webhooks.length === 0 ? (
         <Empty className="rounded-xl border border-dashed border-border">
           <EmptyHeader>
@@ -184,7 +189,7 @@ function WebhookCard({
           </div>
           <div className="truncate font-mono text-xs text-muted-foreground">{webhook.url}</div>
           <div className="text-xs text-muted-foreground">
-            {webhook.spaceName ? `Space „${webhook.spaceName}"` : "Alle Spaces"} ·{" "}
+            {webhook.spaceName ? `Space „${webhook.spaceName}“` : "Alle Spaces"} ·{" "}
             {webhook.secretPreview}
           </div>
         </div>
@@ -266,10 +271,10 @@ function DeleteWebhookDialog({
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>„{webhook?.name}" entfernen?</AlertDialogTitle>
+          <AlertDialogTitle>„{webhook?.name}“ entfernen?</AlertDialogTitle>
           <AlertDialogDescription>
             Es werden keine Ereignisse mehr an diese Adresse geschickt, und die Zustellhistorie wird
-            mitgelöscht. Zum vorübergehenden Stoppen reicht „Bearbeiten → Aktiv aus".
+            mitgelöscht. Zum vorübergehenden Stoppen reicht „Bearbeiten → Aktiv aus“.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -123,10 +123,16 @@ export const courseMemberRouter = {
       const courseRow = await loadCourse(context.db, input.courseId);
       // Seeing who teaches a course is part of its landing page, so this reads
       // at view level; changing the list is what needs `manage`.
-      await requireCourseView(context.db, context, context.headers, courseRow);
-      return selectMembers(context.db, eq(courseMember.courseId, courseRow.id)).orderBy(
+      const access = await requireCourseView(context.db, context, context.headers, courseRow);
+      const rows = await selectMembers(context.db, eq(courseMember.courseId, courseRow.id)).orderBy(
         asc(courseMember.createdAt),
       );
+      if (access.role) return rows;
+      // Outside the staff, the list is what the landing page shows: only those
+      // listed publicly, and without their e-mail addresses.
+      return rows
+        .filter((row) => row.isPublic)
+        .map((row) => ({ ...row, user: row.user ? { ...row.user, email: "" } : null }));
     }),
 
   add: protectedProcedure

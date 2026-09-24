@@ -1,3 +1,5 @@
+import { attachmentIdFromUrl } from "./pdf/pdf-images";
+
 /**
  * Link rewriting for exports.
  *
@@ -12,8 +14,7 @@ export function resolveArchiveUrl(
   pagePaths: Map<string, string>,
   attachmentPaths: Map<string, string>,
 ): string {
-  const attachmentMatch = /^\/attachments\/([^/?#]+)\/(?:inline|download)(?:[?#].*)?$/.exec(url);
-  const attachmentId = attachmentMatch?.[1] ? safeDecodeURIComponent(attachmentMatch[1]) : null;
+  const attachmentId = attachmentIdFromUrl(url);
   const attachmentPath = attachmentId ? attachmentPaths.get(attachmentId) : null;
   if (attachmentPath) return `../../${attachmentPath}`;
 

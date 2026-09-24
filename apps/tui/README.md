@@ -1,15 +1,17 @@
-# react
+# tui — self-hosting installer
 
-To install dependencies:
+Terminal wizard (built with [OpenTUI](https://github.com/sst/opentui)) that
+installs, reconfigures, and updates a Docker Compose deployment of the wiki.
+User-facing docs: `apps/docs/content/docs/self-hosting/installer.mdx`.
+
+It must run inside a checkout of this repository — it locates the repo root by
+walking up to the directory that contains `docker-compose.yml`.
 
 ```bash
-bun install
+pnpm dev:tui                              # from the repo root (needs Bun)
+pnpm --filter tui test                    # unit tests (vitest)
+pnpm --filter tui check-types
+pnpm --filter tui compile                 # single binary in dist/
 ```
 
-To run:
-
-```bash
-bun dev
-```
-
-This project was created using `bun create tui`. [create-tui](https://git.new/create-tui) is the easiest way to get started with OpenTUI.
+Release binaries are built per platform by `.github/workflows/release.yml`.

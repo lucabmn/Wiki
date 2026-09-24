@@ -36,7 +36,7 @@ describe("ImportPagesInputSchema", () => {
 describe("CreatePageInputSchema", () => {
   it("applies title/textContent/isTemplate defaults", () => {
     const parsed = CreatePageInputSchema.parse({ spaceId: "space1" });
-    expect(parsed.title).toBe("Untitled");
+    expect(parsed.title).toBe("Ohne Titel");
     expect(parsed.textContent).toBe("");
     expect(parsed.isTemplate).toBe(false);
   });

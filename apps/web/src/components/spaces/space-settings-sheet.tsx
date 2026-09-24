@@ -175,7 +175,7 @@ export function SpaceSettingsSheet({
         <SheetHeader className="border-b border-border">
           <SheetTitle>Space-Einstellungen</SheetTitle>
           <SheetDescription>
-            Allgemeines, Sichtbarkeit und Mitglieder von „{space.name}".
+            Allgemeines, Sichtbarkeit und Mitglieder von „{space.name}“.
           </SheetDescription>
         </SheetHeader>
 
@@ -207,6 +207,7 @@ export function SpaceSettingsSheet({
                   key={c}
                   type="button"
                   aria-label={`Farbe ${c}`}
+                  aria-pressed={(color ?? DEFAULT_SPACE_COLOR) === c}
                   className={cn(
                     "size-6 rounded-full border border-black/10 transition-transform hover:scale-110",
                     (color ?? DEFAULT_SPACE_COLOR) === c &&
@@ -312,7 +313,7 @@ export function SpaceSettingsSheet({
               noUsersHint="Alle Organisationsmitglieder sind bereits im Space."
               noGroupsHint="Keine weiteren Gruppen verfügbar. Lege welche unter Einstellungen › Gruppen an."
               removeTitle="Mitglied entfernen?"
-              removeDescription={(label) => `„${label}" verliert den Zugriff auf diesen Space.`}
+              removeDescription={(label) => `„${label}“ verliert den Zugriff auf diesen Space.`}
             />
           </section>
 

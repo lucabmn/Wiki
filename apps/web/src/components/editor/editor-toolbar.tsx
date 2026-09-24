@@ -161,6 +161,7 @@ function ColorPopover({ editor, active }: { editor: Editor; active: boolean }) {
                 key={color.label}
                 type="button"
                 title={color.label}
+                aria-label={`Textfarbe ${color.label}`}
                 onClick={() => {
                   const chain = editor.chain().focus();
                   if (color.value) chain.setColor(color.value).run();
@@ -185,6 +186,7 @@ function ColorPopover({ editor, active }: { editor: Editor; active: boolean }) {
                 key={color.label}
                 type="button"
                 title={color.label}
+                aria-label={`Markierung ${color.label}`}
                 onClick={() => {
                   editor.chain().focus().toggleHighlight({ color: color.value }).run();
                   setOpen(false);
@@ -196,6 +198,7 @@ function ColorPopover({ editor, active }: { editor: Editor; active: boolean }) {
             <button
               type="button"
               title="Markierung entfernen"
+              aria-label="Markierung entfernen"
               onClick={() => {
                 editor.chain().focus().unsetHighlight().run();
                 setOpen(false);

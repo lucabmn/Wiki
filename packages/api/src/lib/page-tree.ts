@@ -52,7 +52,9 @@ export async function assertParentInSpace(
     columns: { spaceId: true },
   });
   if (!parent || parent.spaceId !== spaceId) {
-    throw new ORPCError("BAD_REQUEST", { message: "Parent page is not in this space" });
+    throw new ORPCError("BAD_REQUEST", {
+      message: "Die übergeordnete Seite liegt nicht in diesem Bereich.",
+    });
   }
 }
 
@@ -66,10 +68,14 @@ export async function assertNoCycle(
   parentId: string | null,
 ): Promise<void> {
   let cursor = parentId;
-  while (cursor) {
+  // Bounds the walk should the stored tree already contain a loop — otherwise
+  // this would spin forever on data it is meant to protect.
+  const seen = new Set<string>();
+  while (cursor && !seen.has(cursor)) {
+    seen.add(cursor);
     if (cursor === movedId) {
       throw new ORPCError("BAD_REQUEST", {
-        message: "Cannot move a page underneath itself",
+        message: "Eine Seite kann nicht unter sich selbst verschoben werden.",
       });
     }
     const parent = await db.query.page.findFirst({
@@ -90,8 +96,20 @@ export async function positionForMove(
   afterId?: string,
 ): Promise<string> {
   const not = sql`${page.id} <> ${movedId}`;
+  // The anchor has to be a sibling at the destination: an anchor elsewhere in
+  // the tree (or in another space) yields a position that means nothing among
+  // the new siblings, so the page would land in an arbitrary slot.
+  const loadAnchor = async (anchorId: string) => {
+    const anchor = await loadPage(db, anchorId);
+    if (anchor.id === movedId || anchor.spaceId !== spaceId || anchor.parentId !== parentId) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Die Bezugsseite liegt nicht auf derselben Ebene wie das Ziel.",
+      });
+    }
+    return anchor;
+  };
   if (afterId) {
-    const anchor = await loadPage(db, afterId);
+    const anchor = await loadAnchor(afterId);
     const next = await db.query.page.findFirst({
       where: and(siblingsOf(spaceId, parentId), gt(page.position, anchor.position), not),
       orderBy: [asc(page.position)],
@@ -100,7 +118,7 @@ export async function positionForMove(
     return generateKeyBetween(anchor.position, next?.position ?? null);
   }
   if (beforeId) {
-    const anchor = await loadPage(db, beforeId);
+    const anchor = await loadAnchor(beforeId);
     const prev = await db.query.page.findFirst({
       where: and(siblingsOf(spaceId, parentId), lt(page.position, anchor.position), not),
       orderBy: [desc(page.position)],

@@ -50,12 +50,10 @@ export function checkWebhookHostname(rawUrl: string): UrlCheck {
     return { ok: false, reason: "Die URL konnte nicht gelesen werden." };
   }
 
-  // IPv6 literals arrive bracketed (`http://[::1]/`); `hostname` keeps the
-  // brackets, and `isIP` does not accept them.
-  const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const hostname = bareHostname(url);
 
   if (BLOCKED_HOSTNAMES.has(hostname) || BLOCKED_SUFFIXES.some((s) => hostname.endsWith(s))) {
-    return { ok: false, reason: `„${url.hostname}" liegt im internen Netz.` };
+    return { ok: false, reason: `„${url.hostname}“ liegt im internen Netz.` };
   }
   if (isIP(hostname) && isBlockedAddress(hostname)) {
     return { ok: false, reason: `Die Adresse ${url.hostname} liegt im internen Netz.` };
@@ -72,20 +70,33 @@ export async function checkWebhookTarget(rawUrl: string): Promise<UrlCheck> {
   const literal = checkWebhookHostname(rawUrl);
   if (!literal.ok || env.WEBHOOK_ALLOW_PRIVATE_HOSTS) return literal;
 
-  const hostname = new URL(rawUrl).hostname.replace(/^\[|\]$/g, "");
+  const hostname = bareHostname(new URL(rawUrl));
   if (isIP(hostname)) return OK; // already checked above, and nothing to resolve
 
   let addresses: { address: string }[];
   try {
     addresses = await lookup(hostname, { all: true });
   } catch {
-    return { ok: false, reason: `Der Host „${hostname}" ist nicht auflösbar.` };
+    return { ok: false, reason: `Der Host „${hostname}“ ist nicht auflösbar.` };
   }
   const blocked = addresses.find((entry) => isBlockedAddress(entry.address));
   if (blocked) {
-    return { ok: false, reason: `„${hostname}" zeigt auf die interne Adresse ${blocked.address}.` };
+    return { ok: false, reason: `„${hostname}“ zeigt auf die interne Adresse ${blocked.address}.` };
   }
   return OK;
+}
+
+/**
+ * The hostname as the blocklists compare it. IPv6 literals arrive bracketed
+ * (`http://[::1]/`) and `isIP` does not accept the brackets. A trailing dot is
+ * the fully-qualified spelling of the same name — `localhost.` resolves exactly
+ * like `localhost` — so it must not slip past the name and suffix checks.
+ */
+function bareHostname(url: URL): string {
+  return url.hostname
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "")
+    .toLowerCase();
 }
 
 /**
@@ -121,8 +132,16 @@ function isBlockedIPv6(address: string): boolean {
 
   // An IPv4-mapped address (`::ffff:127.0.0.1`) reaches the IPv4 stack, so it
   // has to be judged by IPv4 rules or the loopback block is trivially bypassed.
+  // The URL parser serializes it in hex (`[::ffff:7f00:1]`), so both spellings
+  // have to be recognised.
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(normalized);
   if (mapped?.[1]) return isBlockedIPv4(mapped[1]);
+  const mappedHex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(normalized);
+  if (mappedHex?.[1] && mappedHex[2]) {
+    const high = Number.parseInt(mappedHex[1], 16);
+    const low = Number.parseInt(mappedHex[2], 16);
+    return isBlockedIPv4(`${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`);
+  }
 
   const head = normalized.split(":")[0] ?? "";
   if (/^f[cd]/.test(head)) return true; // fc00::/7 unique local

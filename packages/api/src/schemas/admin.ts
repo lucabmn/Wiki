@@ -183,14 +183,14 @@ export const SetInstanceRoleInputSchema = z.object({
 
 export const BanUserInputSchema = z.object({
   userId: IdSchema,
-  reason: z.string().min(1).max(500),
+  reason: z.string().trim().min(1).max(500),
   /** Omitted = permanent, until an admin lifts it. */
   expiresInDays: z.coerce.number().int().min(1).max(3650).optional(),
 });
 
 export const RevokeSessionInputSchema = z.object({
   userId: IdSchema,
-  sessionToken: z.string().min(1),
+  sessionToken: z.string().min(1).max(512),
 });
 
 /** Every mutation answers with the same shape so the client can stay generic. */

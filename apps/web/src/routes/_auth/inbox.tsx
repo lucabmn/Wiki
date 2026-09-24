@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BellOff, CheckCheck } from "lucide-react";
 
+import { QueryError } from "@/components/query-error";
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { NotificationItem } from "@/components/inbox/notification-item";
 import { useInboxList, useInboxMutations, useUnreadCount } from "@/components/inbox/use-inbox";
@@ -14,12 +15,14 @@ import {
 } from "@nilovon-wiki/ui/components/empty";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@nilovon-wiki/ui/components/tabs";
+import { pageTitle } from "@/lib/page-title";
 
 const PAGE_LIMIT = 50;
 
 type InboxSearch = { filter: "unread" | "all" };
 
 export const Route = createFileRoute("/_auth/inbox")({
+  head: () => pageTitle("Posteingang"),
   // The filter lives in the URL so a link to the unread list stays one.
   validateSearch: (search: Record<string, unknown>): InboxSearch => ({
     filter: search.filter === "all" ? "all" : "unread",
@@ -83,6 +86,8 @@ function InboxRoute() {
             <Skeleton className="h-14 w-full rounded-lg" />
             <Skeleton className="h-14 w-full rounded-lg" />
           </div>
+        ) : list.isError ? (
+          <QueryError error={list.error} onRetry={() => list.refetch()} />
         ) : !list.data?.length ? (
           <Empty>
             <EmptyHeader>

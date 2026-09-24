@@ -195,6 +195,9 @@ const SlashCommandList = forwardRef<SlashListRef, ListProps>(({ items, command }
 
   useImperativeHandle(ref, () => ({
     onKeyDown: ({ event }) => {
+      // Nothing matches: let Enter, arrows and Tab reach the editor instead of
+      // swallowing them (Enter used to do nothing after e.g. "/xyz").
+      if (!items.length) return false;
       // Shift+Tab / Tab mirror the arrows so the menu is fully keyboard-drivable
       // without leaving the home row; returning true suppresses the browser's
       // default focus-move for Tab.

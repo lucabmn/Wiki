@@ -11,6 +11,7 @@ import { Card } from "@nilovon-wiki/ui/components/card";
 import { Dialog, DialogContent, DialogTitle } from "@nilovon-wiki/ui/components/dialog";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -94,6 +95,11 @@ function RouteComponent() {
                     Schließe einen Kurs ab, der ein Zertifikat vergibt — es erscheint danach hier.
                   </EmptyDescription>
                 </EmptyHeader>
+                <EmptyContent>
+                  <Link to="/learn" className={buttonVariants({ variant: "outline" })}>
+                    Zum Kurskatalog
+                  </Link>
+                </EmptyContent>
               </Empty>
             ) : (
               <ul className="space-y-3">
@@ -228,7 +234,7 @@ function SerialField({ serial }: { serial: string }) {
         variant="outline"
         size="icon-sm"
         onClick={onCopy}
-        aria-label="Seriennummer kopieren"
+        aria-label={copied ? "Seriennummer kopiert" : "Seriennummer kopieren"}
       >
         {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
       </Button>

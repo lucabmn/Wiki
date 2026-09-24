@@ -48,11 +48,17 @@ export function CreatePageDialog({
   // in the next one.
   useEffect(() => setTemplateId(null), [effectiveSpaceId]);
 
-  const onSuccess = (page: { id: string }) => {
-    invalidatePages();
+  // Every exit clears the draft, so the next "Neue Seite" starts blank.
+  const close = () => {
     setTitle("");
+    setPickedSpaceId("");
     setTemplateId(null);
     onOpenChange(false);
+  };
+
+  const onSuccess = (page: { id: string }) => {
+    invalidatePages();
+    close();
     // Straight into the new draft: creating a page is never the goal, writing
     // in it is — and a page created from a template has content to look at.
     navigate({ to: "/pages/$id", params: { id: page.id } });
@@ -75,7 +81,7 @@ export function CreatePageDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Neue Seite</DialogTitle>
@@ -113,7 +119,7 @@ export function CreatePageDialog({
                   <Link
                     to="/spaces"
                     className="font-medium text-foreground underline underline-offset-2"
-                    onClick={() => onOpenChange(false)}
+                    onClick={close}
                   >
                     Zu den Spaces
                   </Link>
@@ -138,12 +144,7 @@ export function CreatePageDialog({
             />
           ) : null}
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={pending}
-            >
+            <Button type="button" variant="outline" onClick={close} disabled={pending}>
               Abbrechen
             </Button>
             <Button type="submit" disabled={pending || !effectiveSpaceId || !title.trim()}>

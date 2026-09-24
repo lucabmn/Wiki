@@ -29,7 +29,7 @@ export type LoadOptions = { includeTrashed?: boolean };
 export async function loadSpace(db: Database, id: string, options: LoadOptions = {}) {
   const row = await db.query.space.findFirst({ where: eq(space.id, id) });
   if (!row || (row.deletedAt && !options.includeTrashed)) {
-    throw new ORPCError("NOT_FOUND", { message: "Space not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Bereich nicht gefunden." });
   }
   return row;
 }
@@ -49,7 +49,7 @@ export async function loadPage(db: Database, id: string, options: LoadOptions = 
     .limit(1);
   const row = rows[0];
   if (!row || (!options.includeTrashed && (row.page.deletedAt || row.spaceDeletedAt))) {
-    throw new ORPCError("NOT_FOUND", { message: "Page not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Seite nicht gefunden." });
   }
   return row.page;
 }
@@ -58,7 +58,7 @@ export async function loadPage(db: Database, id: string, options: LoadOptions = 
 export async function loadComment(db: Database, id: string) {
   const row = await db.query.comment.findFirst({ where: eq(comment.id, id) });
   if (!row) {
-    throw new ORPCError("NOT_FOUND", { message: "Comment not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Kommentar nicht gefunden." });
   }
   return row;
 }
@@ -67,7 +67,7 @@ export async function loadComment(db: Database, id: string) {
 export async function loadTag(db: Database, id: string) {
   const row = await db.query.tag.findFirst({ where: eq(tag.id, id) });
   if (!row) {
-    throw new ORPCError("NOT_FOUND", { message: "Tag not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Schlagwort nicht gefunden." });
   }
   return row;
 }
@@ -76,7 +76,7 @@ export async function loadTag(db: Database, id: string) {
 export async function loadAttachment(db: Database, id: string) {
   const row = await db.query.attachment.findFirst({ where: eq(attachment.id, id) });
   if (!row) {
-    throw new ORPCError("NOT_FOUND", { message: "Attachment not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Anhang nicht gefunden." });
   }
   return row;
 }
@@ -87,7 +87,7 @@ export async function loadExternalLink(db: Database, id: string) {
     where: eq(pageExternalLink.id, id),
   });
   if (!row) {
-    throw new ORPCError("NOT_FOUND", { message: "External link not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Link nicht gefunden." });
   }
   return row;
 }
@@ -102,7 +102,7 @@ export async function orgOfSpace(db: Database, spaceId: string): Promise<string>
     columns: { organizationId: true },
   });
   if (!row) {
-    throw new ORPCError("NOT_FOUND", { message: "Space not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Bereich nicht gefunden." });
   }
   return row.organizationId;
 }

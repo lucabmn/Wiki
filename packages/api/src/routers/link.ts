@@ -10,6 +10,7 @@ import { pageNotTrashed } from "../lib/lifecycle";
 import { loadPage, loadSpace } from "../lib/loaders";
 import { PageSchema } from "../schemas/page";
 import { IdSchema } from "../schemas/shared";
+import { redactDraftBody } from "./page";
 
 const TAGS = ["Links"];
 
@@ -48,12 +49,13 @@ export const linkRouter = {
         )
         .orderBy(asc(page.title));
       // Linked pages live in the same space; hide any the caller can't read.
-      return filterReadablePages(
+      const readable = await filterReadablePages(
         context.db,
         context,
         rows.map((r) => r.page),
         spaceRole,
       );
+      return readable.map(redactDraftBody);
     }),
 
   outgoing: protectedProcedure
@@ -79,11 +81,12 @@ export const linkRouter = {
           and(eq(pageLink.sourcePageId, input.id), eq(page.isTemplate, false), pageNotTrashed()),
         )
         .orderBy(asc(page.title));
-      return filterReadablePages(
+      const readable = await filterReadablePages(
         context.db,
         context,
         rows.map((r) => r.page),
         spaceRole,
       );
+      return readable.map(redactDraftBody);
     }),
 };

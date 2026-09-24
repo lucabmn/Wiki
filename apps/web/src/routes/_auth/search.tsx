@@ -1,6 +1,7 @@
 import DashboardLayout from "@/components/layouts/dashboard-layout";
 import { QueryError } from "@/components/query-error";
 import { splitSnippet } from "@/lib/snippet";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import { Input } from "@nilovon-wiki/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/native-select";
@@ -8,11 +9,12 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FileText, Search as SearchIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type SearchParams = { q: string; space: string };
 
 export const Route = createFileRoute("/_auth/search")({
+  head: () => pageTitle("Suche"),
   validateSearch: (search: Record<string, unknown>): SearchParams => ({
     q: typeof search.q === "string" ? search.q : "",
     space: typeof search.space === "string" ? search.space : "",
@@ -45,11 +47,21 @@ function RouteComponent() {
   // Local input mirrors the URL `q`; the URL is the source of truth for the
   // query (so results are shareable / survive reload) and is updated debounced.
   const [term, setTerm] = useState(q);
-  useEffect(() => setTerm(q), [q]);
+  // Follow outside changes of `q` (back/forward, links) — but not the echo of
+  // our own debounced write: the navigation is async, and resetting the input
+  // to the value it had when the write started would drop keys typed since.
+  const written = useRef(q);
+  useEffect(() => {
+    if (q !== written.current) {
+      written.current = q;
+      setTerm(q);
+    }
+  }, [q]);
   useEffect(() => {
     const trimmed = term.trim();
     if (trimmed === q) return;
     const timer = setTimeout(() => {
+      written.current = trimmed;
       navigate({ to: "/search", search: { q: trimmed, space }, replace: true });
     }, 200);
     return () => clearTimeout(timer);
@@ -77,11 +89,16 @@ function RouteComponent() {
       <div className="mx-auto w-full max-w-3xl">
         <h1 className="text-lg font-semibold">Suche</h1>
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
-            <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <SearchIcon
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            />
             <Input
               autoFocus
+              type="search"
+              aria-label="Suchbegriff"
               value={term}
               onChange={(event) => setTerm(event.target.value)}
               placeholder="Seiten durchsuchen …"
@@ -93,7 +110,8 @@ function RouteComponent() {
             onChange={(event) =>
               navigate({ to: "/search", search: { q: query, space: event.target.value } })
             }
-            className="w-48"
+            aria-label="Space"
+            className="w-full sm:w-48"
           >
             <NativeSelectOption value="">Alle Spaces</NativeSelectOption>
             {spaces?.map((s) => (

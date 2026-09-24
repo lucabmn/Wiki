@@ -4,8 +4,10 @@ import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { SettingsSection } from "@/components/settings/settings-section";
 import { cn } from "@nilovon-wiki/ui/lib/utils";
+import { pageTitle } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_auth/settings/appearance")({
+  head: () => pageTitle("Darstellung", "Einstellungen"),
   component: AppearanceSettings,
 });
 

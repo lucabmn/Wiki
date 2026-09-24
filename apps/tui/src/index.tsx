@@ -8,15 +8,10 @@ import { Update } from "./screens/update";
 
 type Screen = "menu" | "install" | "configure" | "update";
 
-const menu = [
-  { key: "install", name: "Installieren", desc: "Stack konfigurieren & starten", ready: true },
-  {
-    key: "configure",
-    name: "Konfigurieren",
-    desc: "Einstellungen ändern & neu starten",
-    ready: true,
-  },
-  { key: "update", name: "Updaten", desc: "Code ziehen & Stack neu bauen", ready: true },
+const menu: { key: Exclude<Screen, "menu">; name: string; desc: string }[] = [
+  { key: "install", name: "Installieren", desc: "Stack konfigurieren & starten" },
+  { key: "configure", name: "Konfigurieren", desc: "Einstellungen ändern & neu starten" },
+  { key: "update", name: "Updaten", desc: "Code ziehen & Stack neu bauen" },
 ];
 
 function Menu({ onOpen, onQuit }: { onOpen: (screen: Screen) => void; onQuit: () => void }) {
@@ -27,16 +22,15 @@ function Menu({ onOpen, onQuit }: { onOpen: (screen: Screen) => void; onQuit: ()
     if (key.name === "up" || key.name === "k")
       return setActive((i) => (i - 1 + menu.length) % menu.length);
     if (key.name === "down" || key.name === "j") return setActive((i) => (i + 1) % menu.length);
-    if (key.name >= "1" && key.name <= String(menu.length)) return setActive(Number(key.name) - 1);
-    if (key.name === "return" || key.name === "enter") {
-      const item = menu[active]!;
-      if (item.ready) onOpen(item.key as Screen);
-    }
+    // Number keys open an entry directly, matching the shown numbering.
+    const n = Number(key.name);
+    if (Number.isInteger(n) && n >= 1 && n <= menu.length) return onOpen(menu[n - 1]!.key);
+    if (key.name === "return" || key.name === "enter") onOpen(menu[active]!.key);
   });
 
   return (
     <box flexDirection="column" flexGrow={1} padding={1} gap={1}>
-      <box flexDirection="column">
+      <box flexDirection="column" flexShrink={0}>
         <ascii-font font="tiny" text="Wiki" />
         <text attributes={TextAttributes.DIM}>
           Self-Hosted · Installieren, Konfigurieren, Updaten
@@ -62,15 +56,15 @@ function Menu({ onOpen, onQuit }: { onOpen: (screen: Screen) => void; onQuit: ()
               flexDirection="column"
               paddingX={1}
               backgroundColor={on ? theme.accentDim : undefined}
-              onMouseDown={() => setActive(i)}
+              onMouseDown={() => (on ? onOpen(m.key) : setActive(i))}
             >
               <box flexDirection="row" gap={1}>
                 <text fg={on ? theme.fg : theme.dim}>{on ? "▶" : " "}</text>
                 <text
-                  fg={m.ready ? (on ? theme.fg : theme.dim) : theme.border}
+                  fg={on ? theme.fg : theme.dim}
                   attributes={on ? TextAttributes.BOLD : undefined}
                 >
-                  {m.name}
+                  {i + 1}. {m.name}
                 </text>
               </box>
               <text fg={theme.dim}> {m.desc}</text>
@@ -79,15 +73,18 @@ function Menu({ onOpen, onQuit }: { onOpen: (screen: Screen) => void; onQuit: ()
         })}
       </box>
 
-      <box flexDirection="row" gap={2} paddingX={1}>
+      <box flexDirection="row" gap={2} paddingX={1} flexShrink={0}>
         <text fg={theme.dim}>
           <span fg={theme.accent}>↑↓/jk</span> Navigation
+        </text>
+        <text fg={theme.dim}>
+          <span fg={theme.accent}>1–{menu.length}</span> Direkt öffnen
         </text>
         <text fg={theme.dim}>
           <span fg={theme.accent}>Enter</span> Öffnen
         </text>
         <text fg={theme.dim}>
-          <span fg={theme.accent}>q</span> Beenden
+          <span fg={theme.accent}>q/Esc</span> Beenden
         </text>
       </box>
     </box>

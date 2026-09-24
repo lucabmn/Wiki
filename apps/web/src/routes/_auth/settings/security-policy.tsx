@@ -4,9 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PermissionRequest } from "@nilovon-wiki/auth/permissions";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { orpc } from "@/utils/orpc";
 import { toastError } from "@/lib/query";
 import { GRACE_PRESETS, graceDeadline } from "@/lib/two-factor";
+import { pageTitle } from "@/lib/page-title";
 import { PermissionGate } from "@/components/settings/permission-gate";
 import { SettingsCard, SettingsSection } from "@/components/settings/settings-section";
 import { AffectedMembers } from "@/components/security/affected-members";
@@ -19,6 +21,7 @@ import { Switch } from "@nilovon-wiki/ui/components/switch";
 const ORG_UPDATE: PermissionRequest[] = [{ organization: ["update"] }];
 
 export const Route = createFileRoute("/_auth/settings/security-policy")({
+  head: () => pageTitle("Sicherheitsrichtlinie", "Einstellungen"),
   component: () => (
     <PermissionGate permissions={ORG_UPDATE}>
       <SecurityPolicySettings />
@@ -61,6 +64,10 @@ function SecurityPolicySettings() {
       onError: toastError,
     }),
   );
+
+  if (overview.isError) {
+    return <QueryError error={overview.error} onRetry={() => overview.refetch()} />;
+  }
 
   if (overview.isPending || !draft || !overview.data) {
     return (

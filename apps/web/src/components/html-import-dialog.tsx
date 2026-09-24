@@ -34,6 +34,11 @@ import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/na
 import { Progress } from "@nilovon-wiki/ui/components/progress";
 import { ScrollArea } from "@nilovon-wiki/ui/components/scroll-area";
 
+/** "1 Seite" / "3 Seiten" — the preview counts are often exactly one. */
+function countLabel(count: number, one: string, many: string) {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Der Import ist fehlgeschlagen.";
 }
@@ -267,19 +272,35 @@ export function HtmlImportDialog({
             <div>
               <h3 className="font-semibold">Migration abgeschlossen</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                {commit.data.imported.length} Seiten und {assets.length} Assets wurden importiert.
+                {countLabel(commit.data.imported.length, "Seite", "Seiten")} und{" "}
+                {countLabel(assets.length, "Asset", "Assets")} wurden importiert.
               </p>
             </div>
-            <Button onClick={() => onComplete?.(commit.data.imported[0]!.id)}>
-              Erste Seite öffnen
-            </Button>
+            {/* The footer is gone on this screen, so it needs its own way out. */}
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Schließen
+              </Button>
+              {onComplete && commit.data.imported[0] ? (
+                <Button onClick={() => onComplete(commit.data.imported[0]!.id)}>
+                  Erste Seite öffnen
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : pages.length === 0 ? (
           <div className="space-y-3">
             <div
               role="button"
               tabIndex={0}
-              onKeyDown={(event) => event.key === "Enter" && inputRef.current?.click()}
+              onKeyDown={(event) => {
+                // role="button" promises both keys a native button answers to.
+                if (event.target !== event.currentTarget) return;
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  inputRef.current?.click();
+                }
+              }}
               onClick={() => inputRef.current?.click()}
               onDragEnter={(event) => {
                 event.preventDefault();
@@ -362,13 +383,14 @@ export function HtmlImportDialog({
                 <p className="text-sm font-medium">Migration bereit zur Prüfung</p>
                 <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <FileCode2 className="size-3.5" /> {pages.length} Seiten
+                    <FileCode2 className="size-3.5" /> {countLabel(pages.length, "Seite", "Seiten")}
                   </span>
                   <span className="flex items-center gap-1">
-                    <ImageIcon className="size-3.5" /> {imageCount} Bilder
+                    <ImageIcon className="size-3.5" /> {countLabel(imageCount, "Bild", "Bilder")}
                   </span>
                   <span className="flex items-center gap-1">
-                    <Paperclip className="size-3.5" /> {attachmentCount} Anhänge
+                    <Paperclip className="size-3.5" />{" "}
+                    {countLabel(attachmentCount, "Anhang", "Anhänge")}
                   </span>
                 </div>
               </div>
@@ -385,7 +407,7 @@ export function HtmlImportDialog({
             {warningCount > 0 ? (
               <Alert>
                 <AlertCircle />
-                <AlertTitle>{warningCount} Hinweise</AlertTitle>
+                <AlertTitle>{countLabel(warningCount, "Hinweis", "Hinweise")}</AlertTitle>
                 <AlertDescription>
                   Fehlende Assets werden gekennzeichnet; technische Export-Dateien wie CSS,
                   JavaScript oder Fonts werden nicht als Wiki-Anhänge übernommen.
@@ -526,7 +548,7 @@ export function HtmlImportDialog({
               >
                 {commit.isPending
                   ? "Migration läuft …"
-                  : `${pages.length} Seiten + ${assets.length} Assets migrieren`}
+                  : `${countLabel(pages.length, "Seite", "Seiten")} + ${countLabel(assets.length, "Asset", "Assets")} migrieren`}
               </Button>
             ) : null}
           </DialogFooter>

@@ -27,6 +27,7 @@ import { Switch } from "@nilovon-wiki/ui/components/switch";
 import { Textarea } from "@nilovon-wiki/ui/components/textarea";
 import type { JSONContent } from "@tiptap/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { Lock, Save } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -81,13 +82,24 @@ export function CourseSettingsForm({ course }: { course: CourseCard }) {
   const [certificateEnabled, setCertificateEnabled] = useState(course.certificateEnabled);
   const [topicIds, setTopicIds] = useState<string[]>(course.topics.map((topic) => topic.id));
 
+  const navigate = useNavigate();
   const invalidateCourses = useInvalidate(orpc.learn.courses.key());
   const invalidateTopics = useInvalidate(orpc.learn.courseTopics.key());
 
   const topics = useQuery(orpc.learn.courseTopics.list.queryOptions({ input: {} }));
   const update = useMutation(
     orpc.learn.courses.update.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async (_course, variables) => {
+        // The builder is addressed by slug, so after a slug change the current
+        // URL points at nothing: move first, or the refetch below would ask
+        // for the old slug and land on "nicht gefunden".
+        if (variables.slug) {
+          await navigate({
+            to: "/learn/courses/$slug/edit",
+            params: { slug: variables.slug },
+            replace: true,
+          });
+        }
         invalidateCourses();
         setDescriptionDirty(false);
       },
@@ -155,8 +167,14 @@ export function CourseSettingsForm({ course }: { course: CourseCard }) {
 
     // Topics live in their own procedure, so a save is two calls; both are
     // awaited before the confirmation so a failed one never reads as success.
-    if (Object.keys(payload).length > 1) await update.mutateAsync(payload);
-    if (topicsChanged) await setTopics.mutateAsync({ courseId: course.id, topicIds });
+    // A failure is already toasted by the mutation's `onError`; the catch only
+    // keeps the rejection from escaping as an unhandled promise.
+    try {
+      if (Object.keys(payload).length > 1) await update.mutateAsync(payload);
+      if (topicsChanged) await setTopics.mutateAsync({ courseId: course.id, topicIds });
+    } catch {
+      return;
+    }
     toast.success("Kurseinstellungen gespeichert");
   };
 

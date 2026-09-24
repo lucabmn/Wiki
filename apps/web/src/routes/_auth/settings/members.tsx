@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { MoreHorizontal, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { authClient } from "@/lib/auth-client";
 import { initials } from "@/lib/format";
 import { ROLE_LABEL, ROLE_VARIANT } from "@/lib/labels";
@@ -16,6 +17,7 @@ import {
   rolesQueryOptions,
   useOrgRefresh,
 } from "@/lib/org-queries";
+import { pageTitle } from "@/lib/page-title";
 import { UserLink } from "@/components/user-link";
 import { InviteMemberDialog } from "@/components/settings/invite-member-dialog";
 import { PermissionGate } from "@/components/settings/permission-gate";
@@ -59,6 +61,7 @@ import {
 const MEMBER_MANAGE: PermissionRequest[] = [{ member: ["update"] }];
 
 export const Route = createFileRoute("/_auth/settings/members")({
+  head: () => pageTitle("Mitglieder", "Einstellungen"),
   component: () => (
     <PermissionGate permissions={MEMBER_MANAGE}>
       <MembersSettings />
@@ -181,6 +184,12 @@ function MembersSettings() {
                     </TableCell>
                   </TableRow>
                 ))
+              ) : membersQuery.isError ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={4}>
+                    <QueryError error={membersQuery.error} onRetry={() => membersQuery.refetch()} />
+                  </TableCell>
+                </TableRow>
               ) : members.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">

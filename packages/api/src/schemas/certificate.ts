@@ -65,7 +65,9 @@ export const PublicCertificateSchema = z.object({
 });
 
 export const VerifyCertificateInputSchema = z.object({
-  serial: z.string().min(1).max(64),
+  // Typed off a printout: tolerate surrounding blanks and lower case, since
+  // serials are only ever issued in upper case (see `generateSerial`).
+  serial: z.string().trim().toUpperCase().min(1).max(64),
 });
 
 export const ListCourseCertificatesInputSchema = z.object({
@@ -81,5 +83,5 @@ export const RevokeCertificateInputSchema = z.object({
    * Required: revoking is a public statement that a qualification no longer
    * stands, and the holder is entitled to be told on what grounds.
    */
-  reason: z.string().min(1).max(500),
+  reason: z.string().trim().min(1).max(500),
 });

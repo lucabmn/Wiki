@@ -160,7 +160,9 @@ export function useLessonProgress({
     };
   }, [enabled, send]);
 
-  const complete = useMutation(
+  // `mutate` is stable across renders; the result object is not, and keeping it
+  // in the deps below rebuilt `setCompleted` on every render.
+  const { mutate: complete, isPending: isCompleting } = useMutation(
     orpc.learn.enrollments.complete.mutationOptions({
       onSuccess: (result) => {
         completed.current = result.progress.status === "completed";
@@ -182,10 +184,10 @@ export function useLessonProgress({
       // Flush first: the completion recomputes the course percentage, and a
       // pending position report landing afterwards would only undo the order.
       void send();
-      complete.mutate({ lessonId, completed: value });
+      complete({ lessonId, completed: value });
     },
     [complete, lessonId, send],
   );
 
-  return { report, flush, setCompleted, isCompleting: complete.isPending };
+  return { report, flush, setCompleted, isCompleting };
 }

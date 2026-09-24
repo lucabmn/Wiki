@@ -17,6 +17,7 @@ import {
 } from "@nilovon-wiki/ui/components/alert-dialog";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
+import type { ThreadPermissions } from "@/components/comments/inline-comment-thread";
 import { MentionTextarea } from "./mention-textarea";
 
 const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
@@ -25,8 +26,13 @@ const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeS
 
 export function CommentCard({
   comment,
+  nameOf,
+  permissions,
 }: {
-  comment: { id: string; body: string; createdAt: Date };
+  comment: { id: string; authorId: string | null; body: string; createdAt: Date };
+  nameOf: (userId: string | null) => string;
+  /** Same rules as the inline threads: commenters resolve, authors and editors delete. */
+  permissions: ThreadPermissions;
 }) {
   const invalidate = useInvalidate(orpc.comments.list.key());
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -50,6 +56,10 @@ export function CommentCard({
     }),
   );
 
+  const mayDelete =
+    permissions.canModerate ||
+    (permissions.viewerId !== null && comment.authorId === permissions.viewerId);
+
   return (
     // Anchor for `/pages/<id>#comment-<id>` links out of the inbox; `:target`
     // gives the row a ring so it is obvious which comment was meant.
@@ -57,31 +67,36 @@ export function CommentCard({
       <CardContent className="py-3">
         <div className="flex items-start justify-between gap-2">
           <div className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{nameOf(comment.authorId)}</span> ·{" "}
             {dateFormat.format(comment.createdAt)}
           </div>
           <div className="-my-1 flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7"
-              disabled={resolve.isPending}
-              onClick={() => resolve.mutate({ id: comment.id, resolved: true })}
-            >
-              <Check className="size-3.5" /> Auflösen
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 text-muted-foreground hover:text-destructive"
-              disabled={remove.isPending}
-              aria-label="Kommentar löschen"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
+            {permissions.canComment ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7"
+                disabled={resolve.isPending}
+                onClick={() => resolve.mutate({ id: comment.id, resolved: true })}
+              >
+                <Check className="size-3.5" /> Auflösen
+              </Button>
+            ) : null}
+            {mayDelete ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 text-muted-foreground hover:text-destructive"
+                disabled={remove.isPending}
+                aria-label="Kommentar löschen"
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            ) : null}
           </div>
         </div>
-        <p className="mt-1 text-sm whitespace-pre-wrap">{comment.body}</p>
+        <p className="mt-1 text-sm wrap-anywhere whitespace-pre-wrap">{comment.body}</p>
       </CardContent>
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -126,7 +141,8 @@ export function CommentForm({ pageId, spaceId }: { pageId: string; spaceId: stri
 
   const submit = () => {
     const trimmed = body.trim();
-    if (trimmed) create.mutate({ pageId, body: trimmed });
+    // ⌘/Strg + ⏎ bypasses the disabled button, so guard the double submit here.
+    if (trimmed && !create.isPending) create.mutate({ pageId, body: trimmed });
   };
 
   return (

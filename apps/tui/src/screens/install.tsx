@@ -1,5 +1,6 @@
 import { TextAttributes } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
+import { existsSync } from "node:fs";
 import { useEffect, useState } from "react";
 import { theme } from "../theme";
 import {
@@ -11,9 +12,9 @@ import {
   writeEnvFiles,
   type InstallConfig,
 } from "../lib/config";
-import { composeUp } from "../lib/docker";
+import { envPath } from "../lib/paths";
 import { ConfigFormView, useConfigForm } from "../components/config-form";
-import { LogBox, StatusRow, pollUntilHealthy, useRunLog } from "../components/run-log";
+import { LogBox, StatusRow, upAndWaitHealthy, useRunLog } from "../components/run-log";
 
 type Stage = "form" | "review" | "installing" | "done" | "error";
 
@@ -49,18 +50,14 @@ export function InstallWizard({ onExit }: { onExit: () => void }) {
         const production = isProduction(config);
         if (production) append("→ Produktionsmodus: Caddy-TLS-Overlay wird mitgestartet.");
         append("→ Baue Images und starte alle Dienste (inkl. DB-Migrationen) …");
-        const upCode = await composeUp(production, (l) => !signal.aborted && append(l));
-        if (signal.aborted) return;
-        if (upCode !== 0) {
-          append(`✘ docker compose beendet mit Code ${upCode}.`);
-          return setStage("error");
-        }
-
-        append("→ Warte auf Health-Checks …");
-        const healthy = await pollUntilHealthy(setStatuses, signal);
-        if (signal.aborted) return;
-        append(healthy ? "✔ Alle Dienste laufen." : "● Timeout — prüfe die Logs.");
-        setStage("done");
+        const result = await upAndWaitHealthy({
+          production,
+          append,
+          onStatuses: setStatuses,
+          signal,
+          successMessage: "✔ Alle Dienste laufen.",
+        });
+        if (result !== "aborted") setStage(result);
       } catch (err) {
         if (signal.aborted) return;
         append(`✘ ${err instanceof Error ? err.message : String(err)}`);
@@ -92,7 +89,7 @@ export function InstallWizard({ onExit }: { onExit: () => void }) {
 
   return (
     <box flexDirection="column" flexGrow={1} padding={1} gap={1}>
-      <box flexDirection="column">
+      <box flexDirection="column" flexShrink={0}>
         <text fg={theme.accent} attributes={TextAttributes.BOLD}>
           Installation — Self-Hosted Wiki
         </text>
@@ -116,7 +113,12 @@ export function InstallWizard({ onExit }: { onExit: () => void }) {
         </box>
       )}
 
-      <Footer stage={stage} valid={isValid(config)} lastField={fieldIndex === fields.length - 1} />
+      <Footer
+        stage={stage}
+        valid={isValid(config)}
+        lastField={fieldIndex === fields.length - 1}
+        secretField={!!fields[fieldIndex]?.secret}
+      />
     </box>
   );
 }
@@ -126,7 +128,7 @@ function stageHint(stage: Stage): string {
     case "form":
       return "Werte prüfen — Secrets sind bereits generiert.";
     case "review":
-      return "Diese .env Dateien werden geschrieben.";
+      return "Diese .env Dateien werden geschrieben (↑↓ scrollt).";
     case "installing":
       return "Images bauen · Migrationen · Dienste starten …";
     case "done":
@@ -138,8 +140,20 @@ function stageHint(stage: Stage): string {
 
 function ReviewStage({ config }: { config: InstallConfig }) {
   const files = renderEnvFiles(config);
+  // Re-running Install over a live stack replaces its secrets; the existing
+  // Postgres volume keeps the old password, so warn before overwriting.
+  const existing = existsSync(envPath(".env"));
   return (
-    <box flexDirection="column" gap={1} flexGrow={1}>
+    <scrollbox flexGrow={1} focused>
+      {existing && (
+        <box border borderStyle="rounded" borderColor={theme.warn} paddingX={1} marginBottom={1}>
+          <text fg={theme.warn}>
+            Achtung: Es gibt bereits eine .env — sie wird überschrieben. Das neue DB-Passwort passt
+            nicht zu einem bestehenden Postgres-Volume. Für bestehende Installationen
+            „Konfigurieren" nutzen.
+          </text>
+        </box>
+      )}
       {files.map((f) => (
         <box
           key={f.rel}
@@ -150,6 +164,7 @@ function ReviewStage({ config }: { config: InstallConfig }) {
           title={` ${f.rel} `}
           titleColor={theme.accent}
           paddingX={1}
+          marginBottom={1}
         >
           {f.content
             .trimEnd()
@@ -160,14 +175,18 @@ function ReviewStage({ config }: { config: InstallConfig }) {
               const secret = /SECRET|PASSWORD|ACCESS_KEY/.test(k ?? "");
               return (
                 <box key={i} flexDirection="row" gap={1}>
-                  <text fg={theme.dim}>{k}</text>
-                  <text fg={secret ? theme.warn : theme.fg}>{secret ? maskValue(v) : v}</text>
+                  <text fg={theme.dim} flexShrink={0}>
+                    {k}
+                  </text>
+                  <text fg={secret ? theme.warn : theme.fg}>
+                    {secret ? maskValue(v) : maskUrlPassword(v)}
+                  </text>
                 </box>
               );
             })}
         </box>
       ))}
-    </box>
+    </scrollbox>
   );
 }
 
@@ -185,19 +204,29 @@ function DoneNote({ config }: { config: InstallConfig }) {
   );
 }
 
-function Footer({ stage, valid, lastField }: { stage: Stage; valid: boolean; lastField: boolean }) {
+function Footer({
+  stage,
+  valid,
+  lastField,
+  secretField,
+}: {
+  stage: Stage;
+  valid: boolean;
+  lastField: boolean;
+  secretField: boolean;
+}) {
   const hint = (k: string, label: string) => (
     <text fg={theme.dim}>
       <span fg={theme.accent}>{k}</span> {label}
     </text>
   );
   return (
-    <box flexDirection="row" gap={2} paddingX={1}>
+    <box flexDirection="row" gap={2} paddingX={1} flexShrink={0}>
       {stage === "form" && (
         <>
           {hint("↑↓/Tab", "Feld")}
-          {hint("Ctrl+R", "Secret neu")}
-          {hint("Enter", lastField ? (valid ? "Weiter" : "— ungültig") : "Nächstes Feld")}
+          {secretField && hint("Ctrl+R", "Secret neu")}
+          {hint("Enter", lastField ? (valid ? "Weiter" : "Zum Fehler") : "Nächstes Feld")}
           {hint("Esc", "Zurück")}
         </>
       )}
@@ -222,4 +251,9 @@ function Footer({ stage, valid, lastField }: { stage: Stage; valid: boolean; las
 function maskValue(v: string): string {
   if (v.length <= 6) return "••••••";
   return `${"•".repeat(6)}${v.slice(-4)}`;
+}
+
+/** Hide the password inside a DSN like `postgresql://user:pass@host` (DATABASE_URL). */
+function maskUrlPassword(v: string): string {
+  return v.replace(/^([a-z][a-z0-9+.-]*:\/\/[^:/@]+:)[^@]+@/i, "$1••••••@");
 }

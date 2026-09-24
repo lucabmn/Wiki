@@ -8,6 +8,7 @@ import z from "zod";
 
 import AuthLayout from "@/components/layouts/auth-layout";
 import { authClient } from "@/lib/auth-client";
+import { pageTitle } from "@/lib/page-title";
 
 // Better Auth's callback appends `?token=…` on success and `?error=…` when the
 // token is missing, already used, or expired.
@@ -17,6 +18,7 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute("/auth/reset-password")({
+  head: () => pageTitle("Neues Passwort"),
   validateSearch: searchSchema,
   component: RouteComponent,
 });

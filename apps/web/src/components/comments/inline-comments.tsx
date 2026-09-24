@@ -149,7 +149,7 @@ export function InlineComments({
 
   const submitDraft = () => {
     const body = draftBody.trim();
-    if (!draft || !body) return;
+    if (!draft || !body || create.isPending) return;
     create.mutate({
       pageId,
       body,

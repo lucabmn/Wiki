@@ -36,6 +36,12 @@ const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeS
 
 function RouteComponent() {
   const { id } = Route.useParams();
+  // Keyed by id: following a link to another page must not carry over the edit
+  // mode, open sheets or the editor instance of the page being left.
+  return <PageView key={id} id={id} />;
+}
+
+function PageView({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   // Effective page-level access (respects space + per-page ACL), replacing the
@@ -82,8 +88,11 @@ function RouteComponent() {
     if (target) scrollIntoPageView(target);
   }, [hash, comments]);
 
-  // Resolve the owning space for the back-link; cached from the sidebar.
-  const { data: spaces } = useQuery(orpc.spaces.list.queryOptions({ input: {} }));
+  // Resolve the owning space for the back-link. Archived spaces included (same
+  // key as the space route) so a page in one still gets its trail.
+  const { data: spaces } = useQuery(
+    orpc.spaces.list.queryOptions({ input: { includeArchived: true } }),
+  );
   const space = spaces?.find((s) => s.id === page?.spaceId);
 
   if (isPending) {
@@ -220,11 +229,20 @@ function RouteComponent() {
             ) : (
               <div className="space-y-2">
                 {openComments.map((comment) => (
-                  <CommentCard key={comment.id} comment={comment} />
+                  <CommentCard
+                    key={comment.id}
+                    comment={comment}
+                    nameOf={nameOf}
+                    permissions={{
+                      canComment,
+                      canModerate: canEdit,
+                      viewerId: auth.session.user.id,
+                    }}
+                  />
                 ))}
               </div>
             )}
-            <CommentForm pageId={page.id} spaceId={page.spaceId} />
+            {canComment ? <CommentForm pageId={page.id} spaceId={page.spaceId} /> : null}
           </section>
         </div>
 

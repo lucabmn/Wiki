@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Building2, FileText, Folder, ShieldCheck } from "lucide-react";
 
+import { QueryError } from "@/components/query-error";
 import { LegalHoldDialog } from "@/components/lifecycle/legal-hold-dialog";
 import { formatDate } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
@@ -47,6 +48,10 @@ export function LegalHoldTable({ organizationName }: { organizationName: string 
 
   if (holdsQuery.isPending) {
     return <Skeleton className="h-24 w-full rounded-lg" />;
+  }
+
+  if (holdsQuery.isError) {
+    return <QueryError onRetry={() => holdsQuery.refetch()} error={holdsQuery.error} />;
   }
 
   if (holds.length === 0) {

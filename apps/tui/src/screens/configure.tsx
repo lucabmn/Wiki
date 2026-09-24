@@ -11,6 +11,8 @@ import {
   writeEnvFiles,
   type InstallConfig,
 } from "../lib/config";
+import { ConfigFormView, useConfigForm } from "../components/config-form";
+import { LogBox, StatusRow, upAndWaitHealthy, useRunLog } from "../components/run-log";
 
 // Configure edits only the URLs. Secrets (DB password, auth secret) are shown
 // read-only: rotating them on a live install is destructive (a new
@@ -18,9 +20,6 @@ import {
 // everyone out), so they belong to a dedicated flow, not routine config edits.
 const EDITABLE = fields.filter((f) => !f.secret);
 const SECRETS = fields.filter((f) => f.secret);
-import { composeUp } from "../lib/docker";
-import { ConfigFormView, useConfigForm } from "../components/config-form";
-import { LogBox, StatusRow, pollUntilHealthy, useRunLog } from "../components/run-log";
 
 type Stage = "loading" | "form" | "applying" | "done" | "error";
 
@@ -64,17 +63,14 @@ export function Configure({ onExit }: { onExit: () => void }) {
         const written = await writeEnvFiles(config);
         written.forEach((p) => append(`  ✔ ${p}`));
         append("→ Baue neu und starte Dienste (up -d --build) …");
-        const code = await composeUp(isProduction(config), (l) => !signal.aborted && append(l));
-        if (signal.aborted) return;
-        if (code !== 0) {
-          append(`✘ docker compose beendet mit Code ${code}.`);
-          return setStage("error");
-        }
-        append("→ Warte auf Health-Checks …");
-        const healthy = await pollUntilHealthy(setStatuses, signal);
-        if (signal.aborted) return;
-        append(healthy ? "✔ Übernommen." : "● Timeout — prüfe die Logs.");
-        setStage("done");
+        const result = await upAndWaitHealthy({
+          production: isProduction(config),
+          append,
+          onStatuses: setStatuses,
+          signal,
+          successMessage: "✔ Übernommen.",
+        });
+        if (result !== "aborted") setStage(result);
       } catch (err) {
         if (signal.aborted) return;
         append(`✘ ${err instanceof Error ? err.message : String(err)}`);
@@ -98,7 +94,7 @@ export function Configure({ onExit }: { onExit: () => void }) {
 
   return (
     <box flexDirection="column" flexGrow={1} padding={1} gap={1}>
-      <box flexDirection="column">
+      <box flexDirection="column" flexShrink={0}>
         <text fg={theme.accent} attributes={TextAttributes.BOLD}>
           Konfiguration
         </text>
@@ -161,11 +157,10 @@ function Footer({ stage, valid, lastField }: { stage: Stage; valid: boolean; las
     </text>
   );
   return (
-    <box flexDirection="row" gap={2} paddingX={1}>
+    <box flexDirection="row" gap={2} paddingX={1} flexShrink={0}>
       {stage === "form" && (
         <>
           {hint("↑↓/Tab", "Feld")}
-          {hint("Ctrl+R", "Secret neu")}
           {hint("Enter", lastField ? (valid ? "Übernehmen" : "— ungültig") : "Nächstes Feld")}
           {hint("Esc", "Zurück")}
         </>

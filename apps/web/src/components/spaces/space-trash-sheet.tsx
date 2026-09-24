@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { FileText, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { formatDate, timeAgo } from "@/lib/format";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
@@ -114,6 +115,8 @@ export function SpaceTrashSheet({
                 <Skeleton key={index} className="h-16 w-full rounded-lg" />
               ))}
             </div>
+          ) : trashQuery.isError ? (
+            <QueryError onRetry={() => trashQuery.refetch()} error={trashQuery.error} />
           ) : entries.length === 0 ? (
             <Empty className="rounded-xl border border-dashed">
               <EmptyHeader>
@@ -176,11 +179,18 @@ export function SpaceTrashSheet({
                       variant="ghost"
                       size="icon-sm"
                       className="text-muted-foreground hover:text-destructive"
-                      aria-label={`„${entry.title}" endgültig löschen`}
-                      // Blocked entries hide the affordance rather than offering
+                      aria-label={`„${entry.title || "Ohne Titel"}“ endgültig löschen`}
+                      // Blocked entries disable the affordance rather than offering
                       // a button that is guaranteed to fail.
+                      title={
+                        entry.held
+                          ? "Gesperrt: für diese Seite besteht eine Löschsperre"
+                          : undefined
+                      }
                       disabled={entry.held || purge.isPending}
-                      onClick={() => setConfirmPurge({ id: entry.id, title: entry.title })}
+                      onClick={() =>
+                        setConfirmPurge({ id: entry.id, title: entry.title || "Ohne Titel" })
+                      }
                     >
                       <Trash2 className="size-3.5" />
                     </Button>

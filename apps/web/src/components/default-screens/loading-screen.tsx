@@ -5,10 +5,17 @@ import { Loader2 } from "lucide-react";
  */
 export default function LoadingScreen({ label = "Wird geladen …" }: { label?: string }) {
   return (
-    <div className="relative flex min-h-svh flex-col items-center justify-center bg-background px-6 font-sans">
+    <div
+      role="status"
+      aria-live="polite"
+      className="relative flex min-h-svh flex-col items-center justify-center bg-background px-6 font-sans"
+    >
       <div className="relative flex flex-col items-center">
         {/* brand mark */}
-        <div className="flex size-13 items-center justify-center rounded-xl bg-primary font-serif text-2xl font-semibold text-primary-foreground shadow-sm">
+        <div
+          aria-hidden
+          className="flex size-13 items-center justify-center rounded-xl bg-primary font-serif text-2xl font-semibold text-primary-foreground shadow-sm"
+        >
           N
         </div>
 

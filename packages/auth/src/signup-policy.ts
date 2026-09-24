@@ -117,7 +117,7 @@ export async function refuseSignupReason(db: Database, email: string): Promise<s
 /**
  * Plugin enforcing the registration policy.
  *
- * `db` is the handle `createAuth` already built, so the invitation lookup
+ * `db` is the shared handle `createAuth` passes in, so the invitation lookup
  * shares its pool instead of opening a second one.
  */
 export function signupPolicyPlugin(db: Database) {

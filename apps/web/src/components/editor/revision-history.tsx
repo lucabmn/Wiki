@@ -22,6 +22,7 @@ import type { JSONContent } from "@tiptap/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Eye, History } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { PageContent } from "./page-content";
 
@@ -60,18 +61,29 @@ export function RevisionHistory({
     content: JSONContent | null;
   } | null>(null);
 
-  const { data: revisions, isPending } = useQuery(
-    orpc.pages.listRevisions.queryOptions({ input: { id: pageId }, enabled: open }),
-  );
+  const {
+    data: revisions,
+    isPending,
+    isError,
+  } = useQuery(orpc.pages.listRevisions.queryOptions({ input: { id: pageId }, enabled: open }));
 
-  const invalidatePage = useInvalidate(orpc.pages.get.key());
-  const invalidateRevisions = useInvalidate(orpc.pages.listRevisions.key());
+  const close = (next: boolean) => {
+    if (!next) {
+      setPreviewVersion(null);
+      setRestoreTarget(null);
+    }
+    onOpenChange(next);
+  };
+
+  // The whole `pages` router: a restore changes the page, its revisions and —
+  // through the title — every list the page appears in.
+  const invalidatePages = useInvalidate(orpc.pages.key());
   const restore = useMutation(
     orpc.pages.restoreRevision.mutationOptions({
-      onSuccess: () => {
-        invalidatePage();
-        invalidateRevisions();
-        onOpenChange(false);
+      onSuccess: (_data, { version }) => {
+        invalidatePages();
+        toast.success(`Version ${version} wiederhergestellt`);
+        close(false);
       },
       onError: toastError,
     }),
@@ -88,18 +100,11 @@ export function RevisionHistory({
     if (onRestore) {
       // Editor is live: apply into the shared doc, don't write content on the server.
       onRestore({ title: revision.title, content: revision.content });
-      onOpenChange(false);
+      toast.success(`Version ${revision.version} in den Editor übernommen`);
+      close(false);
       return;
     }
     restore.mutate({ id: pageId, version: revision.version });
-  };
-
-  const close = (next: boolean) => {
-    if (!next) {
-      setPreviewVersion(null);
-      setRestoreTarget(null);
-    }
-    onOpenChange(next);
   };
 
   return (
@@ -157,6 +162,10 @@ export function RevisionHistory({
             </DialogHeader>
             {isPending ? (
               <p className="py-6 text-center text-sm text-muted-foreground">Lädt …</p>
+            ) : isError ? (
+              <p className="py-6 text-center text-sm text-destructive">
+                Der Versionsverlauf konnte nicht geladen werden.
+              </p>
             ) : !revisions?.length ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 Noch keine veröffentlichten Versionen.
@@ -223,7 +232,7 @@ export function RevisionHistory({
                 {restoreTarget ? `Version ${restoreTarget.version} wiederherstellen?` : null}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Die heutigen Inhalte der Seite werden durch die gewählte Version ersetzt.
+                Der aktuelle Inhalt der Seite wird durch die gewählte Version ersetzt.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

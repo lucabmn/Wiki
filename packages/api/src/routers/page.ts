@@ -260,7 +260,12 @@ function attachmentIdsInDocument(value: unknown): string[] {
   return [...ids];
 }
 
-function redactDraftBody<
+/**
+ * Strips the body from a page that has never been published. Exported so every
+ * reader API returning full page rows (e.g. the link lists) applies the same
+ * rule — a draft body must not escape through a side door.
+ */
+export function redactDraftBody<
   T extends { status: string; publishedAt: Date | null; content: unknown; textContent: string },
 >(row: T): T {
   // Archiving changes status, so publishedAt is the durable signal that a body
@@ -795,6 +800,9 @@ export const pageRouter = {
       const nextContent = input.content !== undefined ? input.content : existing.content;
       const nextText = input.textContent !== undefined ? input.textContent : existing.textContent;
       const published = await context.db.transaction(async (tx) => {
+        // Lock the page so two concurrent publishes can't both read the same
+        // latest version and collide on `page_revision_uq` (a 500).
+        await tx.select({ id: page.id }).from(page).where(eq(page.id, existing.id)).for("update");
         const latest = await tx.query.pageRevision.findFirst({
           where: eq(pageRevision.pageId, existing.id),
           orderBy: [desc(pageRevision.version)],

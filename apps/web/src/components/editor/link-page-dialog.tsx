@@ -35,7 +35,7 @@ export function LinkPageDialog({
 }) {
   const [query, setQuery] = useState("");
   const enabled = open && query.trim().length >= 2;
-  const { data: hits } = useQuery(
+  const { data: hits, isFetching } = useQuery(
     orpc.search.pages.queryOptions({
       input: { query: query.trim(), spaceId, limit: 8 },
       enabled,
@@ -43,7 +43,14 @@ export function LinkPageDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        // A cancelled search must not greet the next "Seite verknüpfen".
+        if (!next) setQuery("");
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="p-0">
         <DialogHeader className="px-4 pt-4">
           <DialogTitle>Seite verknüpfen</DialogTitle>
@@ -57,7 +64,11 @@ export function LinkPageDialog({
           />
           <CommandList>
             <CommandEmpty>
-              {enabled ? "Keine Treffer." : "Tippe mindestens zwei Zeichen."}
+              {!enabled
+                ? "Tippe mindestens zwei Zeichen."
+                : isFetching
+                  ? "Suche …"
+                  : "Keine Treffer."}
             </CommandEmpty>
             {hits?.length ? (
               <CommandGroup>

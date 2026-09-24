@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Monitor } from "lucide-react";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { authClient } from "@/lib/auth-client";
 import { formatDateTime } from "@/lib/format";
 import { toastError } from "@/lib/query";
@@ -121,6 +122,13 @@ export function SessionCard() {
               <Skeleton key={row} className="h-10 w-full rounded-md" />
             ))}
           </div>
+        ) : sessionsQuery.isError ? (
+          <QueryError
+            compact
+            className="px-0"
+            onRetry={() => sessionsQuery.refetch()}
+            error={sessionsQuery.error}
+          />
         ) : sessions.length === 0 ? (
           <p className="text-sm text-muted-foreground">Keine Sitzungen gefunden.</p>
         ) : (

@@ -40,8 +40,11 @@ export function timeAgo(value: string | Date): string {
 
 /** Up to two uppercase initials from a display name, e.g. "Luca Braun" → "LB". */
 export function initials(name: string): string {
+  // Split on any whitespace run: "Luca  Braun" or a leading space must not
+  // yield an empty "initial" and push the second letter out.
   return name
-    .split(" ")
+    .trim()
+    .split(/\s+/)
     .map((part) => part.charAt(0))
     .join("")
     .slice(0, 2)

@@ -3,9 +3,8 @@ import { useKeyboard } from "@opentui/react";
 import { useEffect, useState } from "react";
 import { theme } from "../theme";
 import { ensureStorageCredentials, isProduction, readConfig } from "../lib/config";
-import { composeUp } from "../lib/docker";
 import { gitInfo, gitPull } from "../lib/git";
-import { LogBox, StatusRow, pollUntilHealthy, useRunLog } from "../components/run-log";
+import { LogBox, StatusRow, upAndWaitHealthy, useRunLog } from "../components/run-log";
 
 type Stage = "idle" | "running" | "done" | "error";
 
@@ -44,18 +43,14 @@ export function Update({ onExit }: { onExit: () => void }) {
         }
         const production = isProduction(await readConfig());
         append("→ Baue Images neu und starte Dienste (inkl. DB-Migrationen) …");
-        const upCode = await composeUp(production, (l) => !signal.aborted && append(l));
-        if (signal.aborted) return;
-        if (upCode !== 0) {
-          append(`✘ docker compose beendet mit Code ${upCode}.`);
-          return setStage("error");
-        }
-
-        append("→ Warte auf Health-Checks …");
-        const healthy = await pollUntilHealthy(setStatuses, signal);
-        if (signal.aborted) return;
-        append(healthy ? "✔ Update abgeschlossen." : "● Timeout — prüfe die Logs.");
-        setStage("done");
+        const result = await upAndWaitHealthy({
+          production,
+          append,
+          onStatuses: setStatuses,
+          signal,
+          successMessage: "✔ Update abgeschlossen.",
+        });
+        if (result !== "aborted") setStage(result);
       } catch (err) {
         if (signal.aborted) return;
         append(`✘ ${err instanceof Error ? err.message : String(err)}`);
@@ -85,7 +80,7 @@ export function Update({ onExit }: { onExit: () => void }) {
 
   return (
     <box flexDirection="column" flexGrow={1} padding={1} gap={1}>
-      <box flexDirection="column">
+      <box flexDirection="column" flexShrink={0}>
         <text fg={theme.accent} attributes={TextAttributes.BOLD}>
           Update
         </text>
@@ -97,11 +92,11 @@ export function Update({ onExit }: { onExit: () => void }) {
           <box border borderStyle="rounded" borderColor={theme.border} padding={1}>
             <box flexDirection="row" gap={1}>
               <text fg={theme.dim}>Branch</text>
-              <text fg={theme.fg}>{git?.branch ?? "…"}</text>
+              <text fg={theme.fg}>{git ? git.branch || "unbekannt" : "…"}</text>
             </box>
             <box flexDirection="row" gap={1}>
               <text fg={theme.dim}>Commit</text>
-              <text fg={theme.fg}>{git?.rev ?? "…"}</text>
+              <text fg={theme.fg}>{git ? git.rev || "unbekannt" : "…"}</text>
             </box>
           </box>
           <box border borderStyle="rounded" borderColor={theme.accentDim} padding={1}>
@@ -138,7 +133,7 @@ function Footer({ stage }: { stage: Stage }) {
     </text>
   );
   return (
-    <box flexDirection="row" gap={2} paddingX={1}>
+    <box flexDirection="row" gap={2} paddingX={1} flexShrink={0}>
       {stage === "idle" && (
         <>
           {hint("Enter", "Update starten")}

@@ -13,11 +13,13 @@ import {
 } from "@nilovon-wiki/db/schema/index";
 
 import type { AuthedContext } from "../context";
-import { protectedProcedure, requireActiveOrg, requireOrgPermission } from "../index";
+import { isOrgManager, protectedProcedure, requireActiveOrg, requireOrgPermission } from "../index";
 import { activityActor, recordActivity } from "../lib/activity";
 import {
   hasCourseEntitlement,
+  loadCourseAccess,
   resolveEnrollability,
+  roleAllows,
   type CourseAccessInput,
 } from "../lib/course-access";
 import {
@@ -28,7 +30,12 @@ import {
   toCourseCard,
 } from "../lib/course-cards";
 import { courseViewFilter, requireCourseCapability, resolveAccess } from "../lib/learn-authz";
-import { findEnrollment, loadCourse, loadCourseBySlug } from "../lib/learn-loaders";
+import {
+  findEnrollment,
+  loadCourse,
+  loadCourseAsset,
+  loadCourseBySlug,
+} from "../lib/learn-loaders";
 import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
 import { slugify, uniqueSlug } from "../lib/slug";
@@ -105,7 +112,7 @@ export const courseRouter = {
           ).map((row) => row.courseId)
         : null;
 
-      const [rows, canView] = await Promise.all([
+      const [rows, canView, manager] = await Promise.all([
         context.db.query.course.findMany({
           where: and(
             courseListWhere(organizationId, input.query),
@@ -128,6 +135,9 @@ export const courseRouter = {
           offset: input.offset,
         }),
         courseViewFilter(context.db, context, context.headers, organizationId),
+        // Every row is in the same org, so the manager override is resolved once
+        // here rather than by an auth round-trip per card below.
+        isOrgManager(context.headers, organizationId),
       ]);
 
       const visible = rows.filter((row) => canView(accessInput(row)));
@@ -143,7 +153,7 @@ export const courseRouter = {
           toCourseCard(
             row,
             facts,
-            await resolveAccess(context.db, context, context.headers, accessInput(row)),
+            await loadCourseAccess(context.db, context, accessInput(row), manager),
           ),
         ),
       );
@@ -255,6 +265,17 @@ export const courseRouter = {
       ] as const;
       if (restricted.some((key) => rest[key] !== undefined)) {
         await requireCourseCapability(context.db, context, context.headers, row, "manage");
+      }
+
+      if (rest.thumbnailAssetId) {
+        // Same rule as a lesson's file: the thumbnail is served under its own
+        // course's access rules, so it has to be this course's material.
+        const asset = await loadCourseAsset(context.db, rest.thumbnailAssetId);
+        if (asset.courseId !== row.id || asset.kind === "submission") {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "That file does not belong to this course",
+          });
+        }
       }
 
       const slug =
@@ -547,14 +568,22 @@ export const courseRouter = {
     .output(z.array(CourseSchema))
     .handler(async ({ context }) => {
       const organizationId = requireActiveOrg(context);
-      const [rows, canView] = await Promise.all([
+      const [rows, manager] = await Promise.all([
         context.db.query.course.findMany({
           where: and(eq(course.organizationId, organizationId), isNotNull(course.deletedAt)),
           orderBy: [desc(course.deletedAt)],
         }),
-        courseViewFilter(context.db, context, context.headers, organizationId),
+        isOrgManager(context.headers, organizationId),
       ]);
-      return rows.filter((row) => canView(accessInput(row))).map(toCourse);
+      // Only what the caller could restore or purge — both need `manage`. Mere
+      // viewers (any org member, for an org-visible course) have no business
+      // seeing what was deleted.
+      const manageable = [];
+      for (const row of rows) {
+        const access = await loadCourseAccess(context.db, context, accessInput(row), manager);
+        if (roleAllows(access.role, "manage")) manageable.push(row);
+      }
+      return manageable.map(toCourse);
     }),
 };
 

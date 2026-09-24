@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { orpc } from "@/utils/orpc";
 import { toastError } from "@/lib/query";
 import {
@@ -32,6 +33,10 @@ export function DirectNotificationDefaults() {
       onError: toastError,
     }),
   );
+
+  if (query.isError) {
+    return <QueryError onRetry={() => query.refetch()} error={query.error} />;
+  }
 
   if (query.isPending || !query.data) {
     return (

@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Folder, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { formatDate, timeAgo } from "@/lib/format";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
@@ -62,6 +63,9 @@ export function TrashedSpaces({ nameOf }: { nameOf: (userId: string | null) => s
   );
 
   if (trashQuery.isPending) return <Skeleton className="h-20 w-full rounded-lg" />;
+  if (trashQuery.isError) {
+    return <QueryError onRetry={() => trashQuery.refetch()} error={trashQuery.error} />;
+  }
 
   const entries = trashQuery.data ?? [];
   if (entries.length === 0) {
@@ -122,7 +126,7 @@ export function TrashedSpaces({ nameOf }: { nameOf: (userId: string | null) => s
                 variant="ghost"
                 size="icon-sm"
                 className="text-muted-foreground hover:text-destructive"
-                aria-label={`„${entry.title}" endgültig löschen`}
+                aria-label={`„${entry.title}“ endgültig löschen`}
                 disabled={entry.held || purge.isPending}
                 onClick={() => setConfirmPurge({ id: entry.id, title: entry.title })}
               >

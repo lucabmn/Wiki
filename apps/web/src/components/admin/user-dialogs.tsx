@@ -56,7 +56,12 @@ export function ConfirmDialog({
   isPending?: boolean;
   /** Optional fields rendered between the description and the footer. */
   children?: ReactNode;
-  onConfirm: () => void;
+  /**
+   * May return a promise (e.g. `mutateAsync`): the dialog then stays open, with
+   * its pending label, until it settles — and stays open on failure so the
+   * error toast is not read against an already-closed dialog.
+   */
+  onConfirm: () => unknown;
   onClose?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -86,15 +91,19 @@ export function ConfirmDialog({
           </DialogHeader>
           {children}
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => change(false)}>
+            <Button variant="outline" onClick={() => change(false)} disabled={isPending}>
               Abbrechen
             </Button>
             <Button
               variant={destructive ? "destructive" : "default"}
               disabled={confirmDisabled || isPending}
-              onClick={() => {
-                onConfirm();
-                change(false);
+              onClick={async () => {
+                try {
+                  await onConfirm();
+                  change(false);
+                } catch {
+                  // The mutation's own onError has already reported it.
+                }
               }}
             >
               {isPending ? "Wird ausgeführt …" : confirmLabel}
@@ -199,7 +208,7 @@ export function BanDialog({
           </Field>
 
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={ban.isPending}>
               Abbrechen
             </Button>
             <Button

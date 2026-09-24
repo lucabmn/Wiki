@@ -1,3 +1,5 @@
+import { ORPCError } from "@orpc/server";
+
 import { env } from "@nilovon-wiki/env/server";
 import { Files } from "files-sdk";
 import { s3 } from "files-sdk/s3";
@@ -46,6 +48,21 @@ export function getStorage(): Files | null {
   return files;
 }
 
+/**
+ * `getStorage` for upload paths: throws the user-facing "uploads are off" error
+ * instead of returning null.
+ */
+export function requireStorage(): Files {
+  const storage = getStorage();
+  if (!storage) {
+    throw new ORPCError("NOT_IMPLEMENTED", {
+      message:
+        "Datei-Uploads sind deaktiviert, weil kein Objektspeicher eingerichtet ist (S3_* in der .env).",
+    });
+  }
+  return storage;
+}
+
 /** Swap the storage instance — for tests running against the memory adapter. */
 export function setStorage(instance: Files | null) {
   files = instance;
@@ -58,7 +75,14 @@ export function setStorage(instance: Files | null) {
  * it lives in the database row, which keeps user-controlled text out of paths.
  */
 export function buildStorageKey(spaceId: string, fileName: string): string {
+  return `spaces/${spaceId}/${crypto.randomUUID()}${safeExtension(fileName)}`;
+}
+
+/**
+ * The file name's extension, lower-cased, if it is short and alphanumeric —
+ * otherwise nothing. The only part of a user-supplied name that reaches a key.
+ */
+export function safeExtension(fileName: string): string {
   const extension = fileName.includes(".") ? `.${fileName.split(".").pop()}` : "";
-  const safeExtension = /^\.[A-Za-z0-9]{1,12}$/.test(extension) ? extension.toLowerCase() : "";
-  return `spaces/${spaceId}/${crypto.randomUUID()}${safeExtension}`;
+  return /^\.[A-Za-z0-9]{1,12}$/.test(extension) ? extension.toLowerCase() : "";
 }

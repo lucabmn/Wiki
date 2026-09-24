@@ -79,7 +79,8 @@ export function ChapterListEditor({
   courseId: string;
   canAuthor: boolean;
   selectedLessonId: string | null;
-  onSelectLesson: (lessonId: string) => void;
+  /** `null` clears the selection, e.g. when the open lesson is deleted. */
+  onSelectLesson: (lessonId: string | null) => void;
 }) {
   const outline = useQuery(orpc.learn.lessons.outline.queryOptions({ input: { courseId } }));
   const [chapters, setChapters] = useState<ChapterNode[]>([]);
@@ -117,7 +118,20 @@ export function ChapterListEditor({
 
   const createChapter = useMutation(orpc.learn.chapters.create.mutationOptions(mutationOptions));
   const updateChapter = useMutation(orpc.learn.chapters.update.mutationOptions(mutationOptions));
-  const deleteChapter = useMutation(orpc.learn.chapters.delete.mutationOptions(mutationOptions));
+  const deleteChapter = useMutation(
+    orpc.learn.chapters.delete.mutationOptions({
+      onSuccess: (_result, { id }) => {
+        refresh();
+        // The editor beside the list would otherwise keep showing a lesson that
+        // no longer exists, and fail on its next refetch.
+        const removed = chapters.find((chapter) => chapter.id === id);
+        if (removed?.lessons.some((lesson) => lesson.id === selectedLessonId)) {
+          onSelectLesson(null);
+        }
+      },
+      onError: toastLearnError,
+    }),
+  );
   const moveChapter = useMutation(orpc.learn.chapters.move.mutationOptions(mutationOptions));
   const createLesson = useMutation(
     orpc.learn.lessons.create.mutationOptions({
@@ -129,7 +143,15 @@ export function ChapterListEditor({
     }),
   );
   const publishLesson = useMutation(orpc.learn.lessons.publish.mutationOptions(mutationOptions));
-  const deleteLesson = useMutation(orpc.learn.lessons.delete.mutationOptions(mutationOptions));
+  const deleteLesson = useMutation(
+    orpc.learn.lessons.delete.mutationOptions({
+      onSuccess: (_result, { id }) => {
+        refresh();
+        if (id === selectedLessonId) onSelectLesson(null);
+      },
+      onError: toastLearnError,
+    }),
+  );
   const moveLesson = useMutation(orpc.learn.lessons.move.mutationOptions(mutationOptions));
 
   const sensors = useSensors(
@@ -256,6 +278,7 @@ export function ChapterListEditor({
               deleteChapter.mutate({ id: chapter.id });
             }
           }}
+          addingLesson={createLesson.isPending}
           onAddLesson={(kind) =>
             createLesson.mutate({
               chapterId: chapter.id,
@@ -345,6 +368,7 @@ function ChapterCard({
   onRename,
   onPublishedChange,
   onDelete,
+  addingLesson,
   onAddLesson,
   onPublishLesson,
   onDeleteLesson,
@@ -357,6 +381,7 @@ function ChapterCard({
   onRename: (title: string) => void;
   onPublishedChange: (published: boolean) => void;
   onDelete: () => void;
+  addingLesson: boolean;
   onAddLesson: (kind: LessonKind) => void;
   onPublishLesson: (lessonId: string, published: boolean) => void;
   onDeleteLesson: (lesson: LessonNode) => void;
@@ -368,6 +393,9 @@ function ChapterCard({
   });
   const dropZone = useDroppable({ id: dropZoneId(chapter.id), data: { type: "chapter-zone" } });
   const [title, setTitle] = useState(chapter.title);
+  // Follow the server once a rename (or anyone else's) lands; seeding only on
+  // mount left the field showing a stale title after a refetch.
+  useEffect(() => setTitle(chapter.title), [chapter.title]);
 
   // The card, not the handle, is the drop target — but the *listeners* sit on
   // the handle alone, or the rename field below would never see a click.
@@ -471,7 +499,13 @@ function ChapterCard({
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button type="button" variant="ghost" size="sm" className="ml-6">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-6"
+                disabled={addingLesson}
+              >
                 <Plus className="size-4" aria-hidden />
                 Lektion hinzufügen
               </Button>

@@ -24,7 +24,7 @@ export const ListAttachmentsInputSchema = z
     pageId: IdSchema.optional(),
   })
   .refine((v) => v.spaceId || v.pageId, {
-    message: "provide spaceId or pageId",
+    message: "Gib spaceId oder pageId an.",
   });
 
 /**

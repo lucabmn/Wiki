@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth-client";
-import { toastError } from "@/lib/query";
+import { pageTitle } from "@/lib/page-title";
 import { PasskeyCard } from "@/components/settings/passkey-card";
 import { SessionCard } from "@/components/settings/session-card";
 import { SettingsCard, SettingsSection } from "@/components/settings/settings-section";
@@ -14,6 +14,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@nilovon-wiki/u
 import { Input } from "@nilovon-wiki/ui/components/input";
 
 export const Route = createFileRoute("/_auth/settings/security")({
+  head: () => pageTitle("Sicherheit", "Einstellungen"),
   component: SecuritySettings,
 });
 
@@ -47,7 +48,15 @@ function PasswordForm() {
         // my account" — leaving their sessions alive would defeat it.
         revokeOtherSessions: true,
       });
-      if (result.error) throw new Error(result.error.message ?? "Änderung fehlgeschlagen");
+      if (result.error) {
+        // The generic toast would say "Etwas ist schiefgelaufen" for the one
+        // failure that is the user's to fix.
+        throw new Error(
+          result.error.code === "INVALID_PASSWORD"
+            ? "Das aktuelle Passwort ist falsch."
+            : "Passwort konnte nicht geändert werden. Bitte versuche es erneut.",
+        );
+      }
       return result.data;
     },
     onSuccess: () => {
@@ -56,7 +65,7 @@ function PasswordForm() {
       setRepeat("");
       toast.success("Passwort geändert — andere Geräte wurden abgemeldet");
     },
-    onError: toastError,
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const submit = () => {
@@ -134,7 +143,7 @@ function PasswordForm() {
               size="sm"
               disabled={change.isPending || !current || !next || !repeat}
             >
-              {change.isPending ? "Ändern …" : "Passwort ändern"}
+              {change.isPending ? "Wird geändert …" : "Passwort ändern"}
             </Button>
           </div>
         </form>

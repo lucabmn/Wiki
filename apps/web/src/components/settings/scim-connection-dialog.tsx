@@ -94,23 +94,23 @@ export function SCIMConnectionDialog({
 
   const isRotate = Boolean(rotateProviderId);
 
+  // Closing is the only way out of the token screen, so make sure the value
+  // cannot linger in memory — or flash up again behind a reopened dialog. The
+  // buttons go through here too, not only Escape and the overlay.
+  const close = () => {
+    setToken(null);
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        // Closing is the only way out of the token screen, so make sure the
-        // value cannot linger in memory behind a reopened dialog.
-        if (!next) setToken(null);
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
       <DialogContent className="sm:max-w-lg">
         {token ? (
           <>
             <DialogHeader>
               <DialogTitle>Verbindung bereit</DialogTitle>
               <DialogDescription>
-                Trage beides im Identitätsanbieter unter „Provisioning" ein.
+                Trage beides im Identitätsanbieter unter „Provisioning“ ein.
               </DialogDescription>
             </DialogHeader>
 
@@ -131,7 +131,7 @@ export function SCIMConnectionDialog({
             </div>
 
             <DialogFooter>
-              <Button type="button" onClick={() => onOpenChange(false)}>
+              <Button type="button" onClick={close}>
                 Token gesichert, schließen
               </Button>
             </DialogFooter>
@@ -174,7 +174,7 @@ export function SCIMConnectionDialog({
                 ) : (
                   <FieldDescription>
                     Kurzer interner Name der Verbindung. Muss sich von jeder Anbieter-ID unter
-                    „Identitätsanbieter" unterscheiden.
+                    „Identitätsanbieter“ unterscheiden.
                   </FieldDescription>
                 )}
               </Field>
@@ -183,12 +183,7 @@ export function SCIMConnectionDialog({
             {/* Direct child of `DialogContent`: the footer's negative margins
                 assume the dialog's padding box, not the form's. */}
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={create.isPending}
-              >
+              <Button type="button" variant="outline" onClick={close} disabled={create.isPending}>
                 Abbrechen
               </Button>
               <Button type="submit" form={FORM_ID} disabled={create.isPending}>

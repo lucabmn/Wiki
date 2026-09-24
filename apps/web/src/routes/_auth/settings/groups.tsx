@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { MoreHorizontal, Plus, ShieldAlert, Users } from "lucide-react";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { authClient } from "@/lib/auth-client";
 import { toastError } from "@/lib/query";
 import { splitRoles } from "@/lib/roles";
@@ -15,6 +16,7 @@ import {
   type OrgRole,
 } from "@/lib/org-queries";
 import { summarizePermission } from "@/lib/permission-catalog";
+import { pageTitle } from "@/lib/page-title";
 import { GroupEditorSheet } from "@/components/settings/group-editor-sheet";
 import { PermissionGate } from "@/components/settings/permission-gate";
 import {
@@ -51,6 +53,7 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 const ROLE_MANAGE: PermissionRequest[] = [{ ac: ["create"] }];
 
 export const Route = createFileRoute("/_auth/settings/groups")({
+  head: () => pageTitle("Gruppen", "Einstellungen"),
   component: () => (
     <PermissionGate permissions={ROLE_MANAGE}>
       <GroupsSettings />
@@ -186,6 +189,8 @@ function GroupsSettings() {
             <Skeleton key={row} className="h-32 w-full rounded-xl" />
           ))}
         </div>
+      ) : rolesQuery.isError ? (
+        <QueryError error={rolesQuery.error} onRetry={() => rolesQuery.refetch()} />
       ) : groups.length === 0 ? (
         <Empty className="rounded-xl border border-dashed border-border">
           <EmptyHeader>
@@ -194,7 +199,7 @@ function GroupsSettings() {
             </EmptyMedia>
             <EmptyTitle>Noch keine Gruppen</EmptyTitle>
             <EmptyDescription>
-              Gruppen bündeln Rechte über die Standardrollen hinaus — etwa „Redaktion" mit dem Recht
+              Gruppen bündeln Rechte über die Standardrollen hinaus — etwa „Redaktion“ mit dem Recht
               zu veröffentlichen.
             </EmptyDescription>
           </EmptyHeader>
@@ -237,7 +242,7 @@ function GroupsSettings() {
             <AlertDialogTitle>Gruppe löschen?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget
-                ? `Die Gruppe „${deleteTarget.role}" wird gelöscht. Mitglieder verlieren die darüber gewährten Rechte. Diese Aktion kann nicht rückgängig gemacht werden.`
+                ? `Die Gruppe „${deleteTarget.role}“ wird gelöscht. Mitglieder verlieren die darüber gewährten Rechte. Diese Aktion kann nicht rückgängig gemacht werden.`
                 : null}
             </AlertDialogDescription>
           </AlertDialogHeader>

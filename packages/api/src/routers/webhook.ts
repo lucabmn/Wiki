@@ -3,7 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@nilovon-wiki/db";
-import { organization, webhook, webhookDelivery } from "@nilovon-wiki/db/schema/index";
+import { organization, space, webhook, webhookDelivery } from "@nilovon-wiki/db/schema/index";
 
 import { requireActiveOrg, requireOrgPermission } from "../index";
 import { activityActor, recordActivity } from "../lib/activity";
@@ -61,6 +61,7 @@ export const webhookRouter = {
     .handler(async ({ input, context }) => {
       const organizationId = requireActiveOrg(context);
       assertDeliverableUrl(input.url);
+      if (input.spaceId) await assertSpaceInOrganization(context.db, input.spaceId, organizationId);
       const secret = generateWebhookSecret();
 
       const created = await context.db.transaction(async (tx) => {
@@ -102,6 +103,7 @@ export const webhookRouter = {
       const existing = await loadWebhook(context.db, input.id, organizationId);
       const { id, spaceId, ...patch } = input;
       if (patch.url) assertDeliverableUrl(patch.url);
+      if (spaceId) await assertSpaceInOrganization(context.db, spaceId, organizationId);
 
       const values = {
         ...patch,
@@ -235,6 +237,22 @@ function assertDeliverableUrl(url: string): void {
       message: `${check.reason} Webhooks dürfen nur öffentlich erreichbare Adressen ansprechen.`,
     });
   }
+}
+
+/**
+ * A webhook may only be scoped to a space of its own organization — otherwise
+ * the list projection would echo another tenant's space name back.
+ */
+async function assertSpaceInOrganization(
+  db: Database,
+  spaceId: string,
+  organizationId: string,
+): Promise<void> {
+  const row = await db.query.space.findFirst({
+    where: and(eq(space.id, spaceId), eq(space.organizationId, organizationId)),
+    columns: { id: true },
+  });
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Bereich nicht gefunden" });
 }
 
 /** The list projection, shared by every procedure that returns a webhook. */

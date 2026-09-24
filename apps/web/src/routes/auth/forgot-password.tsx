@@ -8,8 +8,10 @@ import z from "zod";
 
 import AuthLayout from "@/components/layouts/auth-layout";
 import { authClient } from "@/lib/auth-client";
+import { pageTitle } from "@/lib/page-title";
 
 export const Route = createFileRoute("/auth/forgot-password")({
+  head: () => pageTitle("Passwort vergessen"),
   component: RouteComponent,
 });
 

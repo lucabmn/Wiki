@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { QueryError } from "@/components/query-error";
 import { authClient } from "@/lib/auth-client";
 import {
   SCIM_BASE_URL,
@@ -24,6 +25,7 @@ import {
   type SSOProvider,
 } from "@/lib/identity-queries";
 import { toastError } from "@/lib/query";
+import { pageTitle } from "@/lib/page-title";
 import { CopyField } from "@/components/settings/copy-field";
 import { OrgAdminGate } from "@/components/settings/org-admin-gate";
 import { SCIMConnectionDialog } from "@/components/settings/scim-connection-dialog";
@@ -66,6 +68,7 @@ import { Input } from "@nilovon-wiki/ui/components/input";
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 
 export const Route = createFileRoute("/_auth/settings/sso")({
+  head: () => pageTitle("Single Sign-On", "Einstellungen"),
   component: () => (
     <OrgAdminGate>
       <SingleSignOnSettings />
@@ -111,6 +114,8 @@ function ProvidersSection({ organizationId }: { organizationId: string }) {
     >
       {providersQuery.isPending ? (
         <Skeleton className="h-28 w-full rounded-xl" />
+      ) : providersQuery.isError ? (
+        <QueryError error={providersQuery.error} onRetry={() => providersQuery.refetch()} />
       ) : providers.length === 0 ? (
         <Empty className="rounded-xl border border-dashed border-border">
           <EmptyHeader>
@@ -288,7 +293,7 @@ function DeleteProviderDialog({
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>„{provider?.providerId}" entfernen?</AlertDialogTitle>
+          <AlertDialogTitle>„{provider?.providerId}“ entfernen?</AlertDialogTitle>
           <AlertDialogDescription>
             Alle über diesen Anbieter verknüpften Anmeldungen werden gelöscht. Wer sich bisher nur
             so angemeldet hat, kommt danach nicht mehr hinein — die Konten und ihre Inhalte bleiben
@@ -345,6 +350,8 @@ function DirectorySection({ organizationId }: { organizationId: string }) {
     >
       {connectionsQuery.isPending ? (
         <Skeleton className="h-24 w-full rounded-xl" />
+      ) : connectionsQuery.isError ? (
+        <QueryError error={connectionsQuery.error} onRetry={() => connectionsQuery.refetch()} />
       ) : connections.length === 0 ? (
         <Empty className="rounded-xl border border-dashed border-border">
           <EmptyHeader>

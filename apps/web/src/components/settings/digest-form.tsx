@@ -345,7 +345,7 @@ export function describeSchedule(preferences: DigestPreferences): string {
       return `Jeden ${weekday} um ${time}`;
     }
     case "monthly":
-      return `Am ${preferences.dayOfMonth}. jedes Monats um ${time}`;
+      return `Am ${preferences.dayOfMonth}. jeden Monats um ${time}`;
   }
 }
 

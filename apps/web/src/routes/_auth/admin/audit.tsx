@@ -7,6 +7,7 @@ import { Pager } from "@/components/admin/admin-ui";
 import { QueryError } from "@/components/query-error";
 import { ADMIN_AUDIT_LABEL, describeAuditMetadata } from "@/lib/admin-audit";
 import { formatDateTime, timeAgo } from "@/lib/format";
+import { pageTitle } from "@/lib/page-title";
 import { orpc } from "@/utils/orpc";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import {
@@ -20,6 +21,7 @@ import { NativeSelect, NativeSelectOption } from "@nilovon-wiki/ui/components/na
 import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 
 export const Route = createFileRoute("/_auth/admin/audit")({
+  head: () => pageTitle("Protokoll", "Instanz-Verwaltung"),
   component: AdminAudit,
 });
 

@@ -1,9 +1,15 @@
 import { ORPCError } from "@orpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@nilovon-wiki/db";
-import { certificate, enrollment, lessonProgress, user } from "@nilovon-wiki/db/schema/index";
+import {
+  certificate,
+  enrollment,
+  lessonProgress,
+  member,
+  user,
+} from "@nilovon-wiki/db/schema/index";
 
 import type { AuthedContext } from "../context";
 import { protectedProcedure } from "../index";
@@ -12,7 +18,6 @@ import { issueCertificate } from "../lib/certificates";
 import { hasCourseEntitlement, resolveEnrollability } from "../lib/course-access";
 import { seatsLeft } from "../lib/course-cards";
 import {
-  completedLessonCount,
   publishedLessonIds,
   recomputeEnrollmentProgress,
   seedChapterReleases,
@@ -23,6 +28,7 @@ import {
   requireLessonRead,
 } from "../lib/learn-authz";
 import { findEnrollment, loadCourse, loadEnrollment } from "../lib/learn-loaders";
+import { mapUniqueViolation } from "../lib/pg-errors";
 import { firstRow } from "../lib/rows";
 import {
   CompleteLessonInputSchema,
@@ -88,14 +94,31 @@ export const enrollmentRouter = {
       });
 
       const lessonIds = await publishedLessonIds(context.db, input.courseId);
-      return Promise.all(
-        rows.map(async (row) => ({
-          ...row,
-          user: row.user ?? null,
-          completedLessons: await completedLessonCount(context.db, row.id, lessonIds),
-          totalLessons: lessonIds.length,
-        })),
-      );
+      // One grouped count for the whole page instead of a query per learner.
+      const completed =
+        rows.length && lessonIds.length
+          ? await context.db
+              .select({ enrollmentId: lessonProgress.enrollmentId, n: count() })
+              .from(lessonProgress)
+              .where(
+                and(
+                  inArray(
+                    lessonProgress.enrollmentId,
+                    rows.map((row) => row.id),
+                  ),
+                  inArray(lessonProgress.lessonId, lessonIds),
+                  eq(lessonProgress.status, "completed"),
+                ),
+              )
+              .groupBy(lessonProgress.enrollmentId)
+          : [];
+      const completedBy = new Map(completed.map((row) => [row.enrollmentId, row.n]));
+      return rows.map((row) => ({
+        ...row,
+        user: row.user ?? null,
+        completedLessons: completedBy.get(row.id) ?? 0,
+        totalLessons: lessonIds.length,
+      }));
     }),
 
   enroll: protectedProcedure
@@ -138,32 +161,38 @@ export const enrollmentRouter = {
       const status = verdict.reason === "approval_required" ? "pending" : "active";
       const source = course.enrollmentPolicy === "paid" ? "purchase" : "self";
 
-      return context.db.transaction(async (tx) => {
-        const enrolledAt = new Date();
-        const row = existing
-          ? firstRow(
-              await tx
-                .update(enrollment)
-                .set({ status, source, enrolledAt, droppedAt: null })
-                .where(eq(enrollment.id, existing.id))
-                .returning(),
-            )
-          : firstRow(
-              await tx
-                .insert(enrollment)
-                .values({ courseId: course.id, userId, status, source, enrolledAt })
-                .returning(),
-            );
-        await seedChapterReleases(tx, row.id, course.id, enrolledAt);
-        await recordActivity(tx, {
-          organizationId: course.organizationId,
-          action: "enrollment.created",
-          ...activityActor(context),
-          courseId: course.id,
-          metadata: { enrollmentId: row.id, status },
-        });
-        return row;
-      });
+      // A concurrent enrol (double click) can slip past `existing` and hit
+      // `enrollment_course_user_uq`; report that as a conflict, not a 500.
+      return mapUniqueViolation(
+        () =>
+          context.db.transaction(async (tx) => {
+            const enrolledAt = new Date();
+            const row = existing
+              ? firstRow(
+                  await tx
+                    .update(enrollment)
+                    .set({ status, source, enrolledAt, droppedAt: null })
+                    .where(eq(enrollment.id, existing.id))
+                    .returning(),
+                )
+              : firstRow(
+                  await tx
+                    .insert(enrollment)
+                    .values({ courseId: course.id, userId, status, source, enrolledAt })
+                    .returning(),
+                );
+            await seedChapterReleases(tx, row.id, course.id, enrolledAt);
+            await recordActivity(tx, {
+              organizationId: course.organizationId,
+              action: "enrollment.created",
+              ...activityActor(context),
+              courseId: course.id,
+              metadata: { enrollmentId: row.id, status },
+            });
+            return row;
+          }),
+        "You are already enrolled in this course",
+      );
     }),
 
   leave: protectedProcedure
@@ -217,6 +246,21 @@ export const enrollmentRouter = {
         input.courseId,
         "manage",
       );
+      // Only people in the course's organization can be enrolled directly —
+      // otherwise a known user id from another tenant could be pulled into a
+      // private course (and thereby see it). Same NOT_FOUND as for ACL grants.
+      const userIds = [...new Set(input.userIds)];
+      const members = await context.db
+        .select({ userId: member.userId })
+        .from(member)
+        .where(
+          and(eq(member.organizationId, course.organizationId), inArray(member.userId, userIds)),
+        );
+      if (members.length !== userIds.length) {
+        throw new ORPCError("NOT_FOUND", {
+          message: "Person in dieser Organisation nicht gefunden.",
+        });
+      }
       const invitedBy = context.session.user.id;
       const enrolledAt = new Date();
 
@@ -224,7 +268,7 @@ export const enrollmentRouter = {
         const rows = await tx
           .insert(enrollment)
           .values(
-            input.userIds.map((userId) => ({
+            userIds.map((userId) => ({
               courseId: course.id,
               userId,
               status: "active" as const,
@@ -237,7 +281,12 @@ export const enrollmentRouter = {
           // reactivates the existing row rather than failing the whole batch.
           .onConflictDoUpdate({
             target: [enrollment.courseId, enrollment.userId],
-            set: { status: "active", droppedAt: null },
+            // A learner who already finished keeps their completion; everyone
+            // else (pending, dropped) is (re)activated.
+            set: {
+              status: sql`case when ${enrollment.status} = 'completed' then 'completed' else 'active' end`,
+              droppedAt: null,
+            },
           })
           .returning();
 
@@ -402,6 +451,17 @@ export const enrollmentRouter = {
         const certificateId = result.completed
           ? await maybeIssueCertificate(tx, context, enrolment.id)
           : null;
+        // Auto-completion finishes a course just as `complete` does, so it is
+        // logged the same way.
+        if (result.completed) {
+          await recordActivity(tx, {
+            organizationId: course.organizationId,
+            action: "enrollment.completed",
+            ...activityActor(context),
+            courseId: course.id,
+            metadata: { enrollmentId: enrolment.id },
+          });
+        }
         return {
           progress,
           courseProgressPercent: result.progressPercent,

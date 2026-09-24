@@ -189,7 +189,7 @@ export function CourseRoster({
             <EmptyDescription>
               {status === "all"
                 ? "In diesem Kurs ist noch niemand eingeschrieben."
-                : `Niemand hat gerade den Status „${ENROLLMENT_STATUS_LABEL[status]}".`}
+                : `Niemand hat gerade den Status „${ENROLLMENT_STATUS_LABEL[status]}“.`}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -453,10 +453,13 @@ function InviteLearnersDialog({
                 <Skeleton key={index} className="h-10 w-full rounded-lg" />
               ))}
             </div>
+          ) : members.isError ? (
+            // Without this branch a failed load read as "everyone is enrolled".
+            <QueryError compact error={members.error} onRetry={() => void members.refetch()} />
           ) : candidates.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
               {needle
-                ? `Kein Treffer für „${query}".`
+                ? `Kein Treffer für „${query}“.`
                 : "Alle Mitglieder der Organisation sind bereits eingeschrieben."}
             </p>
           ) : (

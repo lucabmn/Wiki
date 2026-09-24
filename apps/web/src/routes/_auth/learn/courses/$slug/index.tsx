@@ -159,7 +159,10 @@ function RouteComponent() {
 
             <section className="space-y-3">
               <h2 className="text-lg font-semibold">Inhalt</h2>
-              {outline.isPending ? (
+              {outline.isError ? (
+                // Otherwise a failed load read as "nothing published yet".
+                <QueryError compact error={outline.error} onRetry={() => void outline.refetch()} />
+              ) : outline.isPending ? (
                 <Skeleton className="h-40 w-full" />
               ) : outline.data && outline.data.chapters.length > 0 ? (
                 <CourseOutlineList slug={slug} chapters={outline.data.chapters} />
@@ -183,7 +186,10 @@ function RouteComponent() {
                         <div className="flex items-baseline justify-between gap-2">
                           <h3 className="font-medium">{item.title}</h3>
                           {item.publishedAt && (
-                            <time className="text-muted-foreground text-xs">
+                            <time
+                              dateTime={new Date(item.publishedAt).toISOString()}
+                              className="text-muted-foreground text-xs"
+                            >
                               {new Date(item.publishedAt).toLocaleDateString("de-DE")}
                             </time>
                           )}
@@ -212,7 +218,7 @@ function RouteComponent() {
                           </Avatar>
                           <span className="text-sm font-medium">{review.user?.name}</span>
                           <span className="text-muted-foreground ml-auto text-sm">
-                            {"★".repeat(review.rating)}
+                            <span aria-hidden>{"★".repeat(review.rating)}</span>
                             <span className="sr-only">{review.rating} von 5</span>
                           </span>
                         </div>

@@ -157,6 +157,20 @@ const trashViewRouter = {
         });
       }
       if (!target.deletedAt) return { id: target.id, restored: 0 };
+      // Same rule one level down: a page restored under a parent that is still
+      // in the trash would be live but unreachable from the page tree.
+      if (target.parentId) {
+        const parent = await context.db.query.page.findFirst({
+          where: eq(page.id, target.parentId),
+          columns: { deletedAt: true },
+        });
+        if (parent?.deletedAt) {
+          throw new ORPCError("CONFLICT", {
+            message:
+              "Die übergeordnete Seite liegt selbst im Papierkorb. Stelle zuerst sie wieder her.",
+          });
+        }
+      }
       // Deleting took the subtree, so restoring puts the same subtree back —
       // anything else leaves child pages nobody can reach. `archivedAt` is left
       // alone on purpose: a page archived before it was deleted comes back

@@ -111,13 +111,12 @@ export function CourseAnnouncements({
     }),
   );
 
+  // Closing the composer and the wording of the toast are per call: the row's
+  // publish toggle uses the same procedure, and must neither throw away a
+  // draft that is open in the composer nor call a retraction "gespeichert".
   const update = useMutation(
     orpc.learn.courseUpdates.update.mutationOptions({
-      onSuccess: (row) => {
-        void invalidate();
-        setDraft(null);
-        toast.success(row.publishedAt ? "Ankündigung veröffentlicht" : "Als Entwurf gespeichert");
-      },
+      onSuccess: () => void invalidate(),
       onError: toastError,
     }),
   );
@@ -143,7 +142,17 @@ export function CourseAnnouncements({
     if (draft.id === null) {
       create.mutate({ courseId, title, content, notifyLearners: draft.notify, publish });
     } else {
-      update.mutate({ id: draft.id, title, content, notifyLearners: draft.notify, publish });
+      update.mutate(
+        { id: draft.id, title, content, notifyLearners: draft.notify, publish },
+        {
+          onSuccess: (row) => {
+            setDraft(null);
+            toast.success(
+              row.publishedAt ? "Ankündigung veröffentlicht" : "Als Entwurf gespeichert",
+            );
+          },
+        },
+      );
     }
   };
 
@@ -274,7 +283,7 @@ export function CourseAnnouncements({
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label={`„${row.title}" bearbeiten`}
+                          aria-label={`„${row.title}“ bearbeiten`}
                           disabled={saving}
                           onClick={() =>
                             setDraft({
@@ -292,11 +301,23 @@ export function CourseAnnouncements({
                           size="icon-sm"
                           aria-label={
                             published
-                              ? `„${row.title}" zurückziehen`
-                              : `„${row.title}" veröffentlichen`
+                              ? `„${row.title}“ zurückziehen`
+                              : `„${row.title}“ veröffentlichen`
                           }
                           disabled={saving}
-                          onClick={() => update.mutate({ id: row.id, publish: !published })}
+                          onClick={() =>
+                            update.mutate(
+                              { id: row.id, publish: !published },
+                              {
+                                onSuccess: (updated) =>
+                                  toast.success(
+                                    updated.publishedAt
+                                      ? "Ankündigung veröffentlicht"
+                                      : "Ankündigung zurückgezogen",
+                                  ),
+                              },
+                            )
+                          }
                         >
                           {published ? (
                             <Undo2 className="size-4" aria-hidden />
@@ -308,7 +329,7 @@ export function CourseAnnouncements({
                           variant="ghost"
                           size="icon-sm"
                           className="text-muted-foreground hover:text-destructive"
-                          aria-label={`„${row.title}" löschen`}
+                          aria-label={`„${row.title}“ löschen`}
                           disabled={remove.isPending}
                           onClick={() => setDeleteTarget({ id: row.id, title: row.title })}
                         >
@@ -337,7 +358,7 @@ export function CourseAnnouncements({
             <AlertDialogTitle>Ankündigung löschen?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget
-                ? `„${deleteTarget.title}" wird entfernt und verschwindet von der Kursseite. Diese Aktion kann nicht rückgängig gemacht werden.`
+                ? `„${deleteTarget.title}“ wird entfernt und verschwindet von der Kursseite. Diese Aktion kann nicht rückgängig gemacht werden.`
                 : null}
             </AlertDialogDescription>
           </AlertDialogHeader>

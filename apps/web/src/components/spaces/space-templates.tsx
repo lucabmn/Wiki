@@ -1,3 +1,4 @@
+import { QueryError } from "@/components/query-error";
 import { toastError, useInvalidate } from "@/lib/query";
 import { orpc } from "@/utils/orpc";
 import { Button } from "@nilovon-wiki/ui/components/button";
@@ -26,16 +27,20 @@ export function SpaceTemplates({
   const invalidateTemplates = useInvalidate(orpc.pages.listTemplates.key());
   const invalidatePages = useInvalidate(orpc.pages.key());
 
-  const { data: templates, isPending } = useQuery(
-    orpc.pages.listTemplates.queryOptions({ input: { spaceId }, enabled }),
-  );
+  const {
+    data: templates,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useQuery(orpc.pages.listTemplates.queryOptions({ input: { spaceId }, enabled }));
 
   const release = useMutation(
     orpc.pages.update.mutationOptions({
       onSuccess: (page) => {
         invalidateTemplates();
         invalidatePages();
-        toast.success(`„${page.title}" ist wieder eine normale Seite.`);
+        toast.success(`„${page.title}“ ist wieder eine normale Seite.`);
       },
       onError: toastError,
     }),
@@ -57,6 +62,8 @@ export function SpaceTemplates({
             <Skeleton key={i} className="h-14 w-full rounded-lg" />
           ))}
         </div>
+      ) : isError ? (
+        <QueryError compact className="px-0" error={error} onRetry={() => void refetch()} />
       ) : !templates?.length ? (
         <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
           Noch keine Vorlagen. Öffne eine Seite, die sich wiederholt — etwa eine Meeting-Notiz — und
@@ -91,6 +98,7 @@ export function SpaceTemplates({
                 variant="outline"
                 size="sm"
                 disabled={release.isPending}
+                title="Wieder als normale Seite in den Seitenbaum aufnehmen"
                 onClick={() => release.mutate({ id: template.id, isTemplate: false })}
               >
                 Freigeben

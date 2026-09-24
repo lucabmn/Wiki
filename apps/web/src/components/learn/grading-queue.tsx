@@ -132,9 +132,9 @@ export function GradingQueue({ courseId }: { courseId: string }) {
     submissionQueries.some((query) => query.isPending);
 
   const refresh = () => {
-    void queryClient.invalidateQueries({
-      queryKey: orpc.learn.submissions.listForAssignment.key(),
-    });
+    // The whole namespace, not just the lists: the learner-facing reads of the
+    // same hand-in (`get`, `listMine`) are stale after a decision too.
+    void queryClient.invalidateQueries({ queryKey: orpc.learn.submissions.key() });
   };
 
   if (outline.isError) {
@@ -181,7 +181,7 @@ export function GradingQueue({ courseId }: { courseId: string }) {
             </EmptyMedia>
             <EmptyTitle>Keine Aufgaben</EmptyTitle>
             <EmptyDescription>
-              Dieser Kurs enthält noch keine Lektion vom Typ „Aufgabe" — es kann also nichts
+              Dieser Kurs enthält noch keine Lektion vom Typ „Aufgabe“ — es kann also nichts
               abgegeben werden.
             </EmptyDescription>
           </EmptyHeader>
@@ -196,7 +196,7 @@ export function GradingQueue({ courseId }: { courseId: string }) {
             <EmptyDescription>
               {status === "submitted"
                 ? "Alle Abgaben sind bewertet."
-                : `Keine Abgabe mit dem Status „${STATUS_FILTER_LABEL[status]}".`}
+                : `Keine Abgabe mit dem Status „${STATUS_FILTER_LABEL[status]}“.`}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -367,6 +367,9 @@ function GradingForm({
   });
 
   const answerByTask = new Map((detail?.tasks ?? []).map((task) => [task.taskId, task]));
+  // The queue row is a snapshot from when the dialog opened; the detail read is
+  // refetched after every decision, so it is the one that knows the status now.
+  const currentStatus = (detail ?? submission).status;
 
   return (
     <>
@@ -382,7 +385,7 @@ function GradingForm({
       <div className="space-y-5">
         <div className="flex flex-wrap items-center gap-2">
           <Submitter submission={submission} />
-          <Badge variant="outline">{SUBMISSION_STATUS_LABEL[submission.status]}</Badge>
+          <Badge variant="outline">{SUBMISSION_STATUS_LABEL[currentStatus]}</Badge>
           {submission.isLate ? <Badge variant="destructive">Verspätet</Badge> : null}
         </div>
 
@@ -535,13 +538,17 @@ function GradingForm({
           </p>
         ) : null}
 
-        {detail ? (
+        {/* The detail is loaded for every opened hand-in, so its mere presence
+            says nothing about a decision — only the status does. */}
+        {detail?.status === "graded" ? (
           <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
-            {detail.status === "graded"
-              ? `Bewertet: ${detail.score ?? 0} von ${detail.maxScore ?? assignment.maxGrade} Punkten — ${
-                  detail.passed ? "bestanden" : "nicht bestanden"
-                }.`
-              : "Die Abgabe liegt wieder bei den Lernenden."}
+            {`Bewertet: ${detail.score ?? 0} von ${detail.maxScore ?? assignment.maxGrade} Punkten — ${
+              detail.passed ? "bestanden" : "nicht bestanden"
+            }.`}
+          </p>
+        ) : detail?.status === "returned" ? (
+          <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+            Die Abgabe liegt wieder bei den Lernenden.
           </p>
         ) : null}
 
@@ -551,7 +558,7 @@ function GradingForm({
           </Button>
           <Button
             variant="outline"
-            disabled={pending || (detail ?? submission).status === "returned"}
+            disabled={pending || currentStatus === "returned"}
             onClick={() =>
               returnToLearner.mutate({
                 id: submission.id,
@@ -573,7 +580,11 @@ function GradingForm({
             }
           >
             <ClipboardCheck className="size-4" aria-hidden />
-            {grade.isPending ? "Bewerten …" : detail ? "Neu bewerten" : "Bewerten"}
+            {grade.isPending
+              ? "Bewerten …"
+              : currentStatus === "graded"
+                ? "Neu bewerten"
+                : "Bewerten"}
           </Button>
         </div>
       </div>

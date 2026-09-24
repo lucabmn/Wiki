@@ -1,5 +1,7 @@
 import { authClient } from "@/lib/auth-client";
-import { client } from "@/utils/orpc";
+import { orgSlugSchema, sanitizeSlugInput, slugify } from "@/lib/org-slug";
+import { pageTitle } from "@/lib/page-title";
+import { client, friendlyErrorMessage } from "@/utils/orpc";
 import { Button } from "@nilovon-wiki/ui/components/button";
 import { Card, CardContent } from "@nilovon-wiki/ui/components/card";
 import { Checkbox } from "@nilovon-wiki/ui/components/checkbox";
@@ -22,6 +24,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 export const Route = createFileRoute("/auth/onboarding")({
+  head: () => pageTitle("Organisation einrichten"),
   ssr: false,
   async beforeLoad() {
     const session = await authClient.getSession();
@@ -38,33 +41,24 @@ export const Route = createFileRoute("/auth/onboarding")({
 
 const orgSchema = z.object({
   name: z.string().min(2, "Mindestens 2 Zeichen").max(120, "Höchstens 120 Zeichen"),
-  slug: z
-    .string()
-    .min(2, "Mindestens 2 Zeichen")
-    .max(60, "Höchstens 60 Zeichen")
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Nur Kleinbuchstaben, Zahlen und Bindestriche"),
+  slug: orgSlugSchema,
 });
 
-function slugify(input: string): string {
-  return input
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
-
-/** Creates the org, retrying once with a suffix if the slug is already taken. */
+/**
+ * Creates the org. A taken slug is retried once with a random suffix; any other
+ * failure is reported as is, rather than masked by a second attempt.
+ */
 async function createOrganization(name: string, slug: string) {
   const first = await authClient.organization.create({ name, slug });
   if (!first.error) return first.data;
+  if (first.error.code !== "ORGANIZATION_ALREADY_EXISTS") {
+    throw new Error("Organisation konnte nicht erstellt werden. Bitte versuche es erneut.");
+  }
 
   const fallbackSlug = `${slug}-${Date.now().toString(36).slice(-4)}`;
   const retry = await authClient.organization.create({ name, slug: fallbackSlug });
   if (retry.error) {
-    throw new Error(retry.error.message ?? "Organisation konnte nicht erstellt werden");
+    throw new Error("Organisation konnte nicht erstellt werden. Bitte versuche es erneut.");
   }
   return retry.data;
 }
@@ -164,14 +158,23 @@ function OnboardingPage() {
       }
 
       setStatus("Organisation wird aktiviert …");
-      await authClient.organization.setActive({ organizationId: createdOrgId.current });
+      // Returns its failure instead of throwing — unchecked, the seeding below
+      // would run without an active organization and fail with a vaguer error.
+      const activation = await authClient.organization.setActive({
+        organizationId: createdOrgId.current,
+      });
+      if (activation.error) {
+        throw new Error("Organisation konnte nicht aktiviert werden. Bitte versuche es erneut.");
+      }
 
       if (useSampleData) {
         setStatus("Beispielinhalte werden angelegt …");
-        await client.onboarding.seedSampleData({});
+        await client.onboarding.seedSampleData({}).catch((error: Error) => {
+          throw new Error(friendlyErrorMessage(error));
+        });
       }
 
-      toast.success("Willkommen! Deine Wiki ist bereit.");
+      toast.success("Willkommen! Dein Wiki ist bereit.");
       await navigate({ to: "/" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Etwas ist schiefgelaufen");
@@ -217,7 +220,7 @@ function OnboardingPage() {
                     id="org-slug"
                     value={slug}
                     onChange={(e) => {
-                      setSlug(slugify(e.target.value));
+                      setSlug(sanitizeSlugInput(e.target.value));
                       setSlugEdited(true);
                     }}
                     placeholder="nordwind"
@@ -236,11 +239,11 @@ function OnboardingPage() {
 
             {step === 1 && (
               <div className="space-y-4">
-                <button
-                  type="button"
-                  onClick={() => setUseSampleData((v) => !v)}
+                {/* A label, not a button: a checkbox nested in a button is invalid
+                    markup, and both toggling on one click cancelled out. */}
+                <label
                   className={cn(
-                    "flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors",
+                    "flex w-full cursor-pointer items-start gap-3 rounded-xl border p-4 text-left transition-colors",
                     useSampleData ? "border-primary bg-primary/5" : "border-border hover:bg-accent",
                   )}
                 >
@@ -260,7 +263,7 @@ function OnboardingPage() {
                       neun Beispielseiten. So siehst du sofort, wie alles zusammenspielt.
                     </p>
                   </div>
-                </button>
+                </label>
                 <p className="text-[13px] text-muted-foreground">
                   {useSampleData
                     ? "Du kannst die Beispielinhalte jederzeit bearbeiten oder löschen."

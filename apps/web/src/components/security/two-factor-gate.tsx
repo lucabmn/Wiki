@@ -65,7 +65,11 @@ function GraceBanner({ deadline }: { deadline: Date }) {
   // agree. An urgent banner ignores any earlier dismissal.
   useEffect(() => {
     if (urgent) return;
-    setDismissed(sessionStorage.getItem(DISMISS_KEY) === "1");
+    try {
+      setDismissed(sessionStorage.getItem(DISMISS_KEY) === "1");
+    } catch {
+      // Storage blocked (private mode, policy): the banner simply stays.
+    }
   }, [urgent]);
 
   // Keeps "noch 3 Stunden" honest on a tab left open overnight without ticking
@@ -76,7 +80,9 @@ function GraceBanner({ deadline }: { deadline: Date }) {
     return () => clearInterval(timer);
   }, []);
 
-  if (dismissed) return null;
+  // Checked against `urgent` here too: a tab dismissed early would otherwise
+  // stay silent through the final hours.
+  if (dismissed && !urgent) return null;
 
   return (
     <div
@@ -110,7 +116,11 @@ function GraceBanner({ deadline }: { deadline: Date }) {
           variant="ghost"
           aria-label="Hinweis für diese Sitzung ausblenden"
           onClick={() => {
-            sessionStorage.setItem(DISMISS_KEY, "1");
+            try {
+              sessionStorage.setItem(DISMISS_KEY, "1");
+            } catch {
+              // Not persisted — still hidden for this page view.
+            }
             setDismissed(true);
           }}
         >

@@ -2,10 +2,14 @@ import { ExternalLinkDialog } from "@/components/editor/external-link-dialog";
 import { pageEditorExtensions } from "@/components/editor/extensions";
 import { applyLink } from "@/components/editor/link-commands";
 import { QueryError } from "@/components/query-error";
-import { uploadCourseAsset } from "@/components/learn/course-thumbnail-upload";
+import {
+  CourseAssetUploadError,
+  uploadCourseAsset,
+} from "@/components/learn/course-thumbnail-upload";
 import { LESSON_KIND_LABEL } from "@/lib/learn-labels";
 import { useInvalidate } from "@/lib/query";
 import { client, friendlyErrorMessage, orpc } from "@/utils/orpc";
+import { env } from "@nilovon-wiki/env/web";
 import type { LessonKind } from "@nilovon-wiki/api/schemas/lesson";
 import { Badge } from "@nilovon-wiki/ui/components/badge";
 import { Button } from "@nilovon-wiki/ui/components/button";
@@ -25,7 +29,6 @@ import { Skeleton } from "@nilovon-wiki/ui/components/skeleton";
 import { Spinner } from "@nilovon-wiki/ui/components/spinner";
 import { Switch } from "@nilovon-wiki/ui/components/switch";
 import { Textarea } from "@nilovon-wiki/ui/components/textarea";
-import { cn } from "@nilovon-wiki/ui/lib/utils";
 import { type Editor, generateText, type JSONContent } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -527,27 +530,45 @@ function LessonAssetField({
     setUploading(true);
     try {
       // Two steps by design: the bytes go to the multipart route, and the lesson
-      // only points at the asset once it exists.
+      // only points at the asset once it exists. The second step reports its
+      // own outcome through the mutation callbacks, so it is not awaited here —
+      // catching it as well would toast every refusal twice.
       const asset = await uploadCourseAsset({ courseId, kind, file });
-      await update.mutateAsync({ id: lesson.id, assetId: asset.id });
-      toast.success(`${file.name} hochgeladen`);
+      update.mutate(
+        { id: lesson.id, assetId: asset.id },
+        { onSuccess: () => toast.success(`${file.name} hochgeladen`) },
+      );
     } catch (error) {
-      toast.error(learnRefusalMessage(error as Error) ?? friendlyErrorMessage(error as Error));
+      toast.error(
+        error instanceof CourseAssetUploadError
+          ? error.message
+          : friendlyErrorMessage(error as Error),
+      );
     } finally {
       setUploading(false);
     }
   };
 
+  // The asset path is relative to the API server, a different origin from the
+  // web app — the player prefixes it the same way.
+  const assetSrc = lesson.assetUrl ? `${env.VITE_SERVER_URL}${lesson.assetUrl}` : null;
+
   return (
     <section className="space-y-3">
       <h3 className="text-sm font-semibold">{lesson.kind === "video" ? "Video" : "Dokument"}</h3>
 
-      {lesson.assetUrl ? (
+      {assetSrc ? (
         lesson.kind === "video" ? (
-          <video src={lesson.assetUrl} controls className="w-full rounded-lg bg-black" />
+          <video
+            src={assetSrc}
+            controls
+            preload="metadata"
+            aria-label={`Video: ${lesson.title}`}
+            className="w-full rounded-lg bg-black"
+          />
         ) : (
           <a
-            href={lesson.assetUrl}
+            href={assetSrc}
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary flex items-center gap-2 text-sm underline"
@@ -576,6 +597,9 @@ function LessonAssetField({
             disabled={!storageEnabled || uploading || update.isPending}
             onChange={(event) => {
               const file = event.target.files?.[0];
+              // Cleared so that picking the same file again (after a failed
+              // upload) still fires `change`.
+              event.target.value = "";
               if (file) void handleFile(file);
             }}
           />
@@ -660,7 +684,7 @@ function QuizLessonEditor({
               bind.mutate({ id: lesson.id, content: value ? { quizId: value } : null })
             }
           >
-            <SelectTrigger id="lesson-quiz" disabled={!canAuthor}>
+            <SelectTrigger id="lesson-quiz" disabled={!canAuthor || bind.isPending}>
               <SelectValue placeholder="Kein Quiz verknüpft" />
             </SelectTrigger>
             <SelectContent>
@@ -676,7 +700,7 @@ function QuizLessonEditor({
           <Button
             type="button"
             variant="outline"
-            disabled={create.isPending}
+            disabled={create.isPending || bind.isPending}
             onClick={() => create.mutate({ courseId, title: lesson.title || "Neues Quiz" })}
           >
             <Plus className="size-4" aria-hidden />
@@ -784,11 +808,13 @@ function QuizQuestionsEditor({ quizId, canAuthor }: { quizId: string; canAuthor:
             placeholder="leer = unbegrenzt"
             onBlur={(event) => {
               const raw = event.target.value.trim();
-              const value = raw === "" ? null : Number.parseInt(raw, 10);
-              updateQuiz.mutate({
-                id: detail.quiz.id,
-                maxAttempts: value === null || !Number.isFinite(value) ? null : Math.max(1, value),
-              });
+              const parsed = raw === "" ? null : Number.parseInt(raw, 10);
+              const maxAttempts =
+                parsed === null || !Number.isFinite(parsed) ? null : Math.max(1, parsed);
+              // Every blur used to write, refetching the quiz on a mere tab-through.
+              if (maxAttempts !== detail.quiz.maxAttempts) {
+                updateQuiz.mutate({ id: detail.quiz.id, maxAttempts });
+              }
             }}
           />
         </div>
@@ -1020,6 +1046,7 @@ function QuizQuestionRow({
                 .split(",")
                 .map((entry) => entry.trim())
                 .filter(Boolean);
+              if (value.join(", ") === accepted) return;
               updateQuestion.mutate({
                 id: question.id,
                 acceptedAnswers: value.length ? value : null,
@@ -1135,6 +1162,13 @@ function AssignmentLessonEditor({
   );
 
   if (assignment.isPending) return <Skeleton className="h-40 w-full" />;
+  // Without this, a failed load fell through to "noch keine Aufgabenstellung"
+  // and offered to create a second brief for a lesson that already has one.
+  if (assignment.isError) {
+    return (
+      <QueryError compact error={assignment.error} onRetry={() => void assignment.refetch()} />
+    );
+  }
 
   if (!assignment.data) {
     return (
@@ -1432,7 +1466,7 @@ function AssignmentForm({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Arbeitsschritt „${task.title}" nach oben`}
+                      aria-label={`Arbeitsschritt „${task.title}“ nach oben`}
                       disabled={index === 0 || moveTask.isPending}
                       onClick={() =>
                         moveTask.mutate({
@@ -1449,7 +1483,7 @@ function AssignmentForm({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Arbeitsschritt „${task.title}" nach unten`}
+                      aria-label={`Arbeitsschritt „${task.title}“ nach unten`}
                       disabled={index === assignment.tasks.length - 1 || moveTask.isPending}
                       onClick={() =>
                         moveTask.mutate({
@@ -1464,7 +1498,7 @@ function AssignmentForm({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Arbeitsschritt „${task.title}" löschen`}
+                      aria-label={`Arbeitsschritt „${task.title}“ löschen`}
                       onClick={() => {
                         if (window.confirm("Diesen Arbeitsschritt und alle Antworten löschen?")) {
                           deleteTask.mutate({ id: task.id });
@@ -1525,10 +1559,3 @@ export const LESSON_KINDS: readonly LessonKind[] = [
   "quiz",
   "assignment",
 ];
-
-/** Shared row classes for the curriculum, so both editors stay in step. */
-export const lessonRowClass = (active: boolean) =>
-  cn(
-    "flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
-    active ? "bg-primary/10 text-primary font-medium" : "hover:bg-accent",
-  );

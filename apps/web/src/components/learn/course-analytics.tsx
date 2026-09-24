@@ -67,7 +67,9 @@ export function CourseAnalytics({ courseId, canGrade }: { courseId: string; canG
             ))}
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          // A `dl`, because `Counter` renders `dt`/`dd` pairs — outside a list
+          // of descriptions those are invalid markup and read as loose text.
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Counter label="Einschreibungen" value={overview.data.enrollmentCount} />
             <Counter label="Aktiv" value={overview.data.activeCount} />
             <Counter label="Abgeschlossen" value={overview.data.completedCount} />
@@ -102,7 +104,7 @@ export function CourseAnalytics({ courseId, canGrade }: { courseId: string; canG
               value={overview.data.awaitingGrading}
               hint="Abgaben, die auf eine Note warten"
             />
-          </div>
+          </dl>
         )}
       </section>
 
@@ -242,7 +244,7 @@ function Counter({ label, value, hint }: { label: string; value: string | number
     <Card className="gap-1 p-4">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="text-2xl font-semibold tabular-nums">{value}</dd>
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {hint ? <dd className="text-xs text-muted-foreground">{hint}</dd> : null}
     </Card>
   );
 }
