@@ -20,7 +20,7 @@
     "@better-auth/sso": "1.7.0-beta.10",
     "@nilovon-wiki/db": "workspace:*",
     "@nilovon-wiki/env": "workspace:*",
-    "@simplewebauthn/server": "13.3.2",
+    "@simplewebauthn/server": "14.0.2",
     "better-auth": "catalog:",
     "better-auth-localization": "^3.0.0",
     "dotenv": "catalog:",
