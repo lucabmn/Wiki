@@ -25,7 +25,7 @@ catalog:
   "@orpc/server": ^1.15.0
   "@orpc/openapi": ^1.15.0
   "@orpc/zod": ^1.15.0
-  better-auth: 1.7.0-beta.10
+  better-auth: 1.7.6
   evlog: ^2.26.0
   lucide-react: ^1.33.0
   next-themes: ^0.4.6
