@@ -15,9 +15,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@better-auth/passkey": "1.7.0-beta.10",
-    "@better-auth/scim": "1.7.0-beta.10",
-    "@better-auth/sso": "1.7.0-beta.10",
+    "@better-auth/passkey": "1.7.6",
+    "@better-auth/scim": "1.7.6",
+    "@better-auth/sso": "1.7.6",
     "@nilovon-wiki/db": "workspace:*",
     "@nilovon-wiki/env": "workspace:*",
     "@simplewebauthn/server": "13.3.2",
@@ -30,7 +30,7 @@
   "devDependencies": {
     "@nilovon-wiki/config": "workspace:*",
     "@types/nodemailer": "^8.0.1",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
