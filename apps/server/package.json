@@ -23,10 +23,10 @@
     "archiver": "^8.0.0",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "evlog": "catalog:",
     "hono": "catalog:",
-    "pdfkit": "^0.19.1",
+    "pdfkit": "^0.20.2",
     "zod": "catalog:"
   },
   "devDependencies": {
