@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.1",
+    "@hono/node-server": "^2.1.4",
     "@nilovon-wiki/api": "workspace:*",
     "@nilovon-wiki/auth": "workspace:*",
     "@nilovon-wiki/db": "workspace:*",
@@ -23,10 +23,10 @@
     "archiver": "^8.0.0",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.4",
     "evlog": "catalog:",
     "hono": "catalog:",
-    "pdfkit": "^0.19.1",
+    "pdfkit": "^0.20.2",
     "zod": "catalog:"
   },
   "devDependencies": {
