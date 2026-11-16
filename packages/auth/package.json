@@ -15,9 +15,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@better-auth/passkey": "1.7.18",
-    "@better-auth/scim": "1.7.18",
-    "@better-auth/sso": "1.7.18",
+    "@better-auth/passkey": "1.7.22",
+    "@better-auth/scim": "1.7.22",
+    "@better-auth/sso": "1.7.22",
     "@nilovon-wiki/db": "workspace:*",
     "@nilovon-wiki/env": "workspace:*",
     "@simplewebauthn/server": "13.3.2",
