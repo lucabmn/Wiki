@@ -31,8 +31,8 @@ catalogs:
       specifier: 1.7.18
       version: 1.7.18
     dotenv:
-      specifier: ^17.4.2
-      version: 17.4.2
+      specifier: ^18.0.10
+      version: 18.0.10
     evlog:
       specifier: ^2.35.1
       version: 2.35.1
@@ -84,7 +84,7 @@ importers:
         version: link:packages/env
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.10
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -246,7 +246,7 @@ importers:
         version: 6.0.3(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       nitro:
         specifier: ^3.0.260610-beta
-        version: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@18.0.10)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.4
@@ -294,13 +294,13 @@ importers:
         version: 1.7.18(@tanstack/react-start@1.169.4(esbuild@0.28.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.1.4)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(drizzle-kit@0.31.10)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@3.2.7(@types/debug@4.1.13)(@types/node@26.6.6)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.4.0))(lightningcss@1.33.0)(tsx@4.23.15)(yaml@2.9.1))
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.10
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1)
       evlog:
         specifier: 'catalog:'
-        version: 2.35.1(@orpc/server@1.16.1(crossws@0.4.17(srvx@1.0.8))(ws@8.22.1))(@tanstack/start-client-core@1.170.39)(hono@4.13.16)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(react@19.3.1)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 2.35.1(@orpc/server@1.16.1(crossws@0.4.17(srvx@1.0.8))(ws@8.22.1))(@tanstack/start-client-core@1.170.39)(hono@4.13.16)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@18.0.10)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(react@19.3.1)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       hono:
         specifier: 'catalog:'
         version: 4.13.16
@@ -503,10 +503,10 @@ importers:
         version: 1.7.18(@tanstack/react-start@1.169.4(esbuild@0.28.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.1.4)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(drizzle-kit@0.31.10)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@3.2.7(@types/debug@4.1.13)(@types/node@26.6.6)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.4.0))(lightningcss@1.33.0)(tsx@4.23.15)(yaml@2.9.1))
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.10
       evlog:
         specifier: 'catalog:'
-        version: 2.35.1(@orpc/server@1.16.1(crossws@0.4.17(srvx@1.0.8))(ws@8.22.1))(@tanstack/start-client-core@1.170.39)(hono@4.13.16)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(react@19.3.1)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 2.35.1(@orpc/server@1.16.1(crossws@0.4.17(srvx@1.0.8))(ws@8.22.1))(@tanstack/start-client-core@1.170.39)(hono@4.13.16)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@18.0.10)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(react@19.3.1)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       lucide-react:
         specifier: 'catalog:'
         version: 1.69.0(@types/react@19.3.0)(react@19.3.1)
@@ -518,7 +518,7 @@ importers:
         version: 0.4.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       nitro:
         specifier: ^3.0.260610-beta
-        version: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@18.0.10)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       qrcode.react:
         specifier: ^4.2.0
         version: 4.2.0(react@19.3.1)
@@ -621,7 +621,7 @@ importers:
         version: 1.16.1(@orpc/contract@1.16.1)(@orpc/server@1.16.1(crossws@0.4.17(srvx@1.0.8))(ws@8.22.1))(crossws@0.4.17(srvx@1.0.8))(ws@8.22.1)(zod@4.6.7)
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.10
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1)
@@ -676,7 +676,7 @@ importers:
         version: 3.0.0(c2825a680bc44a53bcc295171d55a548)
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.10
       nodemailer:
         specifier: ^9.0.5
         version: 9.0.5
@@ -712,7 +712,7 @@ importers:
         version: 3.3.0
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.10
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1)
@@ -798,7 +798,7 @@ importers:
         version: 0.13.11(typescript@7.0.2)(zod@4.6.7)
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.10
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -5101,6 +5101,11 @@ packages:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
 
+  dotenv@18.0.10:
+    resolution: {integrity: sha512-89FAA1xchzK2mxVWdr5F/0rldwiueXs6zJM86rO66EzekR1iBdiXRthyG+m5GvkJaFH3C2LESzamTkgndmLT2A==}
+    engines: {node: '>=12'}
+    hasBin: true
+
   drizzle-kit@0.31.10:
     resolution: {integrity: sha512-7OZcmQUrdGI+DUNNsKBn1aW8qSoKuTH7d0mYgSP8bAzdFzKoovxEFnoGQp2dVs82EOJeYycqRtciopszwUf8bw==}
     hasBin: true
@@ -7802,6 +7807,7 @@ packages:
 
   tldts-core@7.4.20:
     resolution: {integrity: sha512-C630TWXZCZmLq0F2bW4QqwnaaxCQ/svpAqvJwnC4JvgEM5ohhBnGsEzTLSOXcN+xjz+kEaHS5uoWIw2klnqd0A==}
+    deprecated: Partial release, see https://github.com/remusao/tldts/issues/2735. Use >=7.4.22.
 
   tldts@7.4.19:
     resolution: {integrity: sha512-48dH6aSpQnpbzDUc4vIQZ1VjB8tkK+e8c1yx05/SZK+rkssgjEOlxDd/yU8/a4vGYQ9vRgJr9dwMq9TJ0b3X2Q==}
@@ -12572,6 +12578,8 @@ snapshots:
 
   dotenv@17.4.2: {}
 
+  dotenv@18.0.10: {}
+
   drizzle-kit@0.31.10:
     dependencies:
       '@drizzle-team/brocli': 0.10.2
@@ -12830,12 +12838,12 @@ snapshots:
       eventsource-parser: 3.1.1
     optional: true
 
-  evlog@2.35.1(@orpc/server@1.16.1(crossws@0.4.17(srvx@1.0.8))(ws@8.22.1))(@tanstack/start-client-core@1.170.39)(hono@4.13.16)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(react@19.3.1)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
+  evlog@2.35.1(@orpc/server@1.16.1(crossws@0.4.17(srvx@1.0.8))(ws@8.22.1))(@tanstack/start-client-core@1.170.39)(hono@4.13.16)(nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@18.0.10)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(react@19.3.1)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
     optionalDependencies:
       '@orpc/server': 1.16.1(crossws@0.4.17(srvx@1.0.8))(ws@8.22.1)
       '@tanstack/start-client-core': 1.170.39
       hono: 4.13.16
-      nitro: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      nitro: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@18.0.10)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       react: 19.3.1
       vite: 8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
 
@@ -14293,7 +14301,7 @@ snapshots:
 
   nf3@0.3.19: {}
 
-  nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
+  nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@18.0.10)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
     dependencies:
       consola: 3.4.2
       crossws: 0.4.9(srvx@0.11.21)
@@ -14310,7 +14318,7 @@ snapshots:
       unenv: 2.0.0-rc.24
       unstorage: 2.0.0-alpha.7(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(db0@0.3.4(@electric-sql/pglite@0.5.4)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1)))(lru-cache@11.5.1)(ofetch@2.0.0-alpha.3)
     optionalDependencies:
-      dotenv: 17.4.2
+      dotenv: 18.0.10
       jiti: 2.7.0
       rollup: 4.62.2
       vite: 8.1.3(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
@@ -14346,7 +14354,7 @@ snapshots:
       - uploadthing
       - wrangler
 
-  nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@17.4.2)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
+  nitro@3.0.260610-beta(@electric-sql/pglite@0.5.4)(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(dotenv@18.0.10)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1))(jiti@2.7.0)(lru-cache@11.5.1)(rollup@4.62.2)(vite@8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
     dependencies:
       consola: 3.4.2
       crossws: 0.4.9(srvx@0.11.21)
@@ -14363,7 +14371,7 @@ snapshots:
       unenv: 2.0.0-rc.24
       unstorage: 2.0.0-alpha.7(@vercel/functions@3.11.0(@aws-sdk/credential-provider-web-identity@3.972.87)(ws@8.22.1))(aws4fetch@1.0.20)(chokidar@5.0.0)(db0@0.3.4(@electric-sql/pglite@0.5.4)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.4)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.3)(pg@8.23.1)))(lru-cache@11.5.1)(ofetch@2.0.0-alpha.3)
     optionalDependencies:
-      dotenv: 17.4.2
+      dotenv: 18.0.10
       jiti: 2.7.0
       rollup: 4.62.2
       vite: 8.1.3(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
