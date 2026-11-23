@@ -18,13 +18,13 @@
     "@nilovon-wiki/db": "workspace:*",
     "@nilovon-wiki/editor": "workspace:*",
     "@nilovon-wiki/env": "workspace:*",
-    "@tiptap/core": "^3.33.0",
-    "@vercel/functions": "^3.11.0",
+    "@tiptap/core": "^3.34.0",
+    "@vercel/functions": "^3.11.3",
     "drizzle-orm": "^0.45.4",
     "evlog": "catalog:",
     "ioredis": "~6.0.0",
     "tsx": "^4.23.15",
-    "ws": "^8.22.1",
+    "ws": "^8.23.0",
     "yjs": "^13.6.33"
   },
   "devDependencies": {
