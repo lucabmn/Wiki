@@ -9,7 +9,7 @@ FROM minio/mc:RELEASE.2025-08-13T08-35-41Z AS mc
 
 # Same major version as the `postgres` service in docker-compose.yml. pg_dump
 # refuses to dump a server newer than itself, so these two move together.
-FROM postgres:18
+FROM postgres:19
 
 # `openssl` for the optional at-rest encryption of a recovery set. Everything
 # else (pg_dump, psql, gzip, tar, find, sha256sum) is already in the base image.
